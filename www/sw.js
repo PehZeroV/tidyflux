@@ -13,7 +13,6 @@ const URLS_TO_CACHE = [
   '/css/article.css',
   '/css/modals.css',
   '/css/auth.css',
-  '/api.js',
   '/js/main.js',
   '/js/state.js',
   '/js/dom.js',

@@ -36,21 +36,20 @@ cat "$ROOT_DIR/www/css/variables.css" \
     "$ROOT_DIR/www/css/responsive.css" \
     "$ROOT_DIR/www/css/force-dark.css" \
     "$ROOT_DIR/www/css/force-light.css" \
-    | esbuild --loader=css --minify > "$DIST_DIR/www/style.css"
+    | esbuild --loader=css --minify > "$DIST_DIR/www/style-${BUILD_VERSION}.css"
 
 echo "📜 压缩 JavaScript..."
-# 打包并压缩主应用 JS（保持原名 main.js 的入口）
-esbuild "$ROOT_DIR/www/js/main.js" --bundle --minify --outfile="$DIST_DIR/www/js/main.js" --format=esm
+# 打包并压缩主应用 JS (带版本号)
+esbuild "$ROOT_DIR/www/js/main.js" --bundle --minify --outfile="$DIST_DIR/www/js/main-${BUILD_VERSION}.js" --format=esm
 
-# 压缩 api.js（保持原名）
-esbuild "$ROOT_DIR/www/api.js" --minify --outfile="$DIST_DIR/www/api.js"
+
 
 # 复制独立库文件
 mkdir -p "$DIST_DIR/www/js/lib"
 cp "$ROOT_DIR/www/js/lib/howler.min.js" "$DIST_DIR/www/js/lib/howler.min.js"
 
-# Copy theme-init.js
-cp "$ROOT_DIR/www/js/theme-init.js" "$DIST_DIR/www/js/theme-init.js"
+# Copy theme-init.js (with version)
+cp "$ROOT_DIR/www/js/theme-init.js" "$DIST_DIR/www/js/theme-init-${BUILD_VERSION}.js"
 
 # 处理 Service Worker (复制并更新缓存列表)
 echo "⚡ 处理 Service Worker..."
@@ -65,10 +64,9 @@ const buildVersion = process.argv[3];
 const prodCacheList = [
   '/',
   '/index.html',
-  `/style.css?v=${buildVersion}`,
-  `/api.js?v=${buildVersion}`,
-  `/js/main.js?v=${buildVersion}`,
-  `/js/theme-init.js?v=${buildVersion}`,
+  `/style-${buildVersion}.css`,
+  `/js/main-${buildVersion}.js`,
+  `/js/theme-init-${buildVersion}.js`,
   '/js/lib/howler.min.js',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
@@ -106,8 +104,11 @@ JS_EOF
 node "$ROOT_DIR/update_sw.js" "$DIST_DIR/www/sw.js" "$BUILD_VERSION"
 rm "$ROOT_DIR/update_sw.js"
 
-echo "📄 复制 index.html..."
-cp "$ROOT_DIR/www/index.html" "$DIST_DIR/www/index.html"
+echo "📄 处理 index.html..."
+# Copy and Rewrite index.html references
+sed "s|/style.css|/style-${BUILD_VERSION}.css|g" "$ROOT_DIR/www/index.html" | \
+sed "s|/js/main.js|/js/main-${BUILD_VERSION}.js|g" | \
+sed "s|/js/theme-init.js|/js/theme-init-${BUILD_VERSION}.js|g" > "$DIST_DIR/www/index.html"
 
 # 复制静态资源
 echo "📁 复制静态资源..."
