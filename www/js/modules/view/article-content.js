@@ -55,7 +55,18 @@ export const ArticleContentView = {
 
         const queryString = params.toString();
         const hash = queryString ? `#/article/${articleId}?${queryString}` : `#/article/${articleId}`;
-        window.location.hash = hash;
+
+        // If already viewing an article, replace current history entry so "Back" goes to list
+        if (window.location.hash.startsWith('#/article/')) {
+            window.location.replace(hash);
+        } else {
+            window.location.hash = hash;
+        }
+
+        // Sync list view scroll position
+        if (typeof ArticlesView !== 'undefined') {
+            ArticlesView.scrollToArticle(articleId);
+        }
     },
 
     /**
@@ -180,6 +191,7 @@ export const ArticleContentView = {
         // 显示加载状态
         DOMElements.articleContent.innerHTML = `<div class="loading" style="padding: 40px; text-align: center;">${i18n.t('common.loading')}</div>`;
         DOMElements.articleContent.scrollTop = 0;
+        this.clearNavButtons();
 
         if (window.innerWidth <= 1100) {
             vm.showPanel('content');
@@ -273,9 +285,11 @@ export const ArticleContentView = {
             <div class="article-body digest-body" style="margin-top: 24px; line-height: 1.8;">
                 ${renderedContent}
             </div>
+
         `;
 
         this.bindDigestToolbarEvents();
+        this.updateNavButtons(digest.id);
     },
 
     /**
@@ -406,10 +420,12 @@ export const ArticleContentView = {
             <div class="article-body" style="margin-top: 24px; line-height: 1.8;">
                 ${content}
             </div>
+
         `;
 
         this.enhanceCodeBlocks();
         this.bindArticleToolbarEvents(article);
+        this.updateNavButtons(article.id);
     },
 
     /**
@@ -427,21 +443,17 @@ export const ArticleContentView = {
         if (backBtn) {
             backBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (window.innerWidth <= 800) {
-                    requestAnimationFrame(() => {
-                        vm.isProgrammaticNav = true;
-                        history.back();
-                    });
+                // Always return to the parent list view explicitly
+                if (AppState.viewingDigests) {
+                    window.location.hash = '#/digests';
+                } else if (AppState.currentGroupId) {
+                    window.location.hash = `#/group/${AppState.currentGroupId}`;
+                } else if (AppState.currentFeedId) {
+                    window.location.hash = `#/feed/${AppState.currentFeedId}`;
+                } else if (AppState.viewingFavorites) {
+                    window.location.hash = '#/favorites';
                 } else {
-                    if (AppState.currentGroupId) {
-                        window.location.hash = `#/group/${AppState.currentGroupId}`;
-                    } else if (AppState.currentFeedId) {
-                        window.location.hash = `#/feed/${AppState.currentFeedId}`;
-                    } else if (AppState.viewingFavorites) {
-                        window.location.hash = '#/favorites';
-                    } else {
-                        window.location.hash = '#/all';
-                    }
+                    window.location.hash = '#/all';
                 }
             });
         }
@@ -1179,5 +1191,103 @@ export const ArticleContentView = {
                 allCountEl.remove();
             }
         }
-    }
+    },
+
+    /**
+    * 清除导航按钮
+    */
+    clearNavButtons() {
+        if (!DOMElements.contentPanel) return;
+        const container = DOMElements.contentPanel.querySelector('.article-nav-btns');
+        if (container) {
+            container.remove();
+        }
+    },
+
+    /**
+     * 更新导航按钮
+     * @param {string|number} currentId
+     */
+    /**
+     * 更新导航按钮
+     * @param {string|number} currentId
+     */
+    updateNavButtons(currentId) {
+        // 先清除旧的
+        this.clearNavButtons();
+
+        if (!AppState.articles || AppState.articles.length <= 1) return;
+
+        const currentIndex = AppState.articles.findIndex(a => a.id == currentId);
+        if (currentIndex === -1) return;
+
+        const prevId = currentIndex > 0 ? AppState.articles[currentIndex - 1].id : null;
+        const nextId = currentIndex < AppState.articles.length - 1 ? AppState.articles[currentIndex + 1].id : null;
+        const canLoadMore = !nextId && AppState.pagination && AppState.pagination.hasMore;
+
+        if (!prevId && !nextId && !canLoadMore) return;
+
+        const container = document.createElement('div');
+        container.className = 'article-nav-btns';
+
+        let html = '';
+        if (prevId) {
+            html += `<button class="article-nav-btn" data-nav-id="${prevId}" title="上一篇">${Icons.arrow_back}</button>`;
+        }
+        if (nextId) {
+            html += `<button class="article-nav-btn" data-nav-id="${nextId}" title="下一篇">${Icons.arrow_forward}</button>`;
+        } else if (canLoadMore) {
+            html += `<button class="article-nav-btn load-more-nav-btn" title="加载更多">${Icons.arrow_forward}</button>`;
+        }
+
+        container.innerHTML = html;
+        if (DOMElements.contentPanel) {
+            DOMElements.contentPanel.appendChild(container); // Move to contentPanel to avoid scrolling
+        }
+
+        // 绑定事件
+        const btns = container.querySelectorAll('.article-nav-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (btn.classList.contains('load-more-nav-btn')) {
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = Icons.spinner; // Show loading spinner
+                    btn.style.pointerEvents = 'none';
+
+                    try {
+                        await ArticlesView.loadMoreArticles();
+                        // Articles loaded, find the next article from updated AppState
+                        // AppState.articles updated in place
+                        const updatedIndex = AppState.articles.findIndex(a => a.id == currentId);
+                        if (updatedIndex !== -1 && updatedIndex < AppState.articles.length - 1) {
+                            const newNextId = AppState.articles[updatedIndex + 1].id;
+                            this.selectArticle(newNextId);
+                        } else {
+                            // Failed to find next article or still at end? Restore button
+                            btn.innerHTML = originalHtml;
+                            btn.style.pointerEvents = 'auto';
+                            showToast(i18n.t('article.no_more_articles') || '没有更多文章了');
+                        }
+                    } catch (err) {
+                        console.error('Auto load next failed:', err);
+                        btn.innerHTML = originalHtml;
+                        btn.style.pointerEvents = 'auto';
+                    }
+                    return;
+                }
+
+                const id = btn.dataset.navId;
+                if (id) {
+                    this.selectArticle(id);
+                }
+            });
+        });
+    },
+
+
+
+
 };

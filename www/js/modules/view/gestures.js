@@ -11,7 +11,7 @@ import { AppState } from '../../state.js';
  */
 const GESTURE_CONFIG = {
     SWIPE_THRESHOLD: 50,      // 最小滑动距离判定
-    EDGE_SIZE: 25,            // 边缘判定范围 (px)
+    EDGE_SIZE: 25,            // 边缘屏蔽区域 (px) - 原生手势保留区
     VELOCITY_THRESHOLD: 0.3,  // 最小爆发速度 (px/ms)
     MOVEMENT_THRESHOLD: 10,   // 开始滑动判定阈值
     QUICK_SWIPE_MIN: 20       // 结合速度判定的最小距离

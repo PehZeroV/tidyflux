@@ -13,6 +13,7 @@ import { API_ENDPOINTS } from '../../constants.js';
 
 const STORAGE_KEY_COLLAPSED = 'tidyflux_collapsed_groups';
 const STORAGE_KEY_PINNED = 'tidyflux_pinned_groups';
+const DEFAULT_ICON = '/icons/rss.svg';
 
 /**
  * 订阅源视图管理
@@ -20,6 +21,9 @@ const STORAGE_KEY_PINNED = 'tidyflux_pinned_groups';
 export const FeedsView = {
     /** 视图管理器引用 */
     viewManager: null,
+
+    /** IntersectionObserver for lazy loading feed icons */
+    _iconObserver: null,
 
     /**
      * 初始化模块
@@ -281,9 +285,10 @@ export const FeedsView = {
      */
     renderFeedItem(feed) {
         const unread = feed.unread_count || 0;
+        // Use data-src for lazy loading with IntersectionObserver
         return `
             <button class="feed-item-btn ${AppState.currentFeedId === feed.id ? 'active' : ''}" data-feed-id="${feed.id}">
-                <img class="feed-icon" src="${API_ENDPOINTS.FAVICON.BASE}?feedId=${feed.id}&v=1" loading="lazy" decoding="async" alt="">
+                <img class="feed-icon" src="${DEFAULT_ICON}" data-src="${API_ENDPOINTS.FAVICON.BASE}?feedId=${feed.id}" decoding="async" alt="">
                 <span class="feed-name">${feed.title || i18n.t('common.unnamed')}</span>
                 ${unread > 0 ? `<span class="feed-unread-count">${unread}</span>` : ''}
             </button>
@@ -297,10 +302,13 @@ export const FeedsView = {
         const vm = this.viewManager;
         const listEl = DOMElements.feedsList;
 
+        // Setup IntersectionObserver for lazy loading feed icons
+        this._setupIconObserver(listEl);
+
         // Favicon 加载失败回退（使用 capture 捕获 error 事件）
         listEl.addEventListener('error', (e) => {
             if (e.target.tagName === 'IMG' && e.target.classList.contains('feed-icon')) {
-                e.target.src = '/icons/rss.svg';
+                e.target.src = DEFAULT_ICON;
                 e.target.onerror = null; // Prevent infinite loop if fallback also fails
             }
         }, true);
@@ -615,5 +623,43 @@ export const FeedsView = {
         } catch (err) {
             console.error('Save pinned state error:', err);
         }
+    },
+
+    /**
+     * Setup IntersectionObserver for lazy loading feed icons
+     * @param {HTMLElement} container - The scrollable container element
+     */
+    _setupIconObserver(container) {
+        // Disconnect existing observer if any
+        if (this._iconObserver) {
+            this._iconObserver.disconnect();
+        }
+
+        // Create new observer with the feeds list as root
+        this._iconObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const dataSrc = img.dataset.src;
+                        if (dataSrc && img.src !== dataSrc) {
+                            img.src = dataSrc;
+                        }
+                        // Stop observing once loaded
+                        this._iconObserver.unobserve(img);
+                    }
+                });
+            },
+            {
+                root: DOMElements.feedsPanel, // Use feeds panel as scroll container
+                rootMargin: '50px', // Load slightly before entering viewport
+                threshold: 0
+            }
+        );
+
+        // Observe all feed icons with data-src
+        container.querySelectorAll('img.feed-icon[data-src]').forEach(img => {
+            this._iconObserver.observe(img);
+        });
     }
 };

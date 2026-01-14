@@ -69,7 +69,7 @@ export const DigestScheduler = {
                         continue;
                     }
 
-                    const minifluxClient = getMinifluxClient();
+                    const minifluxClient = await getMinifluxClient();
                     if (!minifluxClient) {
                         console.error(`Skipping digest for ${userId}: Miniflux client not available.`);
                         continue;

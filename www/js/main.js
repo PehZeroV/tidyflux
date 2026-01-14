@@ -60,6 +60,16 @@ function handleForceSettings() {
 
 document.addEventListener('DOMContentLoaded', initApp);
 
+// 处理 BFCache (Back-Forward Cache) 恢复
+// 当页面从 BFCache 恢复时，JavaScript 状态可能不同步，需要强制刷新
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        // 页面是从 BFCache 恢复的
+        console.log('Page restored from BFCache, reloading to ensure state consistency...');
+        window.location.reload();
+    }
+});
+
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     registerServiceWorker();

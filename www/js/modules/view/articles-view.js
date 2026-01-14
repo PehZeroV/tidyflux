@@ -601,6 +601,30 @@ export const ArticlesView = {
     },
 
     /**
+     * 滚动到指定文章
+     * @param {string|number} articleId 
+     */
+    scrollToArticle(articleId) {
+        if (!articleId) return;
+
+        if (this.useVirtualScroll && this.virtualList) {
+            this.virtualList.scrollToItem(articleId);
+            this.virtualList.updateActiveItem(articleId);
+        } else {
+            const el = DOMElements.articlesList.querySelector(`.article-item[data-id="${articleId}"]`);
+            if (el) {
+                // 如果使用普通滚动，确保它在视口内
+                el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+                // 更新激活状态
+                DOMElements.articlesList.querySelectorAll('.article-item.active').forEach(item => {
+                    item.classList.remove('active');
+                });
+                el.classList.add('active');
+            }
+        }
+    },
+
+    /**
      * 启动新文章轮询
      */
     startNewArticlesPoller() {

@@ -203,7 +203,7 @@ export class VirtualList {
 
         for (let i = 0; i < this.items.length; i++) {
             this.itemPositions.push(currentTop);
-            const height = this.itemHeights.get(this.items[i].id) || this.estimatedItemHeight;
+            const height = this.itemHeights.get(String(this.items[i].id)) || this.estimatedItemHeight;
             currentTop += height;
         }
 
@@ -239,7 +239,8 @@ export class VirtualList {
     setItems(items) {
         this.items = items;
         // 保留已知高度，只清除不存在的 item
-        const newIds = new Set(items.map(i => i.id));
+        // 使用字符串类型的 ID 以与 itemResizeObserver 保持一致
+        const newIds = new Set(items.map(i => String(i.id)));
         for (const id of this.itemHeights.keys()) {
             if (!newIds.has(id)) {
                 this.itemHeights.delete(id);
@@ -433,7 +434,8 @@ export class VirtualList {
 
         // 差量更新 DOM
         const visibleItems = this.items.slice(this.startIndex, this.endIndex);
-        const visibleIds = new Set(visibleItems.map(item => item.id));
+        // 确保使用字符串类型的 ID，避免类型不匹配导致的比较失败
+        const visibleIds = new Set(visibleItems.map(item => String(item.id)));
 
         // 移除不再可见的项
         for (const [id, el] of this.renderedItems) {
@@ -449,12 +451,13 @@ export class VirtualList {
         // 创建新元素
         const newElements = [];
         visibleItems.forEach((item, idx) => {
-            if (!this.renderedItems.has(item.id)) {
+            const itemIdStr = String(item.id);
+            if (!this.renderedItems.has(itemIdStr)) {
                 const el = this.createItemElement(item, this.startIndex + idx);
-                this.renderedItems.set(item.id, el);
+                this.renderedItems.set(itemIdStr, el);
                 newElements.push({ el, idx, item });
             } else {
-                const el = this.renderedItems.get(item.id);
+                const el = this.renderedItems.get(itemIdStr);
                 const isActive = activeId && item.id == activeId;
                 el.classList.toggle('active', isActive);
                 el.classList.toggle('unread', !item.is_read);
@@ -472,7 +475,7 @@ export class VirtualList {
                     let inserted = false;
 
                     for (let i = idx + 1; i < visibleItems.length; i++) {
-                        const refEl = this.renderedItems.get(visibleItems[i].id);
+                        const refEl = this.renderedItems.get(String(visibleItems[i].id));
                         if (refEl && refEl.parentNode === this.contentEl) {
                             this.contentEl.insertBefore(el, refEl);
                             inserted = true;
@@ -482,7 +485,7 @@ export class VirtualList {
 
                     if (!inserted) {
                         for (let i = idx - 1; i >= 0; i--) {
-                            const refEl = this.renderedItems.get(visibleItems[i].id);
+                            const refEl = this.renderedItems.get(String(visibleItems[i].id));
                             if (refEl && refEl.parentNode === this.contentEl) {
                                 if (refEl.nextSibling) {
                                     this.contentEl.insertBefore(el, refEl.nextSibling);
@@ -640,5 +643,30 @@ export class VirtualList {
         }
         this.scrollTop = this.container.scrollTop;
         this.render();
+    }
+
+    scrollToItem(id) {
+        const index = this.items.findIndex(item => item.id == id);
+        if (index === -1) return;
+
+        // Ensure positions are calculated
+        if (this.itemPositions.length === 0) {
+            this.calculatePositions();
+        }
+
+        const top = this.itemPositions[index];
+        const height = this.itemHeights.get(id) || this.estimatedItemHeight;
+
+        // 如果该项已经在视口内，则微调或不滚动
+        const containerHeight = this.container.clientHeight;
+        const currentScrollTop = this.container.scrollTop;
+
+        // 简单策略：让它尽量居中或者顶部可见
+        // 都在视口内则不动，否则滚动到顶部
+        if (top < currentScrollTop || (top + height) > (currentScrollTop + containerHeight)) {
+            this.container.scrollTop = top;
+            this.scrollTop = top;
+            this.render();
+        }
     }
 }

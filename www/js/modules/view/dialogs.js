@@ -15,6 +15,19 @@ import { AIService, AI_LANGUAGES } from '../ai-service.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { Icons } from '../icons.js';
 
+// UUID 生成辅助函数（兼容旧版浏览器）
+function generateUUID() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 /**
  * 对话框管理
  */
@@ -959,7 +972,7 @@ export const Dialogs = {
                     </div>
 
                     <div class="appearance-mode-group">
-                        <button type="submit" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('settings.save')}</button>
+                        <button type="submit" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('common.save')}</button>
                     </div>
                     <div id="schedule-msg" style="text-align: center; margin-top: 12px; font-size: 0.85em;"></div>
                     
@@ -1094,7 +1107,7 @@ export const Dialogs = {
 
                     // Save immediately
                     try {
-                        await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
+                        const response = await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -1105,6 +1118,9 @@ export const Dialogs = {
                                 value: allSchedules
                             })
                         });
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
                         // Re-render
                         renderOtherTasks();
                     } catch (err) {
@@ -1294,7 +1310,7 @@ export const Dialogs = {
             if (isTwiceDaily) {
                 // Task 1
                 newTasks.push({
-                    id: crypto.randomUUID(),
+                    id: generateUUID(),
                     scope: scope,
                     scopeId: scopeId,
                     feedId: scope === 'feed' ? scopeId : null,
@@ -1310,7 +1326,7 @@ export const Dialogs = {
                 const nextTime = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
                 newTasks.push({
-                    id: crypto.randomUUID(),
+                    id: generateUUID(),
                     scope: scope,
                     scopeId: scopeId,
                     feedId: scope === 'feed' ? scopeId : null,
@@ -1323,7 +1339,7 @@ export const Dialogs = {
             } else {
                 // Task 1 (Once)
                 newTasks.push({
-                    id: crypto.randomUUID(),
+                    id: generateUUID(),
                     scope: scope,
                     scopeId: scopeId,
                     feedId: scope === 'feed' ? scopeId : null,
@@ -1347,7 +1363,7 @@ export const Dialogs = {
             const finalTasks = [...otherTasks, ...newTasks];
 
             try {
-                await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
+                const response = await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1358,6 +1374,9 @@ export const Dialogs = {
                         value: finalTasks
                     })
                 });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 msgEl.textContent = `✓ ${i18n.t('settings.save_success')}`;
                 msgEl.style.color = 'var(--accent-color)';
                 setTimeout(close, 1000);
@@ -1366,7 +1385,7 @@ export const Dialogs = {
                 msgEl.textContent = i18n.t('ai.api_error');
                 msgEl.style.color = 'var(--danger-color)';
                 submitBtn.disabled = false;
-                submitBtn.textContent = i18n.t('settings.save');
+                submitBtn.textContent = i18n.t('common.save');
             }
         });
     },

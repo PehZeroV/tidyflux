@@ -234,6 +234,7 @@ export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showL
         toast.onclick = () => {
             onClick();
             toast.style.opacity = '0';
+            toast.style.pointerEvents = 'none';
             if (toastTimeout) clearTimeout(toastTimeout);
         };
     } else {
@@ -243,6 +244,7 @@ export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showL
     if (toastTimeout) clearTimeout(toastTimeout);
     toastTimeout = setTimeout(() => {
         toast.style.opacity = '0';
+        toast.style.pointerEvents = 'none';
     }, duration);
 }
 
