@@ -56,16 +56,6 @@ router.post('/chat', authenticateToken, async (req, res) => {
                 signal: controller.signal
             });
         } finally {
-            // 如果不是流式，或者是流式但请求很快失败，我们应该清除超时。
-            // 但对于流式，如果在传输过程中超时，controller 会中止连接。
-            // fetch promise 完成只意味着收到了 headers。
-            // 对于流式响应，我们可能希望保持超时直到流结束？
-            // 或者仅仅是连接超时？
-            // 通常 fetch 的 signal 控制整个请求生命周期。
-            // 如果我们在这里 clearTimeout，流式传输将不再受此超时限制（这是对的，因为生成可能很久）。
-            // 但如果流式传输卡住怎么办？
-            // 简单起见，我们仅在获取到响应头后清除连接超时。
-            // 更复杂的实现可能需要监控流的活动。
             clearTimeout(timeout);
         }
 

@@ -398,6 +398,7 @@ export const ViewManager = {
     async loadArticles(feedId, groupId = null) {
         await ArticlesView.loadArticles(feedId, groupId);
         this._syncStateToModules();
+        this.refreshFeedCounts();
     },
 
     renderArticlesList(articles) {
@@ -436,6 +437,8 @@ export const ViewManager = {
             AppState.groups = groups;
             // Store digests count/metadata if needed? No, pass it to view
             this.updateFeedUnreadCounts(digests && digests.digests ? digests.digests : null);
+
+            await ArticlesView.checkUnreadDigestsAndShowToast(digests);
         } catch (err) {
             console.debug('Refresh feed counts failed', err);
         }
@@ -624,12 +627,37 @@ export const ViewManager = {
             this.showSettingsDialog();
         });
 
-        DOMElements.scrollToTopBtn?.addEventListener('click', (e) => {
+        DOMElements.scrollToTopBtn?.addEventListener('click', async (e) => {
             e.stopPropagation();
-            DOMElements.articlesList?.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
+
+            // 1. 立即回到顶部 (提供即时反馈)
+            if (DOMElements.articlesList) {
+                if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                    ArticlesView.virtualList.setScrollTop(0);
+                    ArticlesView.virtualList.render();
+                } else {
+                    DOMElements.articlesList.scrollTop = 0;
+                }
+            }
+
+            // 2. 如果是搜索模式，仅回到顶部，不刷新（保留搜索上下文）
+            if (AppState.isSearchMode) return;
+
+            // 3. 强制刷新当前列表
+            this.forceRefreshList = true;
+
+            // 显示加载状态（可选，也可以依赖 loadArticles 的处理）
+            // DOMElements.articlesList.innerHTML = `<div class="loading">${i18n.t('common.loading')}</div>`;
+
+            if (AppState.viewingDigests) {
+                await this._renderDigests();
+            } else if (AppState.viewingFavorites) {
+                await this._renderFavorites();
+            } else if (AppState.currentGroupId) {
+                await this._renderGroup(AppState.currentGroupId);
+            } else {
+                await this._renderFeed(AppState.currentFeedId);
+            }
         });
 
         document.getElementById('articles-search-btn')?.addEventListener('click', () => {

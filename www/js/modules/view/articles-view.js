@@ -143,7 +143,7 @@ export const ArticlesView = {
 
         this.renderArticlesList(articlesResult.articles);
         this.startNewArticlesPoller();
-        this.checkUnreadDigestsAndShowToast();
+        // this.checkUnreadDigestsAndShowToast(); // Handled by ViewManager
         this.preloadNextPage();
     },
 
@@ -652,28 +652,21 @@ export const ArticlesView = {
         // 搜索模式下不检查新文章，避免将新文章插入搜索结果
         if (AppState.isSearchMode) return;
 
-        // 移动端：只在列表页且停止滚动时才检测新文章
+        // 如果列表不是处于顶部，暂停自动更新，防止列表抖动
+        // 尤其是在虚拟列表中，未渲染的新增项高度只能估算，会导致滚动位置计算偏差
+        if (DOMElements.articlesList.scrollTop > 10) {
+            return;
+        }
+
+        // 移动端：只在列表页才检测新文章
         if (isMobileDevice()) {
             const hash = window.location.hash;
             const isArticlePage = hash.startsWith('#/article/');
             const isFeedsPage = hash === '#/feeds';
-            const isListPage = !isArticlePage && !isFeedsPage;
 
             // 文章页和订阅源页完全跳过检测
             if (isArticlePage || isFeedsPage) {
                 console.debug('Skip new articles check: not on list page (mobile)');
-                return;
-            }
-
-            // 列表页：只有停止滚动时才检测
-            if (isListPage && this.isScrolling) {
-                console.debug('Skip new articles check: user is scrolling (mobile)');
-                return;
-            }
-        } else {
-            // 桌面端：滚动时跳过检测
-            if (this.isScrolling) {
-                console.debug('Skip new articles check: user is scrolling');
                 return;
             }
         }
@@ -870,13 +863,17 @@ export const ArticlesView = {
 
     /**
      * Check for unread digests and show toast
+     * @param {Object} prefetchedResult
      */
-    async checkUnreadDigestsAndShowToast() {
+    async checkUnreadDigestsAndShowToast(prefetchedResult = null) {
         if (AppState.viewingDigests) return;
 
         try {
             // Only check if we are not already viewing digests
-            const result = await FeedManager.getDigests({ unreadOnly: true });
+            let result = prefetchedResult;
+            if (!result) {
+                result = await FeedManager.getDigests({ unreadOnly: true });
+            }
             if (!result || !result.digests) return;
 
             const pinned = result.digests.pinned || [];
