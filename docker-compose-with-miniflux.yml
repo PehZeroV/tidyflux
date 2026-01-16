@@ -12,7 +12,7 @@ services:
       - RUN_MIGRATIONS=1
       - CREATE_ADMIN=1
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin # CHANGE THIS: Set a secure password for your Miniflux admin account
+      - ADMIN_PASSWORD=password # CHANGE THIS: Set a secure password for your Miniflux admin account
       - DATABASE_URL=postgres://miniflux:secret@db/miniflux?sslmode=disable
       - POLLING_FREQUENCY=60
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
       # Auto-connect to the local Miniflux instance
       - MINIFLUX_URL=http://miniflux:8080
       - MINIFLUX_USERNAME=admin
-      - MINIFLUX_PASSWORD=admin # CHANGE THIS: Must match the ADMIN_PASSWORD set above
+      - MINIFLUX_PASSWORD=password # CHANGE THIS: Must match the ADMIN_PASSWORD set above
     volumes:
       - tidyflux_data:/app/server/data
     restart: unless-stopped
