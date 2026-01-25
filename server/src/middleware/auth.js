@@ -2,13 +2,47 @@ import jwt from 'jsonwebtoken';
 import { MinifluxClient } from '../miniflux.js';
 import { MinifluxConfigStore } from '../utils/miniflux-config-store.js';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
-const TOKEN_EXPIRATION = process.env.TOKEN_EXPIRATION || '7d';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-if (!process.env.JWT_SECRET) {
-    console.warn('WARNING: JWT_SECRET is not set in environment variables. Using a random secret. Sessions will be invalidated on server restart.');
+const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../../data');
+const JWT_SECRET_FILE = path.join(DATA_DIR, '.jwt-secret');
+const TOKEN_EXPIRATION = process.env.TOKEN_EXPIRATION || '365d';
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+// 获取或生成持久化的 JWT_SECRET
+function getJwtSecret() {
+    // 优先使用环境变量
+    if (process.env.JWT_SECRET) {
+        return process.env.JWT_SECRET;
+    }
+
+    // 尝试从文件读取
+    if (fs.existsSync(JWT_SECRET_FILE)) {
+        return fs.readFileSync(JWT_SECRET_FILE, 'utf8').trim();
+    }
+
+    // 生成新的密钥并持久化
+    const newSecret = crypto.randomBytes(64).toString('hex');
+    try {
+        fs.writeFileSync(JWT_SECRET_FILE, newSecret, { mode: 0o600 });
+        console.log('Generated and persisted new JWT secret.');
+    } catch (error) {
+        console.error('Failed to persist JWT secret:', error);
+        console.warn('WARNING: Using temporary JWT secret. Sessions will be invalidated on server restart.');
+    }
+    return newSecret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 // 缓存 MinifluxClient 单例实例
 let minifluxClientInstance = null;
