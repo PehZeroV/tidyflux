@@ -2145,3 +2145,104 @@ body.dialog-open #app-container {
         bottom: calc(20px + env(safe-area-inset-bottom) + 60px);
     }
 }
+
+/* ========================================
+   下拉刷新样式
+   ======================================== */
+
+.ptr-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding-bottom: 10px;
+    opacity: 0;
+    transform: translateY(-60px);
+    pointer-events: none;
+    z-index: 5;
+    color: var(--meta-color);
+}
+
+.ptr-indicator.ptr-visible {
+    opacity: 1;
+}
+
+.ptr-spinner {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ptr-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--accent-color);
+    transition: transform 0.2s ease;
+}
+
+.ptr-loading {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.ptr-indicator.ptr-refreshing .ptr-icon {
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+.ptr-indicator.ptr-refreshing .ptr-loading {
+    opacity: 1;
+    animation: ptr-spin 0.8s linear infinite;
+}
+
+.ptr-loading circle {
+    stroke-dasharray: 80, 200;
+    stroke-dashoffset: 0;
+    stroke-linecap: round;
+    animation: ptr-dash 1.5s ease-in-out infinite;
+    transform-origin: center;
+}
+
+@keyframes ptr-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes ptr-dash {
+    0% {
+        stroke-dasharray: 1, 200;
+        stroke-dashoffset: 0;
+    }
+    50% {
+        stroke-dasharray: 80, 200;
+        stroke-dashoffset: -40;
+    }
+    100% {
+        stroke-dasharray: 1, 200;
+        stroke-dashoffset: -120;
+    }
+}
+
+.ptr-text {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: var(--meta-color);
+    user-select: none;
+    opacity: 0.8;
+}

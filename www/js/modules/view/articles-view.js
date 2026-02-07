@@ -8,6 +8,7 @@ import { Icons } from '../icons.js';
 import { Modal } from './components.js';
 import { AuthManager } from '../auth-manager.js';
 import { Dialogs } from './dialogs.js';
+import { PullToRefresh } from '../pull-to-refresh.js';
 
 /**
  * 列表判定与功能常量配置
@@ -56,6 +57,8 @@ export const ArticlesView = {
     _scrollReadPendingIds: new Set(),
     /** 滚动标记已读批量处理定时器 */
     _scrollReadBatchTimer: null,
+    /** 下拉刷新实例 */
+    pullToRefresh: null,
 
 
     /**
@@ -64,6 +67,14 @@ export const ArticlesView = {
      */
     init(viewManager) {
         this.viewManager = viewManager;
+        
+        // 初始化下拉刷新
+        if (DOMElements.articlesList) {
+            this.pullToRefresh = new PullToRefresh(
+                DOMElements.articlesList,
+                this.handlePullToRefresh.bind(this)
+            );
+        }
     },
 
     /**
@@ -1060,6 +1071,34 @@ export const ArticlesView = {
         
         if (!response.ok) {
             throw new Error('Failed to delete digest');
+        }
+    },
+
+    /**
+     * 处理下拉刷新
+     */
+    async handlePullToRefresh() {
+        showToast(i18n.t('common.refreshing'));
+        try {
+            // 刷新当前订阅源或分组
+            if (AppState.currentFeedId) {
+                await FeedManager.refreshFeed(AppState.currentFeedId);
+            } else if (AppState.currentGroupId) {
+                await FeedManager.refreshGroup(AppState.currentGroupId);
+            } else {
+                await FeedManager.refreshFeeds();
+            }
+            
+            // 刷新完成后重新加载文章列表和订阅源列表
+            await Promise.all([
+                this.viewManager.loadArticles(AppState.currentFeedId, AppState.currentGroupId),
+                this.viewManager.loadFeeds()
+            ]);
+            
+            showToast(i18n.t('common.refresh_success'));
+        } catch (err) {
+            console.error('Pull to refresh error:', err);
+            showToast(err.message || i18n.t('common.refresh_failed'), 2000, true);
         }
     }
 };
