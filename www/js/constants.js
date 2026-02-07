@@ -30,6 +30,7 @@ export const API_ENDPOINTS = {
         TEST: '/api/ai/test',
     },
     DIGEST: {
+        BASE: '/api/digest',
         LIST: '/api/digest/list',
         GENERATE: '/api/digest/generate',
         PREVIEW: '/api/digest/preview',
