@@ -9,7 +9,6 @@ import { showToast, createContextMenu } from './utils.js';
 import { i18n } from '../i18n.js';
 import { Modal } from './components.js';
 import { Icons } from '../icons.js';
-import { Dialogs } from './dialogs.js';
 
 /**
  * 上下文菜单管理
@@ -150,20 +149,19 @@ export const ContextMenu = {
 
         let itemsHtml = '';
 
-        // 简报视图只显示简报管理器
-        if (isDigests) {
+        if (!isFavorites && !isDigests) {
             itemsHtml += `
+            <div class="context-menu-item" data-action="refresh">
+                ${Icons.refresh}
+                ${i18n.t('context.refresh_feed')}
+            </div>
             <div class="context-menu-item" data-action="generate-digest">
                 ${Icons.newspaper}
                 ${i18n.t('digest.generate')}
             </div>
-`;
-        } else if (!isFavorites) {
-            // 普通文章列表显示完整菜单
-            itemsHtml += `
-            <div class="context-menu-item" data-action="generate-digest">
-                ${Icons.newspaper}
-                ${i18n.t('digest.generate')}
+            <div class="context-menu-item" data-action="schedule-digest">
+                ${Icons.schedule}
+                ${i18n.t('ai.scheduled_digest')}
             </div>
             <div class="context-menu-item" data-action="mark-all-read">
                  ${Icons.check}
@@ -249,9 +247,32 @@ export const ContextMenu = {
             document.removeEventListener('click', closeHandler, true);
             articlesMenuCloseHandler = null;
 
-            if (action === 'generate-digest') {
-                // 打开简报管理器
-                Dialogs.showDigestManagerDialog();
+            if (action === 'refresh') {
+                showToast(i18n.t('common.refreshing'));
+                try {
+                    if (AppState.currentFeedId) {
+                        await FeedManager.refreshFeed(AppState.currentFeedId);
+                    } else if (AppState.currentGroupId) {
+                        await FeedManager.refreshGroup(AppState.currentGroupId);
+                    } else {
+                        await FeedManager.refreshFeeds();
+                    }
+                } catch (err) {
+                    alert(err.message || i18n.t('common.refresh_failed'));
+                }
+            } else if (action === 'generate-digest') {
+                if (AppState.currentFeedId) {
+                    this.viewManager.generateDigestForFeed(AppState.currentFeedId);
+                } else if (AppState.currentGroupId) {
+                    this.viewManager.generateDigestForGroup(AppState.currentGroupId);
+                } else {
+                    this.viewManager.generateDigest('all');
+                }
+            } else if (action === 'schedule-digest') {
+                this.viewManager.showDigestScheduleDialog({
+                    feedId: AppState.currentFeedId,
+                    groupId: AppState.currentGroupId
+                });
             } else if (action === 'mark-all-read') {
                 if (await Modal.confirm(i18n.t('context.confirm_mark_all_read'))) {
                     await FeedManager.markAllAsRead(AppState.currentFeedId, AppState.currentGroupId);

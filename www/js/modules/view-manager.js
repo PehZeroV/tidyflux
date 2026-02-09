@@ -108,7 +108,7 @@ export const ViewManager = {
         document.title = 'Tidyflux';
         DOMElements.appContainer.style.display = 'flex';
 
-        // 无论初始化是否成功，都必须绑定基础事件（如设置、显示订阅源按钮等），防止页面"假死"
+        // 无论初始化是否成功，都必须绑定基础事件（如设置、显示订阅源按钮等），防止页面“假死”
         this.bindEvents();
 
         // Start fetching data
@@ -124,9 +124,6 @@ export const ViewManager = {
             setTimeout(() => {
                 FeedsView.render(data);
             }, 0);
-
-            // 自动触发全部订阅源刷新（后台静默执行）
-            this.triggerAutoRefreshOnStartup();
         } catch (err) {
             console.error('Init feeds failed', err);
             DOMElements.feedsList.innerHTML = `
@@ -135,27 +132,6 @@ export const ViewManager = {
                     <button class="btn btn-primary" onclick="window.location.reload()">${i18n.t('common.retry') || 'Retry'}</button>
                 </div>
             `;
-        }
-    },
-
-    /**
-     * 启动时自动触发刷新（后台静默执行）
-     */
-    async triggerAutoRefreshOnStartup() {
-        try {
-            console.log('Auto-refreshing all feeds on startup...');
-            // 静默刷新所有订阅源，不阻塞 UI
-            await FeedManager.refreshFeeds();
-            console.log('Auto-refresh completed');
-            
-            // 刷新完成后，如果用户还在初始页面，重新加载文章列表
-            if (!AppState.isSearchMode && !AppState.viewingDigests) {
-                await this.loadArticles(AppState.currentFeedId, AppState.currentGroupId);
-                await this.loadFeeds();
-            }
-        } catch (err) {
-            console.error('Auto-refresh on startup failed:', err);
-            // 静默失败，不影响用户体验
         }
     },
 
@@ -705,28 +681,6 @@ export const ViewManager = {
 
         document.getElementById('articles-search-btn')?.addEventListener('click', () => {
             SearchView.showInlineSearchBox();
-        });
-
-        document.getElementById('articles-refresh-btn')?.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            showToast(i18n.t('common.refreshing'));
-            try {
-                if (AppState.currentFeedId) {
-                    await FeedManager.refreshFeed(AppState.currentFeedId);
-                } else if (AppState.currentGroupId) {
-                    await FeedManager.refreshGroup(AppState.currentGroupId);
-                } else {
-                    await FeedManager.refreshFeeds();
-                }
-                // 刷新完成后自动重新加载文章列表和订阅源列表
-                await Promise.all([
-                    this.loadArticles(AppState.currentFeedId, AppState.currentGroupId),
-                    this.loadFeeds()
-                ]);
-                showToast(i18n.t('common.refresh_success'));
-            } catch (err) {
-                alert(err.message || i18n.t('common.refresh_failed'));
-            }
         });
 
         document.getElementById('articles-menu-btn')?.addEventListener('click', (e) => {

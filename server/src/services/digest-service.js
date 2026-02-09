@@ -31,48 +31,21 @@ function truncateByToken(text, maxTokens) {
 
 // 辅助函数：获取最近未读文章
 export async function getRecentUnreadArticles(miniflux, options) {
-    const { hours = 12, limit, feedId, groupId, categoryIds, includeRead = false } = options;
+    const { hours = 12, limit, feedId, groupId } = options;
 
     const afterDate = new Date();
     afterDate.setHours(afterDate.getHours() - hours);
     const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
 
     const entriesOptions = {
-        status: includeRead ? undefined : 'unread',  // 如果includeRead为true，不限制状态
+        status: 'unread',
         order: 'published_at',
         direction: 'desc',
         limit: limit || 500,
         after: afterTimestamp
     };
 
-    console.log(`[Digest Debug] Fetching articles with options: limit=${entriesOptions.limit}, after=${entriesOptions.after} (${hours} hours ago), includeRead=${includeRead}`);
-
-    // 如果指定了多个分类ID，需要分别获取并合并
-    if (categoryIds && categoryIds.length > 0) {
-        console.log(`[Digest Debug] Fetching from multiple categories: ${categoryIds.join(', ')}`);
-        const allArticles = [];
-        
-        for (const catId of categoryIds) {
-            try {
-                const catOptions = { ...entriesOptions, category_id: parseInt(catId) };
-                const response = await miniflux.getEntries(catOptions);
-                if (response.entries && response.entries.length > 0) {
-                    console.log(`[Digest Debug] Category ${catId}: found ${response.entries.length} articles`);
-                    allArticles.push(...response.entries);
-                }
-            } catch (error) {
-                console.error(`Error fetching entries for category ${catId}:`, error);
-            }
-        }
-        
-        // 去重（根据文章ID）并按发布时间排序
-        const uniqueArticles = Array.from(
-            new Map(allArticles.map(a => [a.id, a])).values()
-        ).sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-        
-        console.log(`[Digest Debug] Total unique articles from all categories: ${uniqueArticles.length}`);
-        return uniqueArticles.slice(0, entriesOptions.limit);
-    }
+    console.log(`[Digest Debug] Fetching articles with options: limit=${entriesOptions.limit}, after=${entriesOptions.after} (${hours} hours ago)`);
 
     if (feedId) entriesOptions.feed_id = parseInt(feedId);
     if (groupId) entriesOptions.category_id = parseInt(groupId);
@@ -115,7 +88,6 @@ async function prepareArticlesForDigest(articles) {
                 index: i + batchIndex + 1,
                 title: article.title,
                 feedTitle: article.feed ? article.feed.title : '',
-                category: article.feed && article.feed.category ? article.feed.category.title : '',
                 publishedAt: article.published_at,
                 summary: truncateByToken(content, maxTokens),
                 url: article.url
@@ -138,17 +110,15 @@ async function prepareArticlesForDigest(articles) {
 function buildDigestPrompt(articles, options = {}) {
     let { targetLang = 'Simplified Chinese', scope = 'subscription', customPrompt } = options;
 
-    // 确保自定义 Prompt 包含 {{content}} 或 {content} 占位符
-    if (customPrompt && customPrompt.trim() && !customPrompt.includes('{{content}}') && !customPrompt.includes('{content}')) {
-        customPrompt = customPrompt.trim() + '\n\n{{content}}';
+    // 确保自定义 Prompt 包含 {content} 占位符
+    if (customPrompt && customPrompt.trim() && !customPrompt.includes('{content}')) {
+        customPrompt = customPrompt.trim() + '\n\n{content}';
     }
 
     const articlesList = articles.map(a =>
         `### ${a.index}. ${a.title}\n` +
         `- Source: ${a.feedTitle}\n` +
-        (a.category ? `- Category: ${a.category}\n` : '') +
         `- Date: ${a.publishedAt}\n` +
-        `- Link: ${a.url}\n` +
         `- Summary: ${a.summary}\n`
     ).join('\n');
 
@@ -156,11 +126,9 @@ function buildDigestPrompt(articles, options = {}) {
     let finalPrompt = '';
 
     if (customPrompt && customPrompt.trim()) {
-        // 使用自定义提示词，支持 {{variable}} 和 {variable} 两种格式
+        // 使用自定义提示词
         finalPrompt = customPrompt
-            .replace(/\{\{targetLang\}\}/g, targetLang)
             .replace(/\{targetLang\}/g, targetLang)
-            .replace(/\{\{content\}\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`)
             .replace(/\{content\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`);
     } else {
         // 默认提示词
@@ -240,18 +208,11 @@ export const DigestService = {
             scope = 'all',
             feedId,
             groupId,
-            categoryIds,
             hours = 12,
-            timeRange,
             targetLang = 'Simplified Chinese',
             prompt: customPrompt,
-            aiConfig,
-            includeRead = false,
-            customTitle
+            aiConfig
         } = options;
-
-        // 使用 timeRange 参数（如果提供）覆盖 hours
-        const effectiveHours = timeRange || hours;
 
         const isEn = targetLang && (targetLang.toLowerCase().includes('english') || targetLang.toLowerCase().includes('en'));
 
@@ -269,23 +230,15 @@ export const DigestService = {
             const categories = await minifluxClient.getCategories();
             const category = categories.find(c => c.id === parseInt(groupId));
             scopeName = category ? category.title : (isEn ? 'Group' : '分组');
-        } else if (categoryIds && categoryIds.length > 0) {
-            // 多个分类的情况
-            const categories = await minifluxClient.getCategories();
-            const categoryNames = categoryIds.map(id => {
-                const cat = categories.find(c => c.id === parseInt(id));
-                return cat ? cat.title : `Category ${id}`;
-            });
-            scopeName = categoryNames.join(', ');
         }
 
-        const fetchOptions = { hours: effectiveHours, feedId, groupId, categoryIds, includeRead };
+        const fetchOptions = { hours, feedId, groupId };
         const articles = await getRecentUnreadArticles(minifluxClient, fetchOptions);
 
         if (articles.length === 0) {
             const noArticlesMsg = isEn
-                ? `No ${includeRead ? '' : 'unread '}articles in the past ${effectiveHours} hours.`
-                : `在过去 ${effectiveHours} 小时内没有${includeRead ? '' : '未读'}文章。`;
+                ? `No unread articles in the past ${hours} hours.`
+                : `在过去 ${hours} 小时内没有未读文章。`;
             return {
                 success: true,
                 digest: {
@@ -311,23 +264,16 @@ export const DigestService = {
         // 调用 AI
         const digestContent = await callAIForDigest(prompt, aiConfig);
 
-        // 生成标题
-        let title;
-        if (customTitle) {
-            // 使用自定义标题
-            title = customTitle;
-        } else {
-            // 生成本地化标题
-            const now = new Date();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hh = String(now.getHours()).padStart(2, '0');
-            const mm = String(now.getMinutes()).padStart(2, '0');
-            const timeStr = `${month}-${day}-${hh}:${mm}`;
+        // 生成本地化标题
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const timeStr = `${month}-${day}-${hh}:${mm}`;
 
-            const digestWord = isEn ? 'Digest' : '简报';
-            title = `${scopeName} · ${digestWord} ${timeStr}`;
-        }
+        const digestWord = isEn ? 'Digest' : '简报';
+        const title = `${scopeName} · ${digestWord} ${timeStr}`;
 
         // 存储简报
         const saved = await DigestStore.add(userId, {
@@ -337,7 +283,7 @@ export const DigestService = {
             title,
             content: digestContent,
             articleCount: preparedArticles.length,
-            hours: effectiveHours
+            hours
         });
 
         return {
