@@ -6,9 +6,9 @@ const DEFAULT_AI_MODEL = 'gpt-4.1-mini';
 
 // 默认提示词
 const DEFAULT_PROMPTS = {
-    translate: 'Please translate the following text into {targetLang}, maintaining the original format and paragraph structure. Return only the translated content, directly outputting the translation result without any additional text:\n\n{content}',
-    summarize: 'Please summarize this article in {targetLang} in a few sentences. Output the result directly without any introductory text like "Here is the summary".\n\n{content}',
-    digest: 'You are a professional news editor. Please generate a concise digest based on the following list of recent articles.\n\n## Output Requirements:\n1. Output in {targetLang}\n2. Start with a 2-3 sentence overview of today\'s/recent key content\n3. Categorize by topic or importance, listing key information in concise bullet points\n4. If multiple articles relate to the same topic, combine them\n5. Keep the format concise and compact, using Markdown\n6. Output the content directly, no opening remarks like "Here is the digest"\n\n## Article List:\n\n{content}'
+    translate: 'Please translate the following text into {{targetLang}}, maintaining the original format and paragraph structure. Return only the translated content, directly outputting the translation result without any additional text:\n\n{{content}}',
+    summarize: 'Please summarize this article in {{targetLang}} in a few sentences. Output the result directly without any introductory text like "Here is the summary".\n\n{{content}}',
+    digest: 'You are a professional news editor. Please generate a concise digest based on the following list of recent articles.\n\n## Output Requirements:\n1. Output in {{targetLang}}\n2. Start with a 2-3 sentence overview of today\'s/recent key content\n3. Categorize by topic or importance, listing key information in concise bullet points\n4. If multiple articles relate to the same topic, combine them\n5. Keep the format concise and compact, using Markdown\n6. Output the content directly, no opening remarks like "Here is the digest"\n\n## Article List:\n\n{{content}}'
 };
 
 // 语言选项
@@ -112,13 +112,20 @@ export const AIService = {
     _sanitizeConfig(config) {
         if (!config) return config;
 
-        // 检查并自动补全必要的占位符 {content}
+        // 迁移旧占位符 {xxx} → {{xxx}}，并自动补全缺失的 {{content}}
         const promptKeys = ['translatePrompt', 'summarizePrompt', 'digestPrompt'];
         promptKeys.forEach((key) => {
             if (config[key]) {
+                // 迁移旧格式占位符
+                if (config[key].includes('{content}') && !config[key].includes('{{content}}')) {
+                    config[key] = config[key].replace(/\{content\}/g, '{{content}}');
+                }
+                if (config[key].includes('{targetLang}') && !config[key].includes('{{targetLang}}')) {
+                    config[key] = config[key].replace(/\{targetLang\}/g, '{{targetLang}}');
+                }
                 // 如果漏掉占位符，自动补全
-                if (config[key].trim() && !config[key].includes('{content}')) {
-                    config[key] = config[key].trim() + '\n\n{content}';
+                if (config[key].trim() && !config[key].includes('{{content}}')) {
+                    config[key] = config[key].trim() + '\n\n{{content}}';
                 }
             }
         });
@@ -296,8 +303,8 @@ export const AIService = {
         const targetLang = this.getLanguageName(targetLangId);
         const promptTemplate = this.getPrompt('translate');
         const prompt = promptTemplate
-            .replace('{targetLang}', targetLang)
-            .replace('{content}', content);
+            .replace('{{targetLang}}', targetLang)
+            .replace('{{content}}', content);
 
         return this.callAPI(prompt, onChunk, signal);
     },
@@ -309,8 +316,8 @@ export const AIService = {
         const targetLang = this.getLanguageName(targetLangId);
         const promptTemplate = this.getPrompt('summarize');
         const prompt = promptTemplate
-            .replace('{targetLang}', targetLang)
-            .replace('{content}', content);
+            .replace('{{targetLang}}', targetLang)
+            .replace('{{content}}', content);
 
         return this.callAPI(prompt, onChunk, signal);
     },

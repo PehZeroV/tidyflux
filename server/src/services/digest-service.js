@@ -110,9 +110,19 @@ async function prepareArticlesForDigest(articles) {
 function buildDigestPrompt(articles, options = {}) {
     let { targetLang = 'Simplified Chinese', scope = 'subscription', customPrompt } = options;
 
-    // 确保自定义 Prompt 包含 {content} 占位符
-    if (customPrompt && customPrompt.trim() && !customPrompt.includes('{content}')) {
-        customPrompt = customPrompt.trim() + '\n\n{content}';
+    // 迁移旧占位符并确保自定义 Prompt 包含 {{content}} 占位符
+    if (customPrompt && customPrompt.trim()) {
+        // 迁移旧格式占位符
+        if (customPrompt.includes('{content}') && !customPrompt.includes('{{content}}')) {
+            customPrompt = customPrompt.replace(/\{content\}/g, '{{content}}');
+        }
+        if (customPrompt.includes('{targetLang}') && !customPrompt.includes('{{targetLang}}')) {
+            customPrompt = customPrompt.replace(/\{targetLang\}/g, '{{targetLang}}');
+        }
+        // 自动补全缺失的占位符
+        if (!customPrompt.includes('{{content}}')) {
+            customPrompt = customPrompt.trim() + '\n\n{{content}}';
+        }
     }
 
     const articlesList = articles.map(a =>
@@ -128,8 +138,8 @@ function buildDigestPrompt(articles, options = {}) {
     if (customPrompt && customPrompt.trim()) {
         // 使用自定义提示词
         finalPrompt = customPrompt
-            .replace(/\{targetLang\}/g, targetLang)
-            .replace(/\{content\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`);
+            .replace(/\{\{targetLang\}\}/g, targetLang)
+            .replace(/\{\{content\}\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`);
     } else {
         // 默认提示词
         finalPrompt = `You are a professional news editor. Please generate a concise digest based on the following list of recent ${scope} articles.
