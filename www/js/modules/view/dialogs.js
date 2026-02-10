@@ -94,13 +94,12 @@ export const Dialogs = {
         const urlInput = dialog.querySelector('#new-feed-url');
         const groupSelect = dialog.querySelector('#new-feed-group');
         const confirmBtn = dialog.querySelector('.confirm-btn');
-        const closeBtn = dialog.querySelector('.close-dialog-btn');
         const manageGroupsBtn = dialog.querySelector('#manage-groups-btn');
         const importBtn = dialog.querySelector('#import-opml-btn');
         const exportBtn = dialog.querySelector('#export-opml-btn');
         const opmlFileInput = dialog.querySelector('#opml-file-input');
 
-        closeBtn.addEventListener('click', close);
+
 
         // Init Custom Select
         const container = dialog.querySelector('.settings-dialog-content');
@@ -266,7 +265,6 @@ export const Dialogs = {
                 container.innerHTML = contentHtml;
 
                 // Bind Events
-                const closeBtn = dialog.querySelector('.close-dialog-btn');
 
                 // Init Custom Select
                 CustomSelect.replaceAll(container);
@@ -283,7 +281,7 @@ export const Dialogs = {
                 feedUrlInput.value = feed.feed_url || '';
 
 
-                closeBtn.addEventListener('click', close);
+
 
                 saveBtn.addEventListener('click', async () => {
                     const updates = {
@@ -390,9 +388,8 @@ export const Dialogs = {
         const groupList = dialog.querySelector('#group-list');
         const nameInput = dialog.querySelector('#new-group-name');
         const addBtn = dialog.querySelector('#add-group-btn');
-        const closeBtn = dialog.querySelector('.close-dialog-btn');
 
-        closeBtn.addEventListener('click', close);
+
 
         addBtn.addEventListener('click', async () => {
             const name = nameInput.value.trim();
@@ -576,9 +573,6 @@ export const Dialogs = {
                                 
                                 <label class="miniflux-input-label">${i18n.t('ai.summarize_prompt')}</label>
                                 <textarea id="ai-summarize-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.summarize_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
-                                
-                                <label class="miniflux-input-label">${i18n.t('ai.digest_prompt')}</label>
-                                <textarea id="ai-digest-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.digest_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
 
                                 <button type="button" id="ai-reset-prompts-btn" style="background: none; border: none; color: var(--accent-color); padding: 4px 0; font-size: 0.85em; cursor: pointer; margin-top: 8px;">
                                     ${i18n.t('ai.reset_prompts')}
@@ -602,6 +596,13 @@ export const Dialogs = {
                 
                 ${showFullSettings ? `
                 <div class="settings-section">
+                    <div class="settings-section-title">${i18n.t('digest.manage_scheduled')}</div>
+                    <div class="appearance-mode-group">
+                        <button type="button" id="settings-manage-digest-btn" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('digest.manager_title')}</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <div class="settings-section-title">${i18n.t('settings.account_security')}</div>
 
                     <form id="settings-change-password-form" style="margin-bottom: 16px;">
@@ -621,9 +622,8 @@ export const Dialogs = {
                     </div>
                 </div>` : ''}
             </div>
-        `);
+        `, { preventClose: forceMode });
 
-        const closeBtn = dialog.querySelector('.close-dialog-btn');
         const logoutBtn = dialog.querySelector('.logout-btn-full');
         const themeColorBtns = dialog.querySelectorAll('.theme-color-btn');
         const modeBtns = dialog.querySelectorAll('.appearance-mode-btn[data-mode]');
@@ -639,13 +639,16 @@ export const Dialogs = {
         // 异步加载 Miniflux 配置信息
         this._loadMinifluxConfig(minifluxConfigInfo);
 
-        // 主题色切换强制模式下不允许关闭
-        if (!forceMode) {
-            closeBtn?.addEventListener('click', close);
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) close();
+        // 管理定时简报按钮
+        const manageDigestBtn = dialog.querySelector('#settings-manage-digest-btn');
+        if (manageDigestBtn) {
+            manageDigestBtn.addEventListener('click', () => {
+                close();
+                Dialogs.showDigestManagerDialog();
             });
         }
+
+
 
         // 主题色切换
         themeColorBtns.forEach(btn => {
@@ -758,7 +761,6 @@ export const Dialogs = {
         const aiTargetLangSelect = dialog.querySelector('#ai-target-lang');
         const aiTranslatePromptInput = dialog.querySelector('#ai-translate-prompt');
         const aiSummarizePromptInput = dialog.querySelector('#ai-summarize-prompt');
-        const aiDigestPromptInput = dialog.querySelector('#ai-digest-prompt');
         const aiMsg = dialog.querySelector('#ai-settings-msg');
         const collapsibleToggle = dialog.querySelector('.collapsible-toggle');
         const collapsibleContent = dialog.querySelector('.collapsible-content');
@@ -767,7 +769,6 @@ export const Dialogs = {
         const aiConfig = AIService.getConfig();
         const defaultTranslatePrompt = AIService.getDefaultPrompt('translate');
         const defaultSummarizePrompt = AIService.getDefaultPrompt('summarize');
-        const defaultDigestPrompt = AIService.getDefaultPrompt('digest');
 
         if (aiUrlInput) aiUrlInput.value = aiConfig.apiUrl || '';
         if (aiKeyInput) aiKeyInput.value = aiConfig.apiKey || '';
@@ -788,7 +789,6 @@ export const Dialogs = {
 
         if (aiTranslatePromptInput) aiTranslatePromptInput.value = aiConfig.translatePrompt || defaultTranslatePrompt;
         if (aiSummarizePromptInput) aiSummarizePromptInput.value = aiConfig.summarizePrompt || defaultSummarizePrompt;
-        if (aiDigestPromptInput) aiDigestPromptInput.value = aiConfig.digestPrompt || defaultDigestPrompt;
 
         // 折叠面板切换
         if (collapsibleToggle) {
@@ -810,7 +810,6 @@ export const Dialogs = {
             aiResetPromptsBtn.addEventListener('click', () => {
                 if (aiTranslatePromptInput) aiTranslatePromptInput.value = defaultTranslatePrompt;
                 if (aiSummarizePromptInput) aiSummarizePromptInput.value = defaultSummarizePrompt;
-                if (aiDigestPromptInput) aiDigestPromptInput.value = defaultDigestPrompt;
             });
         }
 
@@ -864,7 +863,7 @@ export const Dialogs = {
                     targetLang: aiTargetLangSelect.value,
                     translatePrompt: aiTranslatePromptInput.value.trim(),
                     summarizePrompt: aiSummarizePromptInput.value.trim(),
-                    digestPrompt: aiDigestPromptInput.value.trim()
+                    digestPrompt: AIService.getConfig().digestPrompt || ''
                 };
 
                 try {
@@ -1030,7 +1029,6 @@ export const Dialogs = {
             </div>
         `);
 
-        const closeBtn = dialog.querySelector('.close-dialog-btn');
         const loader = dialog.querySelector('.schedule-loader');
         const form = dialog.querySelector('#schedule-form');
         const enabledInput = dialog.querySelector('#schedule-enabled');
@@ -1195,7 +1193,7 @@ export const Dialogs = {
 
         // --- Events ---
 
-        closeBtn.addEventListener('click', close);
+
 
         freqOnceBtn.addEventListener('click', () => { isTwiceDaily = false; updateFrequencyUI(); });
         freqTwiceBtn.addEventListener('click', () => { isTwiceDaily = true; updateFrequencyUI(); });
@@ -1358,17 +1356,42 @@ export const Dialogs = {
                     </div>
                 </div>
 
+                <div style="margin-top: 12px; margin-bottom: 4px;">
+                    <div class="appearance-mode-group">
+                        <button type="button" id="digest-manager-add-btn" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">
+                            ${i18n.t('digest.add_scheduled')}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Digest Prompt Settings -->
+                <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px;">${i18n.t('ai.digest_prompt')}</div>
+                    <div style="margin-bottom: 12px;">
+                        <textarea id="manager-digest-prompt" class="auth-input" rows="4" placeholder="${i18n.t('ai.digest_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <button type="button" id="manager-digest-prompt-reset-btn" class="appearance-mode-btn" style="flex: 1; justify-content: center;">
+                            ${i18n.t('ai.reset_prompts')}
+                        </button>
+                        <button type="button" id="manager-digest-prompt-save-btn" class="appearance-mode-btn active" style="flex: 1; justify-content: center;">
+                            ${i18n.t('common.save')}
+                        </button>
+                    </div>
+                    <div id="manager-digest-prompt-msg" style="text-align: center; font-size: 0.85em; min-height: 1.2em;"></div>
+                </div>
+
                 <!-- Global Push Settings -->
                 <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                     <div style="font-weight: 600; margin-bottom: 12px;">${i18n.t('settings.push_notification')}</div>
                     <div id="global-push-config">
                         <div style="margin-bottom: 12px;">
                             <div class="settings-item-label" style="margin-bottom: 6px;">${i18n.t('settings.push_url')}</div>
-                            <input type="text" id="global-push-url" placeholder="${i18n.t('settings.push_url_placeholder')}" style="width: 100%; padding: 10px 12px; border: none; border-radius: var(--radius); background: var(--card-bg); color: var(--text-color); box-shadow: var(--card-shadow); box-sizing: border-box; font-size: 0.9em;">
+                            <input type="text" id="global-push-url" class="auth-input" placeholder="${i18n.t('settings.push_url_placeholder')}" style="margin-bottom: 0;">
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div class="settings-item-label" style="margin-bottom: 6px;">${i18n.t('settings.push_body')}</div>
-                            <textarea id="global-push-body" rows="4" placeholder='{"title": "{{title}}", "content": "{{digest_content}}"}' style="width: 100%; padding: 10px 12px; border: none; border-radius: var(--radius); background: var(--card-bg); color: var(--text-color); box-shadow: var(--card-shadow); box-sizing: border-box; font-size: 0.85em; font-family: monospace; resize: vertical;"></textarea>
+                            <textarea id="global-push-body" class="auth-input" rows="4" placeholder='{"title": "{{title}}", "content": "{{digest_content}}"}' style="margin-bottom: 8px; resize: vertical; font-family: monospace;"></textarea>
                             <div style="font-size: 0.8em; color: var(--meta-color); margin-top: 4px;">${i18n.t('settings.push_body_hint')}</div>
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 4px;">
@@ -1383,19 +1406,47 @@ export const Dialogs = {
                     </div>
                 </div>
 
-                <div style="margin-top: 16px;">
-                    <div class="appearance-mode-group">
-                        <button type="button" id="digest-manager-add-btn" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">
-                            ${i18n.t('digest.add_scheduled')}
-                        </button>
-                    </div>
-                </div>
             </div>
         `);
 
-        const closeBtn = dialog.querySelector('.close-dialog-btn');
         const listContainer = dialog.querySelector('#digest-manager-list');
         const addBtn = dialog.querySelector('#digest-manager-add-btn');
+
+        // Digest prompt elements
+        const digestPromptInput = dialog.querySelector('#manager-digest-prompt');
+        const digestPromptResetBtn = dialog.querySelector('#manager-digest-prompt-reset-btn');
+        const digestPromptSaveBtn = dialog.querySelector('#manager-digest-prompt-save-btn');
+        const digestPromptMsg = dialog.querySelector('#manager-digest-prompt-msg');
+
+        // Load digest prompt
+        const aiConfig = AIService.getConfig();
+        const defaultDigestPrompt = AIService.getDefaultPrompt('digest');
+        digestPromptInput.value = aiConfig.digestPrompt || defaultDigestPrompt;
+
+        // Reset digest prompt
+        digestPromptResetBtn.addEventListener('click', () => {
+            digestPromptInput.value = defaultDigestPrompt;
+        });
+
+        // Save digest prompt
+        digestPromptSaveBtn.addEventListener('click', async () => {
+            digestPromptSaveBtn.disabled = true;
+            digestPromptMsg.textContent = '...';
+            digestPromptMsg.style.color = 'var(--meta-color)';
+            try {
+                const currentConfig = AIService.getConfig();
+                currentConfig.digestPrompt = digestPromptInput.value.trim();
+                await AIService.saveConfig(currentConfig);
+                digestPromptMsg.textContent = `✓ ${i18n.t('settings.save_success')}`;
+                digestPromptMsg.style.color = 'var(--accent-color)';
+            } catch (err) {
+                console.error('Save digest prompt failed:', err);
+                digestPromptMsg.textContent = `✗ ${i18n.t('common.error')}`;
+                digestPromptMsg.style.color = 'var(--danger-color)';
+            }
+            digestPromptSaveBtn.disabled = false;
+            setTimeout(() => { digestPromptMsg.textContent = ''; }, 2000);
+        });
 
         // Push notification elements
         const globalPushUrl = dialog.querySelector('#global-push-url');
@@ -1404,10 +1455,8 @@ export const Dialogs = {
         const globalPushSaveBtn = dialog.querySelector('#global-push-save-btn');
         const globalPushMsg = dialog.querySelector('#global-push-msg');
 
-        closeBtn?.addEventListener('click', close);
-        dialog.addEventListener('click', (e) => {
-            if (e.target === dialog) close();
-        });
+
+
 
         globalPushTestBtn.addEventListener('click', async () => {
             const url = globalPushUrl.value.trim();

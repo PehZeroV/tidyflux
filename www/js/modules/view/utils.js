@@ -316,39 +316,52 @@ export function createContextMenu(event, innerHTML) {
  * @param {string} innerHTML - 对话框内容 HTML
  * @returns {{dialog: HTMLElement, close: Function}} 对话框元素和关闭函数
  */
-export function createDialog(className, innerHTML) {
+export function createDialog(className, innerHTML, options = {}) {
+    // Clean up stale dialog elements (non-active ones left by previous close timeouts)
+    document.querySelectorAll(`.${className}:not(.active)`).forEach(el => el.remove());
+
     const dialog = document.createElement('div');
     dialog.className = `${className} active`;
     dialog.innerHTML = innerHTML;
     document.body.appendChild(dialog);
     document.body.classList.add('dialog-open');
 
-    const close = () => {
-        dialog.classList.remove('active');
-        setTimeout(() => {
-            dialog.remove();
-            document.body.classList.remove('dialog-open');
-        }, UI_CONFIG.DIALOG_TRANSITION_MS);
-    };
-
-    // 点击背景关闭
-    dialog.addEventListener('click', (e) => {
-        if (e.target === dialog) close();
-    });
+    let closed = false;
 
     // ESC 关闭
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             close();
-            document.removeEventListener('keydown', escHandler);
         }
     };
-    document.addEventListener('keydown', escHandler);
 
-    // 关闭按钮
-    const closeBtn = dialog.querySelector('.close-dialog-btn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', close);
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        dialog.classList.remove('active');
+        document.removeEventListener('keydown', escHandler);
+        setTimeout(() => {
+            dialog.remove();
+            // Only remove dialog-open if no other active dialogs remain
+            if (!document.querySelector('.settings-dialog.active, .add-feed-dialog.active, .custom-modal-dialog.active')) {
+                document.body.classList.remove('dialog-open');
+            }
+        }, UI_CONFIG.DIALOG_TRANSITION_MS);
+    };
+
+    if (!options.preventClose) {
+        document.addEventListener('keydown', escHandler);
+
+        // 点击背景关闭
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) close();
+        });
+
+        // 关闭按钮
+        const closeBtn = dialog.querySelector('.close-dialog-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', close);
+        }
     }
 
     return { dialog, close };
