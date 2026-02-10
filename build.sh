@@ -27,15 +27,19 @@ echo "🎨 压缩 CSS..."
 # 合并并压缩所有 CSS 到一个文件（保持原名 style.css）
 cat "$ROOT_DIR/www/css/variables.css" \
     "$ROOT_DIR/www/css/base.css" \
-    "$ROOT_DIR/www/css/layout.css" \
-    "$ROOT_DIR/www/css/article.css" \
-    "$ROOT_DIR/www/css/modals.css" \
-    "$ROOT_DIR/www/css/auth.css" \
     "$ROOT_DIR/www/css/themes.css" \
-    "$ROOT_DIR/www/css/skeleton.css" \
-    "$ROOT_DIR/www/css/responsive.css" \
     "$ROOT_DIR/www/css/force-dark.css" \
     "$ROOT_DIR/www/css/force-light.css" \
+    "$ROOT_DIR/www/css/layout.css" \
+    "$ROOT_DIR/www/css/feeds.css" \
+    "$ROOT_DIR/www/css/responsive.css" \
+    "$ROOT_DIR/www/css/article.css" \
+    "$ROOT_DIR/www/css/modals.css" \
+    "$ROOT_DIR/www/css/settings.css" \
+    "$ROOT_DIR/www/css/search.css" \
+    "$ROOT_DIR/www/css/context-menu.css" \
+    "$ROOT_DIR/www/css/skeleton.css" \
+    "$ROOT_DIR/www/css/auth.css" \
     | esbuild --loader=css --minify > "$DIST_DIR/www/style-${BUILD_VERSION}.css"
 
 echo "📜 压缩 JavaScript..."

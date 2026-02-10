@@ -24,7 +24,8 @@ export default {
         menu: 'Menu',
         unnamed: 'Unnamed',
         global_settings: 'Global Settings',
-        view: 'View'
+        view: 'View',
+        go_to_settings: 'Go to Settings'
     },
     nav: {
         all: 'All Articles',
@@ -257,7 +258,8 @@ export default {
         view_summary: 'View Summary',
         reset_prompts: 'Reset to Default Prompts',
         copy: 'Copy',
-        copied: 'Copied'
+        copied: 'Copied',
+        not_configured: 'AI service not configured, please configure in settings'
     },
     theme: {
         default: 'Default',

@@ -1,0 +1,360 @@
+/**
+ * ArticleAIMixin - AI 功能模块（翻译 + 总结）
+ * @module view/article-ai
+ *
+ * 通过 Mixin 模式合并到 ArticleContentView
+ * - translateBilingual: 双语段落翻译
+ * - bindAIButtons: AI 按钮事件绑定（总结 + 翻译）
+ */
+
+import { AIService } from '../ai-service.js';
+import { Modal } from './components.js';
+import { Icons } from '../icons.js';
+import { i18n } from '../i18n.js';
+import { showToast } from './utils.js';
+import { Dialogs } from './dialogs.js';
+
+export const ArticleAIMixin = {
+    /**
+     * 双语段落翻译
+     * @param {HTMLElement} bodyEl
+     * @param {HTMLElement} titleEl
+     * @param {AbortSignal} signal
+     */
+    async translateBilingual(bodyEl, titleEl, signal = null) {
+        // 1. 识别需要翻译的块
+        const blocks = [];
+        if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
+
+        const blockTags = new Set([
+            'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CANVAS', 'DD', 'DIV', 'DL', 'DT',
+            'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5',
+            'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'NOSCRIPT', 'OL', 'P', 'SECTION',
+            'TABLE', 'TFOOT', 'UL', 'VIDEO'
+        ]);
+
+        const isMeaningfulText = (text) => {
+            // 移除常见的干扰字符 (Emoji, 标点, 空白, 数字)
+            // \p{P}: Punctuation, \p{S}: Symbols (including Emojis), \p{Z}: Separators, \p{N}: Numbers
+            // 保留一点余地：如果文本包含至少一个字母或 CJK 字符等连续语义字符
+            const cleanText = text.replace(/[\p{P}\p{S}\p{Z}\p{N}]+/gu, '').trim();
+            return cleanText.length >= 1;
+        };
+
+        let pendingInlineNodes = [];
+
+        const flushInlineBlock = () => {
+            if (pendingInlineNodes.length === 0) return;
+
+            let textContent = '';
+            pendingInlineNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.tagName === 'BR') {
+                        textContent += '\n';
+                    } else {
+                        textContent += node.innerText || node.textContent || '';
+                    }
+                } else {
+                    textContent += node.textContent || '';
+                }
+            });
+
+            const trimmedText = textContent.trim();
+            if (trimmedText.length >= 2 && isMeaningfulText(trimmedText)) {
+                blocks.push({
+                    el: pendingInlineNodes[pendingInlineNodes.length - 1],
+                    text: trimmedText
+                });
+            }
+            pendingInlineNodes = [];
+        };
+
+        if (bodyEl.childNodes.length > 0) {
+            Array.from(bodyEl.childNodes).forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tag = node.tagName.toUpperCase();
+                    if (['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'].includes(tag)) return;
+
+                    // 容器类标签 (代码块、公式、表格)：中断当前行内累积，且不参与翻译
+                    if (['MATH', 'PRE', 'TABLE'].includes(tag)) {
+                        flushInlineBlock();
+                        return;
+                    }
+
+                    if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar')) return;
+
+                    if (blockTags.has(tag)) {
+                        flushInlineBlock();
+
+                        // 如果块级元素内部包含不需要翻译的特殊标签，直接跳过整个块的翻译
+                        if (node.querySelector('math, pre, table')) {
+                            return;
+                        }
+
+                        const text = node.innerText ? node.innerText.trim() : '';
+                        if (text.length >= 2 && isMeaningfulText(text)) {
+                            blocks.push({ el: node, text: text });
+                        }
+                        return;
+                    }
+                }
+
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (!node.textContent.trim() && pendingInlineNodes.length === 0) return;
+                }
+
+                pendingInlineNodes.push(node);
+            });
+            flushInlineBlock();
+        } else if (bodyEl.innerText.trim().length > 0) {
+            const text = bodyEl.innerText.trim();
+            if (text.length >= 2 && isMeaningfulText(text)) {
+                blocks.push({ el: bodyEl, text: text });
+            }
+        }
+
+        // 2. 插入占位符
+        blocks.forEach(block => {
+            const transEl = document.createElement('div');
+            transEl.className = block.isTitle ? 'ai-title-trans-block' : 'ai-trans-block';
+
+            block.transEl = transEl;
+
+            if (block.isTitle) {
+                const computedStyle = window.getComputedStyle(block.el);
+
+                transEl.style.fontFamily = computedStyle.fontFamily;
+                transEl.style.fontSize = computedStyle.fontSize;
+                transEl.style.fontWeight = computedStyle.fontWeight;
+                transEl.style.lineHeight = computedStyle.lineHeight;
+                transEl.style.color = computedStyle.color;
+                transEl.style.letterSpacing = computedStyle.letterSpacing;
+                transEl.style.textTransform = computedStyle.textTransform;
+
+                transEl.style.marginTop = '8px';
+                transEl.style.marginBottom = '24px';
+
+                transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.6em; font-weight: normal;">... ${i18n.t('ai.translating')} ...</span>`;
+
+                const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
+                parent.insertAdjacentElement('afterend', transEl);
+            } else {
+                transEl.style.color = 'var(--text-secondary)';
+                transEl.style.fontSize = '0.95em';
+                transEl.style.marginTop = '6px';
+                transEl.style.marginBottom = '20px';
+                transEl.style.padding = '8px 12px';
+                transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 96%)';
+                transEl.style.borderRadius = 'var(--radius)';
+                transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
+
+                if (block.el.nodeType === Node.ELEMENT_NODE) {
+                    block.el.insertAdjacentElement('afterend', transEl);
+                } else if (block.el.parentNode) {
+                    block.el.parentNode.insertBefore(transEl, block.el.nextSibling);
+                }
+            }
+        });
+
+        // 3. 并发队列执行翻译
+        const CONCURRENT_LIMIT = 5;
+        let currentIndex = 0;
+
+        const processNext = async () => {
+            while (currentIndex < blocks.length) {
+                const index = currentIndex++;
+                const block = blocks[index];
+
+                if (signal?.aborted) return;
+
+                try {
+                    const aiConfig = AIService.getConfig();
+                    const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                    const translation = await AIService.translate(block.text, targetLang, signal);
+                    if (signal?.aborted) return;
+                    block.transEl.innerHTML = this.parseMarkdown(translation);
+                } catch (err) {
+                    console.error('Block translate error:', err);
+                    block.transEl.innerHTML = `<span style="color:red; font-size: 0.85em;">Translation failed</span>`;
+                }
+            }
+        };
+
+        const workers = [];
+        for (let i = 0; i < CONCURRENT_LIMIT; i++) {
+            workers.push(processNext());
+        }
+
+        await Promise.all(workers);
+    },
+
+    /**
+     * 绑定 AI 功能按钮
+     * @param {Object} article - 文章对象
+     */
+    bindAIButtons(article) {
+        const translateBtn = document.getElementById('article-translate-btn');
+        const summarizeBtn = document.getElementById('article-summarize-btn');
+        const summaryBox = document.getElementById('article-ai-summary');
+
+        // 总结功能
+        if (summarizeBtn && summaryBox) {
+            const summaryContent = summaryBox.querySelector('.ai-content');
+            const closeBtn = summaryBox.querySelector('.ai-close-btn');
+
+            closeBtn.addEventListener('click', () => {
+                summaryBox.style.display = 'none';
+            });
+
+            // 如果已有缓存的总结，直接显示（可以在 article 对象上缓存）
+            // 这里暂不实现持久化缓存，仅页面级
+
+            summarizeBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!AIService.isConfigured()) {
+                    Modal.alertWithSettings(i18n.t('ai.not_configured'), i18n.t('common.go_to_settings'), () => Dialogs.showSettingsDialog(false));
+                    return;
+                }
+
+                // 如果正在加载，点击取消
+                if (summarizeBtn.classList.contains('loading')) {
+                    if (article._summarizeController) {
+                        article._summarizeController.abort();
+                        article._summarizeController = null;
+                        summarizeBtn.classList.remove('loading');
+                        summaryBox.style.display = 'none';
+                        summaryContent.innerHTML = '';
+                    }
+                    return;
+                }
+
+                if (summarizeBtn.classList.contains('active')) {
+                    summaryBox.style.display = summaryBox.style.display === 'none' ? 'block' : 'none';
+                    return;
+                }
+
+                summarizeBtn.classList.add('loading');
+                summaryBox.style.display = 'block';
+                summaryContent.innerHTML = `<div class="loading-spinner">${i18n.t('ai.summarizing')}</div>`;
+
+                try {
+                    // 创建 AbortController
+                    article._summarizeController = new AbortController();
+                    const signal = article._summarizeController.signal;
+
+                    // 获取纯文本内容用于总结
+                    const rawContent = AIService.extractText(article.content || '');
+
+                    // 获取配置的目标语言
+                    const aiConfig = AIService.getConfig();
+                    const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+
+                    let streamedText = '';
+                    await AIService.summarize(rawContent, targetLang, (chunk) => {
+                        streamedText += chunk;
+                        summaryContent.innerHTML = this.parseMarkdown(streamedText);
+                    }, signal);
+
+                    summarizeBtn.classList.remove('loading');
+                    summarizeBtn.classList.add('active');
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        console.log('Summarize aborted');
+                        return;
+                    }
+                    console.error('Summarize failed:', err);
+                    summaryContent.innerHTML = `<span style="color: red;">${i18n.t('ai.api_error')}: ${err.message}</span>`;
+                    summarizeBtn.classList.remove('loading');
+                } finally {
+                    article._summarizeController = null;
+                }
+            });
+        }
+
+        // 翻译功能
+        if (translateBtn) {
+            // 如果已有翻译缓存
+            if (article._translatedContent) {
+                translateBtn.classList.add('active');
+                translateBtn.title = i18n.t('ai.original_content');
+            }
+
+            translateBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // 取消逻辑
+                if (translateBtn.classList.contains('loading')) {
+                    if (article._translateController) {
+                        article._translateController.abort();
+                        article._translateController = null;
+                        translateBtn.classList.remove('loading');
+
+                        // 清理已生成的翻译块
+                        const bodyEl = document.querySelector('.article-body');
+                        if (bodyEl) {
+                            bodyEl.querySelectorAll('.ai-trans-block').forEach(el => el.remove());
+                        }
+                        const titleTransBlock = document.querySelector('.ai-title-trans-block');
+                        if (titleTransBlock) titleTransBlock.remove();
+
+                        translateBtn.classList.remove('active');
+                        translateBtn.title = i18n.t('ai.translate_btn');
+
+                        showToast('翻译已取消');
+                    }
+                    return;
+                }
+
+                if (!AIService.isConfigured()) {
+                    Modal.alertWithSettings(i18n.t('ai.not_configured'), i18n.t('common.go_to_settings'), () => Dialogs.showSettingsDialog(false));
+                    return;
+                }
+
+                const bodyEl = document.querySelector('.article-body');
+                const titleHeader = document.querySelector('.article-header h1');
+                const titleLink = titleHeader ? titleHeader.querySelector('a') : null;
+                const titleEl = titleLink || titleHeader;
+
+                if (!bodyEl) return;
+
+                // 检查是否已经是双语模式（存在翻译块）
+                const existingBlocks = bodyEl.querySelectorAll('.ai-trans-block');
+                const existingTitleBlock = document.querySelector('.ai-title-trans-block');
+
+                if (existingBlocks.length > 0 || existingTitleBlock) {
+                    // 切换显示/隐藏
+                    const anyVisible = (existingTitleBlock && existingTitleBlock.style.display !== 'none') ||
+                        (existingBlocks.length > 0 && existingBlocks[0].style.display !== 'none');
+
+                    const newDisplay = anyVisible ? 'none' : 'block';
+
+                    if (existingTitleBlock) existingTitleBlock.style.display = newDisplay;
+                    existingBlocks.forEach(el => el.style.display = newDisplay);
+
+                    translateBtn.classList.toggle('active', !anyVisible);
+                    translateBtn.title = !anyVisible ? i18n.t('ai.original_content') : i18n.t('ai.translate_btn');
+                    return;
+                }
+
+                // 开始双语翻译
+                translateBtn.classList.add('loading');
+
+                try {
+                    article._translateController = new AbortController();
+                    await this.translateBilingual(bodyEl, titleEl, article._translateController.signal);
+                    translateBtn.classList.remove('loading');
+                    translateBtn.classList.add('active');
+                    translateBtn.title = i18n.t('ai.original_content');
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error('Translation failed', err);
+                    Modal.alert(`${i18n.t('ai.api_error')}: ${err.message}`);
+                    translateBtn.classList.remove('loading');
+                }
+            });
+        }
+    },
+};

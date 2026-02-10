@@ -24,7 +24,8 @@ export default {
         menu: '菜单',
         unnamed: '未命名',
         global_settings: '全局设置',
-        view: '查看'
+        view: '查看',
+        go_to_settings: '前往设置'
     },
     nav: {
         all: '全部文章',
@@ -257,7 +258,8 @@ export default {
         view_summary: '查看总结',
         reset_prompts: '恢复默认提示词',
         copy: '复制',
-        copied: '已复制'
+        copied: '已复制',
+        not_configured: 'AI 服务未配置，请先在设置中配置'
     },
     theme: {
         default: '默认',
