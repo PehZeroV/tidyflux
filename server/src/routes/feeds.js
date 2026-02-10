@@ -145,37 +145,52 @@ router.post('/refresh/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Refresh Group - Miniflux doesn't have group refresh.
-// Refresh Group
+// Refresh Group - return immediately, process in background
 router.post('/refresh-group/:groupId', authenticateToken, async (req, res) => {
     try {
         const { groupId } = req.params;
-        const feeds = await req.miniflux.getFeeds();
-        const groupFeeds = feeds.filter(f => f.category && f.category.id == groupId);
+        const miniflux = req.miniflux;
+        const feeds = await miniflux.getFeeds();
+        const groupFeeds = feeds.filter(f => !f.disabled && f.category && f.category.id == groupId);
 
-        // Limit concurrency to prevent overwhelming Miniflux API
+        // Return immediately, refresh in background
+        res.json({ success: true, count: groupFeeds.length });
+
+        // Fire-and-forget: refresh feeds in background
         const CONCURRENCY_LIMIT = 5;
-        const results = [];
         for (let i = 0; i < groupFeeds.length; i += CONCURRENCY_LIMIT) {
             const batch = groupFeeds.slice(i, i + CONCURRENCY_LIMIT);
-            await Promise.all(batch.map(feed => req.miniflux.refreshFeed(feed.id)));
+            await Promise.all(batch.map(feed => miniflux.refreshFeed(feed.id).catch(() => { })));
         }
-
-        res.json({ success: true, count: groupFeeds.length });
     } catch (error) {
         console.error('Refresh group error:', error);
-        res.status(500).json({ error: '刷新分组失败' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: '刷新分组失败' });
+        }
     }
 });
 
-// Refresh All
+// Refresh All - return immediately, process in background
 router.post('/refresh', authenticateToken, async (req, res) => {
     try {
-        await req.miniflux.refreshAllFeeds();
-        res.json({ success: true });
+        const miniflux = req.miniflux;
+        const feeds = await miniflux.getFeeds();
+        const activeFeeds = feeds.filter(f => !f.disabled);
+
+        // Return immediately, refresh in background
+        res.json({ success: true, count: activeFeeds.length });
+
+        // Fire-and-forget: refresh feeds in background
+        const CONCURRENCY_LIMIT = 5;
+        for (let i = 0; i < activeFeeds.length; i += CONCURRENCY_LIMIT) {
+            const batch = activeFeeds.slice(i, i + CONCURRENCY_LIMIT);
+            await Promise.all(batch.map(feed => miniflux.refreshFeed(feed.id).catch(() => { })));
+        }
     } catch (error) {
         console.error('Refresh all error:', error);
-        res.status(500).json({ error: '刷新失败' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: '刷新失败' });
+        }
     }
 });
 

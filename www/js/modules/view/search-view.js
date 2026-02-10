@@ -207,6 +207,8 @@ export const SearchView = {
      */
     exitSearch() {
         AppState.searchQuery = '';
+        DOMElements.currentFeedTitle.style.display = '';
+        DOMElements.currentFeedTitle.style.alignItems = '';
         window.location.hash = '#/all';
     },
 
@@ -215,8 +217,10 @@ export const SearchView = {
      * @param {string} query - 搜索关键词
      */
     updateSearchTitle(query) {
+        DOMElements.currentFeedTitle.style.display = 'flex';
+        DOMElements.currentFeedTitle.style.alignItems = 'center';
         DOMElements.currentFeedTitle.innerHTML = `
-            ${i18n.t('common.search')}: <span class="search-query-text">${query}</span>
+            ${i18n.t('common.search')}:&nbsp;<span class="search-query-text">${query}</span>
             <button id="exit-search-btn" class="icon-btn" style="margin-left: 8px; width: 24px; height: 24px; min-width: 24px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; padding: 0; background: none; border: none; cursor: pointer; color: inherit; opacity: 0.7;" title="${i18n.t('common.close')}">
                 ${Icons.close}
             </button>

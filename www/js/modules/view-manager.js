@@ -683,6 +683,38 @@ export const ViewManager = {
             SearchView.showInlineSearchBox();
         });
 
+        document.getElementById('articles-refresh-btn')?.addEventListener('click', async (e) => {
+            e.stopPropagation();
+
+            const btn = document.getElementById('articles-refresh-btn');
+            if (btn.classList.contains('is-loading')) return;
+
+            btn.classList.add('is-loading');
+            try {
+                await this.loadArticles(AppState.currentFeedId, AppState.currentGroupId);
+            } catch (err) {
+                console.error('Refresh failed:', err);
+            } finally {
+                btn.classList.remove('is-loading');
+            }
+        });
+
+        // Scroll-to-top triggers an immediate article reload
+        let wasScrolledDown = false;
+        let scrollTopCooldown = false;
+        DOMElements.articlesList.addEventListener('scroll', () => {
+            if (DOMElements.articlesList.scrollTop > 50) {
+                wasScrolledDown = true;
+            } else if (DOMElements.articlesList.scrollTop === 0 && wasScrolledDown && !scrollTopCooldown) {
+                wasScrolledDown = false;
+                scrollTopCooldown = true;
+                setTimeout(() => {
+                    this.checkForNewArticles().catch(() => { });
+                }, 500);
+                setTimeout(() => { scrollTopCooldown = false; }, 3000);
+            }
+        }, { passive: true });
+
         document.getElementById('articles-menu-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.showArticlesContextMenu(e);

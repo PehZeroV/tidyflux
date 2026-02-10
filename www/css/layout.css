@@ -128,17 +128,24 @@
     }
 }
 
-/* 主题色按钮 - 添加订阅、菜单、订阅源按钮、搜索按钮 */
+/* 主题色按钮 - 添加订阅、菜单、订阅源按钮、搜索按钮、刷新按钮 */
 #add-feed-btn,
 #articles-menu-btn,
 #articles-search-btn,
+#articles-refresh-btn,
 #show-feeds-btn {
     color: var(--accent-color);
+}
+
+#articles-search-btn,
+#articles-refresh-btn {
+    margin-right: 4px;
 }
 
 #add-feed-btn:hover,
 #articles-menu-btn:hover,
 #articles-search-btn:hover,
+#articles-refresh-btn:hover,
 #show-feeds-btn:hover {
     color: var(--accent-color);
     background: var(--hover-bg);
@@ -1914,6 +1921,14 @@ body.dialog-open #app-container {
 #current-feed-title .search-query-text {
     font-weight: normal;
     color: var(--meta-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+#current-feed-title #exit-search-btn {
+    flex-shrink: 0;
 }
 
 /* 自定义时间选择器组件 */

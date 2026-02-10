@@ -15,6 +15,7 @@ export default {
         success: '成功',
         load_error: '加载失败',
         refreshing: '等待 Miniflux 刷新...',
+        refresh_in_progress: '刷新中，请稍候...',
         refresh_failed: '刷新失败',
         search: '搜索',
         menu: '菜单',
@@ -145,7 +146,9 @@ export default {
         show_thumbnails: '显示缩略图',
         hide_thumbnails: '隐藏缩略图',
         thumbnails_on: '已开启缩略图显示',
-        thumbnails_off: '已关闭缩略图显示'
+        thumbnails_off: '已关闭缩略图显示',
+        manual_refresh: '手动刷新订阅',
+        refresh_miniflux: '刷新 Miniflux 订阅'
     },
     auth: {
         title: 'Tidyflux',

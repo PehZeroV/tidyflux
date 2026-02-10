@@ -15,6 +15,7 @@ import { Icons } from '../icons.js';
  */
 // 模块级变量：跟踪 showArticlesContextMenu 的关闭处理器
 let articlesMenuCloseHandler = null;
+let isManualRefreshing = false;
 
 export const ContextMenu = {
     /** 视图管理器引用 */
@@ -151,10 +152,11 @@ export const ContextMenu = {
 
         if (!isFavorites && !isDigests) {
             itemsHtml += `
-            <div class="context-menu-item" data-action="refresh">
-                ${Icons.refresh}
-                ${i18n.t('context.refresh_feed')}
+            <div class="context-menu-item" data-action="manual-refresh">
+                ${Icons.miniflux}
+                ${i18n.t('context.refresh_miniflux')}
             </div>
+            <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="generate-digest">
                 ${Icons.newspaper}
                 ${i18n.t('digest.generate')}
@@ -163,11 +165,11 @@ export const ContextMenu = {
                 ${Icons.schedule}
                 ${i18n.t('ai.scheduled_digest')}
             </div>
+            <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="mark-all-read">
                  ${Icons.check}
                 ${i18n.t('context.mark_all_read')}
             </div>
-            <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="toggle-view">
                     ${isUnreadOnly ? Icons.checkbox_checked : Icons.checkbox_unchecked}
                 ${i18n.t('context.show_unread')}
@@ -247,7 +249,12 @@ export const ContextMenu = {
             document.removeEventListener('click', closeHandler, true);
             articlesMenuCloseHandler = null;
 
-            if (action === 'refresh') {
+            if (action === 'manual-refresh') {
+                if (isManualRefreshing) {
+                    showToast(i18n.t('common.refresh_in_progress'));
+                    return;
+                }
+                isManualRefreshing = true;
                 showToast(i18n.t('common.refreshing'));
                 try {
                     if (AppState.currentFeedId) {
@@ -257,8 +264,54 @@ export const ContextMenu = {
                     } else {
                         await FeedManager.refreshFeeds();
                     }
+
+                    // Miniflux refreshes asynchronously, poll for new articles
+                    const snapFeedId = AppState.currentFeedId;
+                    const snapGroupId = AppState.currentGroupId;
+                    const snapArticleId = AppState.currentArticleId;
+                    let userInteracted = false;
+                    const articlesList = document.getElementById('articles-list');
+                    const onScroll = () => { userInteracted = true; };
+                    articlesList.addEventListener('scroll', onScroll, { passive: true });
+
+                    const shouldStop = () =>
+                        userInteracted
+                        || AppState.currentFeedId !== snapFeedId
+                        || AppState.currentGroupId !== snapGroupId
+                        || AppState.currentArticleId !== snapArticleId;
+
+                    let everFoundNew = false;
+                    let consecutiveEmpty = 0;
+                    let round = 0;
+
+                    while (!shouldStop()) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        if (shouldStop()) break;
+                        round++;
+
+                        const prevCount = AppState.articles.length;
+                        try {
+                            await this.viewManager.checkForNewArticles();
+                        } catch { /* ignore */ }
+                        const foundNew = AppState.articles.length > prevCount;
+
+                        if (foundNew) {
+                            everFoundNew = true;
+                            consecutiveEmpty = 0;
+                        } else {
+                            consecutiveEmpty++;
+                            if (everFoundNew && consecutiveEmpty >= 2) {
+                                break;
+                            } else if (!everFoundNew && round >= 3 && consecutiveEmpty >= 2) {
+                                break;
+                            }
+                        }
+                    }
+                    articlesList.removeEventListener('scroll', onScroll);
                 } catch (err) {
-                    alert(err.message || i18n.t('common.refresh_failed'));
+                    showToast(i18n.t('common.refresh_failed'));
+                } finally {
+                    isManualRefreshing = false;
                 }
             } else if (action === 'generate-digest') {
                 if (AppState.currentFeedId) {

@@ -158,6 +158,10 @@ export class MinifluxClient {
         return this.request('/feeds/refresh', { method: 'PUT' });
     }
 
+    async refreshCategory(categoryId) {
+        return this.request(`/categories/${categoryId}/refresh`, { method: 'PUT' });
+    }
+
     // --- Entries ---
 
     async getEntries(params = {}) {

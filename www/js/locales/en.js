@@ -15,6 +15,7 @@ export default {
         success: 'Success',
         load_error: 'Load failed',
         refreshing: 'Waiting for Miniflux refresh...',
+        refresh_in_progress: 'Refresh in progress, please wait...',
         refresh_failed: 'Refresh failed',
         search: 'Search',
         menu: 'Menu',
@@ -145,7 +146,9 @@ export default {
         show_thumbnails: 'Show Thumbnails',
         hide_thumbnails: 'Hide Thumbnails',
         thumbnails_on: 'Thumbnails enabled',
-        thumbnails_off: 'Thumbnails disabled'
+        thumbnails_off: 'Thumbnails disabled',
+        manual_refresh: 'Refresh Feeds',
+        refresh_miniflux: 'Refresh Miniflux Feeds'
     },
     auth: {
         title: 'Tidyflux',
