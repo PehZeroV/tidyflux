@@ -453,37 +453,67 @@ export const ArticleContentView = {
         // 1. 基础处理
         text = text.trim();
 
-        // 2. 基础转义
+        // 2. 提取代码块 (``` ... ```)，用占位符替代，防止内部内容被后续规则处理
+        const codeBlocks = [];
+        text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+            const escaped = code
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const index = codeBlocks.length;
+            codeBlocks.push(`<pre class="md-code-block"><code>${escaped}</code></pre>`);
+            return `\x00CODEBLOCK_${index}\x00`;
+        });
+
+        // 3. 基础转义
         text = text
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // 3. 字体样式
+        // 4. 行内代码 (`code`)
+        text = text.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+
+        // 5. 字体样式
         text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        text = text.replace(/~~(.*?)~~/g, '<del>$1</del>');
+
+        // 6. 链接 [text](url)
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
         // 分隔线
         text = text.replace(/^---+$/gim, '<hr class="md-hr">');
 
-        // 4. 标题 (更紧凑)
+        // 7. 引用块 (> text，但 > 已被转义为 &gt;)
+        text = text.replace(/^&gt;\s?(.*$)/gim, '<div class="md-blockquote">$1</div>');
+
+        // 8. 标题 (更紧凑)
         text = text.replace(/^#### (.*$)/gim, '<div class="md-h4">$1</div>');
         text = text.replace(/^### (.*$)/gim, '<div class="md-h3">$1</div>');
         text = text.replace(/^## (.*$)/gim, '<div class="md-h2">$1</div>');
         text = text.replace(/^# (.*$)/gim, '<div class="md-h1">$1</div>');
 
-        // 5. 列表项 (使用 Flex 布局对齐，更紧凑)
+        // 9. 有序列表 (1. item)
+        text = text.replace(/^\s*(\d+)\.\s+(.*$)/gim, '<div class="md-list-item"><span class="md-list-bullet">$1.</span><span class="md-list-content">$2</span></div>');
+
+        // 10. 无序列表项 (使用 Flex 布局对齐，更紧凑)
         text = text.replace(/^\s*[-*]\s+(.*$)/gim, '<div class="md-list-item"><span class="md-list-bullet">•</span><span class="md-list-content">$1</span></div>');
 
-        // 6. 换行处理
+        // 11. 换行处理
         // 两个以上换行 -> 段间距 (8px)
         text = text.replace(/\n\s*\n/g, '<div class="md-gap"></div>');
 
-        // 闭合标签后的换行 -> 移除 (避免 div 后再跟 br)
-        text = text.replace(/>\s*\n/g, '>');
+        // 块级元素闭合标签后的换行 -> 移除 (避免 div/hr/pre 后再跟 br)
+        text = text.replace(/(<\/div>|<hr[^>]*>|<\/pre>)\s*\n/g, '$1');
 
         // 其他换行 -> br
         text = text.replace(/\n/g, '<br>');
+
+        // 12. 还原代码块占位符
+        codeBlocks.forEach((block, i) => {
+            text = text.replace(`\x00CODEBLOCK_${i}\x00`, block);
+        });
 
         return text;
     },

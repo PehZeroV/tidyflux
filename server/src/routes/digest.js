@@ -123,7 +123,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
             hours: parseInt(hours),
             targetLang,
             prompt: customPrompt,
-            aiConfig: storedAiConfig
+            aiConfig: storedAiConfig,
+            timezone: prefs.digest_timezone || ''
         };
 
         if (isNaN(options.hours)) options.hours = 12;

@@ -207,6 +207,11 @@
     margin-top: 8px;
 }
 
+/* API Key 输入框 - 用 CSS 模拟密码遮罩，避免浏览器密码自动填充 */
+.auth-input-secret {
+    -webkit-text-security: disc;
+}
+
 .logout-btn-full {
     width: 100%;
     padding: 12px;
@@ -222,6 +227,49 @@
 
 .logout-btn-full:hover {
     background: color-mix(in srgb, var(--accent-color), black 10%);
+}
+
+/* 设置页底部 GitHub 链接 */
+.settings-footer {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+    text-align: center;
+}
+
+.settings-github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    color: var(--meta-color);
+    text-decoration: none;
+    font-size: 0.8em;
+    transition: all 0.25s ease;
+    background: transparent;
+}
+
+.settings-github-link:hover {
+    color: var(--text-color);
+    background: var(--hover-bg);
+}
+
+.settings-github-link svg {
+    opacity: 0.7;
+    transition: opacity 0.25s ease;
+}
+
+.settings-github-link:hover svg {
+    opacity: 1;
+}
+
+.settings-github-dot {
+    opacity: 0.4;
+}
+
+.settings-github-desc {
+    opacity: 0.7;
 }
 
 /* ========================================

@@ -503,7 +503,7 @@ input:checked+.slider:before {
 .custom-modal-input {
     width: 100%;
     padding: 12px 14px;
-    font-size: 0.9em;
+    font-size: 16px;
     border: none;
     border-radius: var(--radius);
     background: var(--card-bg);

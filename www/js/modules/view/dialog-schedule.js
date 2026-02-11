@@ -94,7 +94,7 @@ export const ScheduleDialogMixin = {
                 </div>
 
                 <div class="schedule-loader" style="text-align: center; padding: 20px;">
-                    ${i18n.t('app.loading')}
+                    ${i18n.t('common.loading')}
                 </div>
 
                 <form id="schedule-form" style="display: none;">

@@ -228,7 +228,8 @@ export const DigestService = {
             targetLang = 'Simplified Chinese',
             prompt: customPrompt,
             aiConfig,
-            unreadOnly = true
+            unreadOnly = true,
+            timezone = ''
         } = options;
 
         const isEn = targetLang && (targetLang.toLowerCase().includes('english') || targetLang.toLowerCase().includes('en'));
@@ -281,12 +282,36 @@ export const DigestService = {
         // 调用 AI
         const digestContent = await callAIForDigest(prompt, aiConfig);
 
-        // 生成本地化标题
+        // 生成本地化标题 — 使用用户设定的时区
         const now = new Date();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
+        let month, day, hh, mm;
+
+        if (timezone) {
+            try {
+                const fmt = new Intl.DateTimeFormat('en-US', {
+                    timeZone: timezone,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                });
+                const parts = Object.fromEntries(
+                    fmt.formatToParts(now).map(p => [p.type, p.value])
+                );
+                month = parts.month;
+                day = parts.day;
+                hh = parts.hour.padStart(2, '0');
+                mm = parts.minute.padStart(2, '0');
+            } catch {
+                // fallback to system timezone
+            }
+        }
+
+        if (!month) {
+            month = String(now.getMonth() + 1).padStart(2, '0');
+            day = String(now.getDate()).padStart(2, '0');
+            hh = String(now.getHours()).padStart(2, '0');
+            mm = String(now.getMinutes()).padStart(2, '0');
+        }
+
         const timeStr = `${month}-${day}-${hh}:${mm}`;
 
         const digestWord = isEn ? 'Digest' : '简报';

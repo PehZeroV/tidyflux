@@ -61,7 +61,7 @@ export const SettingsDialogMixin = {
                 <div class="settings-section">
                     <div class="settings-section-title">${i18n.t('dialogs.miniflux_connection')}</div>
                     <div id="miniflux-config-info" class="miniflux-config-info">
-                        <div class="miniflux-loading">${i18n.t('app.loading')}</div>
+                        <div class="miniflux-loading">${i18n.t('common.loading')}</div>
                     </div>
                 </div>
                 
@@ -93,12 +93,12 @@ export const SettingsDialogMixin = {
 
                 <div class="settings-section">
                     <div class="settings-section-title">${i18n.t('ai.settings_title')}</div>
-                    <form id="ai-settings-form">
+                    <form id="ai-settings-form" autocomplete="off">
                         <label class="miniflux-input-label">${i18n.t('ai.api_url')}</label>
                         <input type="text" id="ai-api-url" class="auth-input" placeholder="https://api.openai.com/v1" style="margin-bottom: 8px;">
                         
                         <label class="miniflux-input-label">${i18n.t('ai.api_key')}</label>
-                        <input type="password" id="ai-api-key" class="auth-input" placeholder="sk-..." style="margin-bottom: 8px;" autocomplete="off" spellcheck="false">
+                        <input type="text" id="ai-api-key" class="auth-input auth-input-secret" placeholder="sk-..." style="margin-bottom: 8px;" autocomplete="off" spellcheck="false">
                         
                         <label class="miniflux-input-label">${i18n.t('ai.model')}</label>
                         <input type="text" id="ai-model" class="auth-input" placeholder="gpt-4.1-mini" style="margin-bottom: 8px;" autocomplete="off">
@@ -164,9 +164,9 @@ export const SettingsDialogMixin = {
                 <div class="settings-section">
                     <div class="settings-section-title">${i18n.t('settings.account_security')}</div>
 
-                    <form id="settings-change-password-form" style="margin-bottom: 16px;">
-                        <input type="password" id="settings-new-password" class="auth-input" placeholder="${i18n.t('settings.new_password')}" style="margin-bottom: 8px;" required>
-                        <input type="password" id="settings-confirm-password" class="auth-input" placeholder="${i18n.t('settings.confirm_password')}" style="margin-bottom: 8px;" required>
+                    <form id="settings-change-password-form" style="margin-bottom: 16px;" autocomplete="off">
+                        <input type="password" id="settings-new-password" class="auth-input" placeholder="${i18n.t('settings.new_password')}" style="margin-bottom: 8px;" required autocomplete="new-password">
+                        <input type="password" id="settings-confirm-password" class="auth-input" placeholder="${i18n.t('settings.confirm_password')}" style="margin-bottom: 8px;" required autocomplete="new-password">
                         <div class="appearance-mode-group">
                             <button type="submit" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('settings.change_password')}</button>
                         </div>
@@ -179,7 +179,17 @@ export const SettingsDialogMixin = {
                     <div class="appearance-mode-group">
                         <button class="logout-btn-full appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('nav.logout')}</button>
                     </div>
-                </div>` : ''}
+                </div>
+
+                <div class="settings-footer">
+                    <a href="https://github.com/PehZeroV/tidyflux" target="_blank" rel="noopener noreferrer" class="settings-github-link">
+                        ${Icons.github}
+                        <span>Tidyflux</span>
+                        <span class="settings-github-dot">·</span>
+                        <span class="settings-github-desc">${i18n.t('app.description')}</span>
+                    </a>
+                </div>
+                ` : ''}
             </div>
         `, { preventClose: forceMode });
 
@@ -478,7 +488,7 @@ export const SettingsDialogMixin = {
             <div class="miniflux-config-item">
                 <span class="miniflux-config-label">${i18n.t('settings.status')}</span>
                 <span class="miniflux-config-value miniflux-status-connected" id="miniflux-status-value">
-                    <span class="status-dot" style="background-color: var(--meta-color);"></span>${i18n.t('settings.connected')} ${sourceText} <span style="font-size: 0.9em; opacity: 0.8;">(${i18n.t('app.loading')}...)</span>
+                    <span class="status-dot" style="background-color: var(--meta-color);"></span>${i18n.t('settings.connected')} ${sourceText} <span style="font-size: 0.9em; opacity: 0.8;">(${i18n.t('common.loading')}...)</span>
                 </span>
             </div>
             <div class="miniflux-config-item">
@@ -538,7 +548,7 @@ export const SettingsDialogMixin = {
                     <span class="status-dot"></span>${isEditing ? i18n.t('settings.editing') : i18n.t('settings.not_configured')}
                 </span>
             </div>
-            <form id="miniflux-config-form" class="miniflux-config-form">
+            <form id="miniflux-config-form" class="miniflux-config-form" autocomplete="off">
                 <label class="miniflux-input-label">${i18n.t('settings.miniflux_url')}</label>
                 <input type="text" id="miniflux-url" class="auth-input" placeholder="https://miniflux.example.com" style="margin-bottom: 12px;" value="${prefill?.url || ''}" required>
                 
@@ -550,13 +560,13 @@ export const SettingsDialogMixin = {
 
                 <div id="auth-fields-basic" style="${authType === 'basic' ? 'display:block' : 'display:none'}">
                     <label class="miniflux-input-label">${i18n.t('settings.username_password')}</label>
-                    <input type="text" id="miniflux-username" class="auth-input" placeholder="admin" style="margin-bottom: 8px;" value="${prefill?.username || ''}">
-                    <input type="password" id="miniflux-password" class="auth-input" placeholder="${isEditing ? i18n.t('settings.enter_new_password') : '••••••••'}" style="margin-bottom: 12px;">
+                    <input type="text" id="miniflux-username" class="auth-input" placeholder="admin" style="margin-bottom: 8px;" value="${prefill?.username || ''}" autocomplete="off">
+                    <input type="password" id="miniflux-password" class="auth-input" placeholder="${isEditing ? i18n.t('settings.enter_new_password') : '••••••••'}" style="margin-bottom: 12px;" autocomplete="new-password">
                 </div>
 
                 <div id="auth-fields-apikey" style="${authType === 'api_key' ? 'display:block' : 'display:none'}">
                     <label class="miniflux-input-label">${i18n.t('settings.auth_api_key')}</label>
-                    <input type="password" id="miniflux-api-key" class="auth-input" placeholder="${i18n.t('settings.api_key_placeholder')}" style="margin-bottom: 12px;" value="${prefill?.apiKey || ''}" autocomplete="off">
+                    <input type="text" id="miniflux-api-key" class="auth-input auth-input-secret" placeholder="${i18n.t('settings.api_key_placeholder')}" style="margin-bottom: 12px;" value="${prefill?.apiKey || ''}" autocomplete="off">
                 </div>
 
                 <div class="appearance-mode-group">

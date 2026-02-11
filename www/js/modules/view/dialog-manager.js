@@ -44,6 +44,23 @@ export const ManagerDialogMixin = {
                     </div>
                 </div>
 
+                <!-- Timezone Settings -->
+                <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px;">${i18n.t('settings.timezone')}</div>
+                    <div style="margin-bottom: 8px;">
+                        <select id="manager-timezone-select" class="auth-input" style="margin-bottom: 0; cursor: pointer;">
+                            <option value="">${i18n.t('settings.timezone_system_default')}</option>
+                        </select>
+                    </div>
+                    <div id="manager-timezone-preview" style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 8px;"></div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <button type="button" id="manager-timezone-save-btn" class="appearance-mode-btn active" style="flex: 1; justify-content: center;">
+                            ${i18n.t('common.save')}
+                        </button>
+                    </div>
+                    <div id="manager-timezone-msg" style="text-align: center; font-size: 0.85em; min-height: 1.2em;"></div>
+                </div>
+
                 <!-- Digest Prompt Settings -->
                 <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                     <div style="font-weight: 600; margin-bottom: 12px;">${i18n.t('ai.digest_prompt')}</div>
@@ -97,6 +114,126 @@ export const ManagerDialogMixin = {
         const digestPromptResetBtn = dialog.querySelector('#manager-digest-prompt-reset-btn');
         const digestPromptSaveBtn = dialog.querySelector('#manager-digest-prompt-save-btn');
         const digestPromptMsg = dialog.querySelector('#manager-digest-prompt-msg');
+
+        // Timezone elements
+        const timezoneSelect = dialog.querySelector('#manager-timezone-select');
+        const timezonePreview = dialog.querySelector('#manager-timezone-preview');
+        const timezoneSaveBtn = dialog.querySelector('#manager-timezone-save-btn');
+        const timezoneMsg = dialog.querySelector('#manager-timezone-msg');
+
+        // Common IANA timezone list
+        const timezones = [
+            'Pacific/Midway', 'Pacific/Honolulu', 'America/Anchorage',
+            'America/Los_Angeles', 'America/Denver', 'America/Chicago',
+            'America/New_York', 'America/Sao_Paulo',
+            'Atlantic/Reykjavik', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+            'Europe/Moscow', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok',
+            'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul',
+            'Australia/Sydney', 'Pacific/Auckland'
+        ];
+
+        // Populate timezone dropdown
+        timezones.forEach(tz => {
+            const opt = document.createElement('option');
+            opt.value = tz;
+            try {
+                const now = new Date();
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: tz,
+                    timeZoneName: 'shortOffset'
+                });
+                const parts = formatter.formatToParts(now);
+                const offsetPart = parts.find(p => p.type === 'timeZoneName');
+                const offset = offsetPart ? offsetPart.value : '';
+                opt.textContent = `${tz.replace(/_/g, ' ')} (${offset})`;
+            } catch {
+                opt.textContent = tz.replace(/_/g, ' ');
+            }
+            timezoneSelect.appendChild(opt);
+        });
+
+        // Server timezone info (will be filled by API call)
+        let serverEffectiveTz = '';
+
+        // Fetch server timezone and update default option label
+        (async () => {
+            try {
+                const resp = await fetch(API_ENDPOINTS.PREFERENCES.SERVER_TIMEZONE, {
+                    headers: { 'Authorization': `Bearer ${AuthManager.getToken()}` }
+                });
+                if (resp.ok) {
+                    const { envTZ, systemTimezone } = await resp.json();
+                    serverEffectiveTz = envTZ || systemTimezone || '';
+                    const defaultOpt = timezoneSelect.querySelector('option[value=""]');
+                    if (defaultOpt && serverEffectiveTz) {
+                        const source = envTZ ? i18n.t('settings.env_var') : '';
+                        defaultOpt.textContent = `${serverEffectiveTz.replace(/_/g, ' ')}${source}`;
+                    }
+                    updateTimezonePreview();
+                }
+            } catch (e) {
+                console.warn('Failed to fetch server timezone:', e);
+            }
+        })();
+
+        // Update preview showing current time in selected timezone
+        let timezonePreviewTimer = null;
+        const updateTimezonePreview = () => {
+            const tz = timezoneSelect.value || serverEffectiveTz;
+            if (!tz) {
+                timezonePreview.textContent = '';
+                return;
+            }
+            try {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('en-US', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                timezonePreview.textContent = `${i18n.t('settings.timezone_current_time')}: ${timeStr}`;
+            } catch {
+                timezonePreview.textContent = '';
+            }
+        };
+
+        timezoneSelect.addEventListener('change', updateTimezonePreview);
+        updateTimezonePreview();
+        timezonePreviewTimer = setInterval(updateTimezonePreview, 1000);
+
+        // Cleanup timer when dialog closes
+        const observer = new MutationObserver(() => {
+            if (!document.body.contains(dialog)) {
+                clearInterval(timezonePreviewTimer);
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Save timezone
+        timezoneSaveBtn.addEventListener('click', async () => {
+            timezoneSaveBtn.disabled = true;
+            timezoneMsg.textContent = '...';
+            timezoneMsg.style.color = 'var(--meta-color)';
+            try {
+                const response = await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${AuthManager.getToken()}`
+                    },
+                    body: JSON.stringify({
+                        key: 'digest_timezone',
+                        value: timezoneSelect.value
+                    })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                timezoneMsg.textContent = `✓ ${i18n.t('settings.save_success')}`;
+                timezoneMsg.style.color = 'var(--accent-color)';
+            } catch (err) {
+                console.error('Save timezone failed:', err);
+                timezoneMsg.textContent = `✗ ${i18n.t('common.error')}`;
+                timezoneMsg.style.color = 'var(--danger-color)';
+            }
+            timezoneSaveBtn.disabled = false;
+            setTimeout(() => { timezoneMsg.textContent = ''; }, 2000);
+        });
 
         // Load digest prompt
         const aiConfig = AIService.getConfig();
@@ -248,6 +385,11 @@ export const ManagerDialogMixin = {
                 const pushCfg = prefs.digest_push_config || {};
                 globalPushUrl.value = pushCfg.url || '';
                 globalPushBody.value = pushCfg.body || '';
+
+                // Load timezone
+                const savedTz = prefs.digest_timezone || '';
+                timezoneSelect.value = savedTz;
+                updateTimezonePreview();
 
                 renderTasks();
             } catch (err) {

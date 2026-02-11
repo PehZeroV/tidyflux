@@ -115,7 +115,11 @@ export default {
 
         push_test: '测试推送',
         push_test_success: '推送测试成功',
-        push_test_failed: '推送测试失败'
+        push_test_failed: '推送测试失败',
+        timezone: '时区设置',
+        timezone_system_default: '跟随系统 / 环境变量',
+        timezone_current_time: '当前时间',
+        timezone_env_hint: '未设置时区，将使用容器 TZ 环境变量或系统默认时区'
     },
     article: {
         mark_read: '标记为已读',

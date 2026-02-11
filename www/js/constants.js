@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
     },
     PREFERENCES: {
         BASE: '/api/preferences',
+        SERVER_TIMEZONE: '/api/preferences/server-timezone',
     },
     AI: {
         CHAT: '/api/ai/chat',

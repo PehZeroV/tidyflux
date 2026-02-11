@@ -115,7 +115,11 @@ export default {
 
         push_test: 'Test Push',
         push_test_success: 'Push test succeeded',
-        push_test_failed: 'Push test failed'
+        push_test_failed: 'Push test failed',
+        timezone: 'Timezone',
+        timezone_system_default: 'System Default / Env Variable',
+        timezone_current_time: 'Current time',
+        timezone_env_hint: 'No timezone set, using container TZ env variable or system default'
     },
     article: {
         mark_read: 'Mark as Read',

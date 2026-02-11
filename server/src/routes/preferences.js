@@ -65,6 +65,12 @@ router.post('/', authenticateToken, async (req, res) => {
         res.status(500).json({ error: '更新偏好设置失败' });
     }
 });
+// Get server timezone info
+router.get('/server-timezone', authenticateToken, (req, res) => {
+    const envTZ = process.env.TZ || '';
+    const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    res.json({ envTZ, systemTimezone });
+});
 
 export default router;
 
