@@ -15,6 +15,7 @@
 @import url('./css/responsive.css');
 
 /* 组件 */
+@import url('./css/components.css');
 @import url('./css/article.css');
 @import url('./css/modals.css');
 @import url('./css/settings.css');

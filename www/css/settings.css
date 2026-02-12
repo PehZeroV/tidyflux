@@ -1,40 +1,14 @@
 /* ========================================
    设置对话框样式
+   基础 overlay/card 样式已在 components.css 中定义
    ======================================== */
 
-/* 设置弹窗 - 卡片风格 */
-.settings-dialog {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.2s;
-}
-
-.settings-dialog.active {
-    opacity: 1;
-    visibility: visible;
-}
-
+/* 设置弹窗 - 尺寸与布局 */
 .settings-dialog-content {
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    padding: 24px;
     width: 90%;
     max-width: 420px;
     max-height: 80vh;
     overflow-y: auto;
-    box-shadow: var(--card-shadow);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 @media (max-width: 800px) {

@@ -45,6 +45,27 @@ export const ArticleContentView = {
     },
 
     /**
+     * 渲染工具栏到 content-panel（与 panel-header 同级，脱离滚动容器）
+     * @param {string} toolbarHTML - 工具栏 HTML
+     */
+    _renderToolbar(toolbarHTML) {
+        this._clearToolbar();
+        if (DOMElements.contentPanel) {
+            DOMElements.contentPanel.insertAdjacentHTML('afterbegin', toolbarHTML);
+        }
+    },
+
+    /**
+     * 清除工具栏
+     */
+    _clearToolbar() {
+        if (DOMElements.contentPanel) {
+            const existing = DOMElements.contentPanel.querySelector('.article-toolbar');
+            if (existing) existing.remove();
+        }
+    },
+
+    /**
      * 选择文章
      * @param {string|number} articleId - 文章 ID
      */
@@ -193,6 +214,9 @@ export const ArticleContentView = {
             this.updateLocalUnreadCount(feedId);
         }
 
+        // 清除旧的工具栏
+        this._clearToolbar();
+
         // 显示加载状态
         DOMElements.articleContent.innerHTML = `<div class="loading" style="padding: 40px; text-align: center;">${i18n.t('common.loading')}</div>`;
         DOMElements.articleContent.scrollTop = 0;
@@ -273,11 +297,13 @@ export const ArticleContentView = {
             </div>
         `;
 
+        // 渲染工具栏到 content-panel（与 panel-header 同级）
+        this._renderToolbar(toolbarHTML);
+
         // 使用 Markdown 解析内容
         const renderedContent = this.parseMarkdown(digest.content || '');
 
         DOMElements.articleContent.innerHTML = `
-            ${toolbarHTML}
             <header class="article-header digest-header">
                 <h1>
                     ${digest.title}
@@ -395,8 +421,10 @@ export const ArticleContentView = {
             </div>
         `;
 
+        // 渲染工具栏到 content-panel（与 panel-header 同级）
+        this._renderToolbar(toolbarHTML);
+
         DOMElements.articleContent.innerHTML = `
-            ${toolbarHTML}
             <header class="article-header">
                 ${titleHTML}
                 <div class="article-header-info" style="

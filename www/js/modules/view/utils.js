@@ -179,6 +179,7 @@ export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showL
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'app-toast';
+        toast.className = 'app-toast';
         document.body.appendChild(toast);
     }
 
@@ -191,30 +192,11 @@ export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showL
         leftPos = `${rect.left + rect.width / 2}px`;
     }
 
-    toast.style.cssText = `
-        position: fixed;
-        top: 10px;
-        left: ${leftPos};
-        transform: translateX(-50%);
-        background: var(--card-bg);
-        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-        color: var(--text-color);
-        padding: 8px 16px;
-        border-radius: var(--radius);
-        box-shadow: var(--card-shadow);
-        z-index: ${UI_CONFIG.TOAST_Z_INDEX};
-        font-size: 0.85em;
-        font-weight: 500;
-        opacity: 0;
-        transition: opacity 0.3s ease, box-shadow 0.2s ease;
-        pointer-events: ${onClick ? 'auto' : 'none'};
-        cursor: ${onClick ? 'pointer' : 'default'};
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
-    `;
+    // 仅设置动态属性，其余由 CSS 类 .app-toast 控制
+    toast.style.left = leftPos;
+    toast.style.pointerEvents = onClick ? 'auto' : 'none';
+    toast.style.cursor = onClick ? 'pointer' : 'default';
+    toast.style.opacity = '0';
 
     const iconHtml = showLoadingIcon ? `
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite; flex-shrink: 0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>

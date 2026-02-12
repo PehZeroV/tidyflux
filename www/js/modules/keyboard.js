@@ -593,13 +593,13 @@ export const KeyboardShortcuts = {
         const CloseIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
         const { dialog, close } = createDialog('settings-dialog', `
-            <div class="settings-dialog-content" style="position: relative; max-width: 480px;">
+            <div class="settings-dialog-content" style="position: relative; max-width: 480px; display: flex; flex-direction: column; overflow-x: hidden;">
                 <button class="icon-btn close-dialog-btn" title="${isZh ? '关闭' : 'Close'}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; z-index: 10;">
                     ${CloseIcon}
                 </button>
                 <h3>${title}</h3>
                 <div class="keyboard-customize-hint" style="margin-bottom: 12px;">${hintText}</div>
-                <div style="max-height: 55vh; overflow-y: auto; margin: 0 -24px; padding: 0 24px;">
+                <div style="flex: 1; min-height: 0; overflow-y: auto; margin: 0 -24px; padding: 0 24px;">
                     ${groupOrder.map(g => `
                         <div class="keyboard-help-section">
                             <h3>${isZh ? GROUP_LABELS[g].zh : GROUP_LABELS[g].en}</h3>
@@ -616,7 +616,7 @@ export const KeyboardShortcuts = {
                         </div>
                     `).join('')}
                 </div>
-                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); flex-shrink: 0;">
                     <div class="appearance-mode-group" style="gap: 8px;">
                         <button type="button" id="keyboard-reset-btn" class="appearance-mode-btn" style="flex: 1; justify-content: center;">${resetText}</button>
                         <button type="button" id="keyboard-save-btn" class="appearance-mode-btn active" style="flex: 1; justify-content: center;">${saveText}</button>

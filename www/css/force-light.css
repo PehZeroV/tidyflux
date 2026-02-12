@@ -65,6 +65,9 @@
     border-left-color: var(--accent-color);
 }
 
-[data-color-scheme="light"] .search-dialog-content {
+[data-color-scheme="light"] .add-feed-dialog-content,
+[data-color-scheme="light"] .settings-dialog-content,
+[data-color-scheme="light"] .custom-modal-content,
+[data-color-scheme="light"] .context-menu {
     box-shadow: var(--card-shadow);
 }

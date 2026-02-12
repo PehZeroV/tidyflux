@@ -65,9 +65,9 @@
         border-left-color: var(--accent-color);
     }
 
-    .search-dialog-content,
     .add-feed-dialog-content,
     .settings-dialog-content,
+    .custom-modal-content,
     .context-menu {
         box-shadow: var(--card-shadow);
     }

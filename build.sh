@@ -34,6 +34,7 @@ cat "$ROOT_DIR/www/css/variables.css" \
     "$ROOT_DIR/www/css/feeds.css" \
     "$ROOT_DIR/www/css/responsive.css" \
     "$ROOT_DIR/www/css/article.css" \
+    "$ROOT_DIR/www/css/components.css" \
     "$ROOT_DIR/www/css/modals.css" \
     "$ROOT_DIR/www/css/settings.css" \
     "$ROOT_DIR/www/css/search.css" \

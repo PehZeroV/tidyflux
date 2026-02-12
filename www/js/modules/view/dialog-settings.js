@@ -230,8 +230,7 @@ export const SettingsDialogMixin = {
         if (keyboardBtn) {
             keyboardBtn.addEventListener('click', () => {
                 close();
-                // Wait for settings dialog to finish closing before opening help
-                setTimeout(() => KeyboardShortcuts._showHelp.call(KeyboardShortcuts), 300);
+                KeyboardShortcuts._showHelp.call(KeyboardShortcuts);
             });
         }
 

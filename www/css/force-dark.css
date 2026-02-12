@@ -70,9 +70,9 @@
     border-left-color: var(--accent-color);
 }
 
-[data-color-scheme="dark"] .search-dialog-content,
 [data-color-scheme="dark"] .add-feed-dialog-content,
 [data-color-scheme="dark"] .settings-dialog-content,
+[data-color-scheme="dark"] .custom-modal-content,
 [data-color-scheme="dark"] .context-menu {
     box-shadow: var(--card-shadow);
 }

@@ -246,7 +246,8 @@ export const ArticleToolbarMixin = {
                 // Create menu and append to body
                 const menu = document.createElement('div');
                 menu.className = 'context-menu';
-                menu.style.maxWidth = '240px';
+                menu.style.maxWidth = 'calc(100vw - 20px)';
+                menu.style.minWidth = '200px';
                 menu.innerHTML = `
                     <div class="context-menu-label">${i18n.t('article.save_to_third_party')}</div>
                     <div class="article-more-menu-content">
@@ -256,15 +257,14 @@ export const ArticleToolbarMixin = {
                 document.body.appendChild(menu);
                 activeMenu = menu;
 
-                // Position below the button
+                // Position below the button, anchored to right edge
                 const positionMenu = () => {
                     const rect = moreBtn.getBoundingClientRect();
-                    const mw = menu.offsetWidth;
-                    let x = rect.right - mw;
                     const y = rect.bottom + 4;
-                    if (x < 10) x = 10;
-                    if (x + mw > window.innerWidth - 10) x = window.innerWidth - mw - 10;
-                    menu.style.left = `${x}px`;
+                    // 右对齐：菜单右边缘与按钮右边缘对齐，向左展开
+                    const rightOffset = window.innerWidth - rect.right;
+                    menu.style.right = `${Math.max(10, rightOffset)}px`;
+                    menu.style.left = 'auto';
                     menu.style.top = `${y}px`;
                 };
                 positionMenu();
