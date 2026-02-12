@@ -33,8 +33,10 @@
 - 📱 Support for mobile, tablet, and desktop
 - 🌐 Bilingual interface (Chinese/English)
 - 📥 Installable to desktop (PWA)
-- 🔄 Personalized settings and AI configuration cloud storage, automatic synchronization across multiple devices
+- ⌨️ Keyboard Shortcuts: Rich built-in shortcuts with customizable key bindings
+- 💾 Save to Third-party Services: Save articles to Pocket, Instapaper, Wallabag, and other third-party services
 - 🎧 Built-in podcast player, supporting background playback and progress control
+- 🔄 Personalized settings and AI configuration cloud storage, automatic synchronization across multiple devices
 - 🤖 **AI Enhanced Features**:
     - 📝 **Article Summary**: Extract core viewpoints and summaries of articles with one click
     - 🌍 **Full Text Translation**: Support full text translation in multiple languages
@@ -45,7 +47,7 @@
 
 **feeds**: Add, Edit, Delete, Refresh, OPML Import/Export
 
-**Articles**: Read, Search, Mark as Read/Unread, Star, Fetch Full Text
+**Articles**: Read, Search, Mark as Read/Unread, Star, Fetch Full Text, Save to Third-party Services
 
 **Categories**: Create, Rename, Delete, Pin Categories
 
@@ -99,7 +101,7 @@ docker compose up -d
 - Password: `admin`
 - *Recommended to change password after login*
 
-### II. Fresh Deployment (Includes Miniflux + TidyFlux)
+### II. Fresh Deployment (Includes Miniflux + Tidyflux)
 
 If you have not deployed Miniflux yet, you can deploy the full suite of services using the following steps.
 

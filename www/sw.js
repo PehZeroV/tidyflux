@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tidyflux-cache-v7.0';
+const CACHE_NAME = 'tidyflux-cache-v9.8';
 
 const URLS_TO_CACHE = [
   '/',
@@ -28,7 +28,9 @@ const URLS_TO_CACHE = [
   '/manifest.json',
   '/icons/apple-touch-icon.png',
   '/icons/favicon.png',
-  '/icons/rss.svg'
+  '/icons/rss.svg',
+  '/js/modules/keyboard.js',
+  '/css/keyboard.css'
 ];
 
 self.addEventListener('install', event => {

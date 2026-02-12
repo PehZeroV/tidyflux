@@ -12,6 +12,7 @@ import { Modal, CustomSelect } from './components.js';
 import { i18n } from '../i18n.js';
 import { AIService, AI_LANGUAGES } from '../ai-service.js';
 import { Icons } from '../icons.js';
+import { KeyboardShortcuts } from '../keyboard.js';
 
 /**
  * 设置对话框相关方法
@@ -162,6 +163,13 @@ export const SettingsDialogMixin = {
                 </div>
 
                 <div class="settings-section">
+                    <div class="settings-section-title">${i18n.t('settings.keyboard_shortcuts')}</div>
+                    <div class="appearance-mode-group">
+                        <button type="button" id="settings-keyboard-shortcuts-btn" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">${i18n.t('settings.keyboard_shortcuts')}</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <div class="settings-section-title">${i18n.t('settings.account_security')}</div>
 
                     <form id="settings-change-password-form" style="margin-bottom: 16px;" autocomplete="off">
@@ -214,6 +222,16 @@ export const SettingsDialogMixin = {
             manageDigestBtn.addEventListener('click', () => {
                 close();
                 this.showDigestManagerDialog();
+            });
+        }
+
+        // 快捷键管理按钮
+        const keyboardBtn = dialog.querySelector('#settings-keyboard-shortcuts-btn');
+        if (keyboardBtn) {
+            keyboardBtn.addEventListener('click', () => {
+                close();
+                // Wait for settings dialog to finish closing before opening help
+                setTimeout(() => KeyboardShortcuts._showHelp.call(KeyboardShortcuts), 300);
             });
         }
 

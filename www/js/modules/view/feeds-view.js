@@ -10,6 +10,7 @@ import { setTheme, setColorScheme } from '../theme-manager.js';
 import { i18n } from '../i18n.js';
 import { Icons } from '../icons.js';
 import { API_ENDPOINTS } from '../../constants.js';
+import { KeyboardShortcuts } from '../keyboard.js';
 
 const STORAGE_KEY_COLLAPSED = 'tidyflux_collapsed_groups';
 const STORAGE_KEY_PINNED = 'tidyflux_pinned_groups';
@@ -85,6 +86,9 @@ export const FeedsView = {
             if (AppState.preferences.pinned_groups) {
                 localStorage.setItem(STORAGE_KEY_PINNED, JSON.stringify(AppState.preferences.pinned_groups));
             }
+
+            // Sync keyboard shortcuts from server preferences
+            KeyboardShortcuts.syncFromPreferences();
 
             return { feeds, groups, digestsData };
         } catch (err) {

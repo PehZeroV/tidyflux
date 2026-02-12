@@ -91,6 +91,7 @@ export default {
         env_var: ' (Env)',
         manual_config: ' (Manual)',
         edit_config: 'Edit Prompts',
+        keyboard_shortcuts: 'Keyboard Shortcuts',
         edit_connection: 'Edit Connection',
         editing: 'Editing',
         enter_new_password: 'Enter new password',

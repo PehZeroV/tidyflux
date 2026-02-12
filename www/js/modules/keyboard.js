@@ -1,0 +1,750 @@
+/**
+ * Keyboard Shortcuts Module - Tidyflux
+ * @module keyboard
+ * 
+ * Customizable keyboard shortcuts with Miniflux-compatible defaults.
+ * Users can remap any shortcut via the settings dialog.
+ * 
+ * Default shortcuts (following Miniflux conventions):
+ * 
+ *   List view:
+ *     j / ↓    - Next article
+ *     k / ↑    - Previous article
+ *     o / Enter - Open selected article
+ *     /        - Search
+ *     r        - Refresh list
+ *     a        - Add feed
+ *
+ *   Reading view:
+ *     n        - Next article
+ *     p        - Previous article
+ *     f        - Toggle star / favorite
+ *     m        - Toggle read / unread
+ *     v        - Open original in new tab
+ *     d        - Fetch original content
+ *     s        - Save to third-party service
+ *     Escape   - Go back to list
+ *
+ *   Global:
+ *     ?        - Show shortcuts help
+ */
+
+import { DOMElements } from '../dom.js';
+import { AppState } from '../state.js';
+import { ArticlesView } from './view/articles-view.js';
+import { FeedManager } from './feed-manager.js';
+import { showToast, createDialog } from './view/utils.js';
+import { i18n } from './i18n.js';
+
+const CLASS_ARTICLE_VIEW_ACTIVE = 'article-view-active';
+
+/**
+ * Storage key for custom shortcuts
+ */
+const STORAGE_KEY = 'tidyflux_keyboard_shortcuts';
+
+/**
+ * Default shortcut mapping: action → key(s)
+ * Each action maps to an array of accepted keys.
+ * The first key in the array is the "primary" (displayed in help).
+ */
+const DEFAULT_SHORTCUTS = {
+    // List view
+    nextItem: ['j'],
+    prevItem: ['k'],
+    openItem: ['o', 'Enter'],
+    search: ['/'],
+    refresh: ['r'],
+    addFeed: ['a'],
+
+    // Reading view
+    nextArticle: ['n'],
+    prevArticle: ['p'],
+    toggleStar: ['f'],
+    toggleRead: ['m'],
+    openOriginal: ['v'],
+    fetchContent: ['d'],
+    saveThirdParty: ['s'],
+    goBack: ['Escape'],
+
+    // Global
+    showHelp: ['?'],
+};
+
+/**
+ * Action metadata: labels for i18n
+ * Grouped by context for display in help and settings
+ */
+const ACTION_META = {
+    nextItem: { group: 'list', zhLabel: '下一篇文章', enLabel: 'Next article' },
+    prevItem: { group: 'list', zhLabel: '上一篇文章', enLabel: 'Previous article' },
+    openItem: { group: 'list', zhLabel: '打开文章', enLabel: 'Open article' },
+    search: { group: 'list', zhLabel: '搜索', enLabel: 'Search' },
+    refresh: { group: 'list', zhLabel: '刷新列表', enLabel: 'Refresh list' },
+    addFeed: { group: 'list', zhLabel: '添加订阅', enLabel: 'Add feed' },
+
+    nextArticle: { group: 'reading', zhLabel: '下一篇', enLabel: 'Next article' },
+    prevArticle: { group: 'reading', zhLabel: '上一篇', enLabel: 'Previous article' },
+    toggleStar: { group: 'reading', zhLabel: '收藏 / 取消收藏', enLabel: 'Toggle star' },
+    toggleRead: { group: 'reading', zhLabel: '已读 / 未读', enLabel: 'Toggle read/unread' },
+    openOriginal: { group: 'reading', zhLabel: '打开原文', enLabel: 'Open original' },
+    fetchContent: { group: 'reading', zhLabel: '获取全文', enLabel: 'Fetch content' },
+    saveThirdParty: { group: 'reading', zhLabel: '保存到第三方', enLabel: 'Save to third-party' },
+    goBack: { group: 'reading', zhLabel: '返回列表', enLabel: 'Go back' },
+
+    showHelp: { group: 'global', zhLabel: '快捷键帮助', enLabel: 'Shortcuts help' },
+};
+
+const GROUP_LABELS = {
+    list: { zh: '文章列表', en: 'Article List' },
+    reading: { zh: '文章阅读', en: 'Reading View' },
+    global: { zh: '通用', en: 'General' },
+};
+
+/**
+ * Keyboard Shortcuts Manager
+ */
+export const KeyboardShortcuts = {
+    /** ViewManager reference */
+    viewManager: null,
+    /** Whether shortcuts are enabled */
+    enabled: true,
+    /** Help dialog element reference */
+    helpDialog: null,
+    /** Current shortcut mapping (action → keys[]) */
+    shortcuts: null,
+    /** Reverse mapping (key → action) for fast lookup, rebuilt on change */
+    _keyToAction: null,
+
+    /**
+     * Initialize keyboard shortcuts
+     * @param {Object} viewManager - ViewManager instance
+     */
+    init(viewManager) {
+        this.viewManager = viewManager;
+        this.shortcuts = this._loadShortcuts();
+        this._buildReverseMap();
+        this._bindGlobalKeydown();
+    },
+
+    /**
+     * Re-sync shortcuts after server preferences have been loaded.
+     * Called after AppState.preferences is populated from the server.
+     */
+    syncFromPreferences() {
+        if (AppState.preferences?.keyboard_shortcuts) {
+            this.shortcuts = this._loadShortcuts();
+            this._buildReverseMap();
+            // Also update localStorage cache
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(this.shortcuts));
+            } catch (e) { /* ignore */ }
+        }
+    },
+
+    // ==================== Persistence ====================
+
+    /**
+     * Load custom shortcuts, prioritizing server preferences over localStorage
+     * @returns {Object}
+     */
+    _loadShortcuts() {
+        const base = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+        try {
+            // Priority: server preferences > localStorage
+            const saved = AppState.preferences?.keyboard_shortcuts
+                || JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+            if (saved) {
+                for (const action of Object.keys(base)) {
+                    if (saved[action] && Array.isArray(saved[action]) && saved[action].length > 0) {
+                        base[action] = saved[action];
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load keyboard shortcuts:', e);
+        }
+        return base;
+    },
+
+    /**
+     * Save current shortcuts to server preferences and localStorage (as cache)
+     */
+    _saveShortcuts() {
+        try {
+            // Save to localStorage as cache
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.shortcuts));
+            // Save to server preferences
+            FeedManager.setPreference('keyboard_shortcuts', this.shortcuts).catch(err => {
+                console.warn('Failed to sync keyboard shortcuts to server:', err);
+            });
+        } catch (e) {
+            console.warn('Failed to save keyboard shortcuts:', e);
+        }
+    },
+
+    /**
+     * Build reverse map: key → { action, group }
+     */
+    _buildReverseMap() {
+        this._keyToAction = {};
+        for (const [action, keys] of Object.entries(this.shortcuts)) {
+            const meta = ACTION_META[action];
+            if (!meta) continue;
+            for (const key of keys) {
+                this._keyToAction[key] = { action, group: meta.group };
+            }
+        }
+    },
+
+    /**
+     * Update a single shortcut
+     * @param {string} action - Action name
+     * @param {string[]} keys - New key(s)
+     */
+    updateShortcut(action, keys) {
+        if (!DEFAULT_SHORTCUTS[action]) return;
+        this.shortcuts[action] = keys;
+        this._buildReverseMap();
+        this._saveShortcuts();
+    },
+
+    /**
+     * Reset all shortcuts to defaults
+     */
+    resetToDefaults() {
+        this.shortcuts = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+        this._buildReverseMap();
+        this._saveShortcuts();
+    },
+
+    /**
+     * Get the default shortcuts (for comparison / reset)
+     * @returns {Object}
+     */
+    getDefaults() {
+        return JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+    },
+
+    // ==================== State Checks ====================
+
+    /**
+     * Check if an interactive element is focused
+     * @returns {boolean}
+     */
+    _isInputFocused() {
+        const el = document.activeElement;
+        if (!el) return false;
+        const tag = el.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+        if (el.isContentEditable) return true;
+        return false;
+    },
+
+    /**
+     * Check if a dialog/modal is currently open
+     * @returns {boolean}
+     */
+    _isDialogOpen() {
+        const overlay = document.querySelector('.dialog-overlay');
+        if (overlay) return true;
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) return true;
+        const contextMenu = document.querySelector('.context-menu.show');
+        if (contextMenu) return true;
+        return false;
+    },
+
+    /**
+     * Check if currently viewing an article
+     * On mobile: body has 'article-view-active' class
+     * On desktop: check if an article is currently loaded in the content panel
+     * @returns {boolean}
+     */
+    _isArticleViewActive() {
+        // Mobile: body class is toggled
+        if (DOMElements.body.classList.contains(CLASS_ARTICLE_VIEW_ACTIVE)) return true;
+        // Desktop: check if an article is currently displayed
+        return !!AppState.content.currentArticleId;
+    },
+
+    // ==================== List Navigation ====================
+
+    /** Currently focused article index in AppState.articles */
+    _focusedIndex: -1,
+    /** Reference to last known articles array (to detect list changes) */
+    _lastArticles: null,
+
+    /**
+     * Navigate to next or previous article in the list (highlight only, no open)
+     * @param {number} direction - 1 for next, -1 for previous
+     */
+    _navigateList(direction) {
+        const articles = AppState.articles;
+        if (!articles || articles.length === 0) return;
+
+        // Reset index when articles list has changed (search, feed switch, etc.)
+        if (articles !== this._lastArticles) {
+            this._focusedIndex = -1;
+            this._lastArticles = articles;
+        }
+
+        // If no focused index, start from beginning (j) or end (k)
+        if (this._focusedIndex < 0 || this._focusedIndex >= articles.length) {
+            this._focusedIndex = direction === 1 ? 0 : articles.length - 1;
+        } else {
+            this._focusedIndex += direction;
+        }
+
+        // Clamp
+        if (this._focusedIndex < 0) this._focusedIndex = 0;
+        if (this._focusedIndex >= articles.length) this._focusedIndex = articles.length - 1;
+
+        const article = articles[this._focusedIndex];
+        if (!article) return;
+
+        // Only highlight, don't open
+        this._highlightArticle(article.id);
+    },
+
+    /**
+     * Highlight an article by ID - works with both virtual and regular lists
+     * @param {string|number} articleId
+     */
+    _highlightArticle(articleId) {
+        // Remove previous keyboard-active
+        DOMElements.articlesList?.querySelectorAll('.keyboard-active').forEach(el => {
+            el.classList.remove('keyboard-active');
+        });
+
+        // Use virtual list scrollToItem if available (ensures the element is rendered)
+        if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+            ArticlesView.virtualList.scrollToItem(articleId);
+            // After scrollToItem renders, find the element
+            requestAnimationFrame(() => {
+                const el = DOMElements.articlesList?.querySelector(`.article-item[data-id="${articleId}"]`);
+                if (el) {
+                    el.classList.add('keyboard-active');
+                }
+            });
+        } else {
+            // Regular list - element is always in DOM
+            const el = DOMElements.articlesList?.querySelector(`.article-item[data-id="${articleId}"]`);
+            if (el) {
+                el.classList.add('keyboard-active');
+                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+    },
+
+    // ==================== Actions ====================
+
+    _openActiveItem() {
+        const articles = AppState.articles;
+        if (!articles || this._focusedIndex < 0 || this._focusedIndex >= articles.length) return;
+        const article = articles[this._focusedIndex];
+        if (article && this.viewManager) {
+            this.viewManager.selectArticle(article.id);
+        }
+    },
+
+    _goBack() {
+        if (this._isArticleViewActive()) {
+            // Sync focused index to current article before going back
+            if (AppState.content.currentArticleId && AppState.articles) {
+                const idx = AppState.articles.findIndex(a => a.id == AppState.content.currentArticleId);
+                if (idx !== -1) this._focusedIndex = idx;
+            }
+            const backBtn = document.getElementById('article-back-btn');
+            if (backBtn) backBtn.click();
+            else history.back();
+        }
+    },
+
+    _toggleStar() {
+        const btn = document.getElementById('article-toggle-fav-btn');
+        if (btn) btn.click();
+    },
+
+    _toggleRead() {
+        const btn = document.getElementById('article-toggle-read-btn');
+        if (btn) btn.click();
+    },
+
+    _openOriginal() {
+        const link = DOMElements.articleContent?.querySelector('.article-title-link');
+        if (link) window.open(link.href, '_blank', 'noopener,noreferrer');
+    },
+
+    _fetchContent() {
+        const btn = document.getElementById('article-fetch-content-btn');
+        if (btn) btn.click();
+    },
+
+    async _saveThirdParty() {
+        const articleId = AppState.content.currentArticleId;
+        if (!articleId) return;
+        try {
+            // Check if integrations are configured first
+            const status = await FeedManager.getIntegrationsStatus();
+            if (!status.has_integrations) {
+                showToast(i18n.t('article.no_integrations') || 'No third-party services configured', 3000, true);
+                return;
+            }
+            await FeedManager.saveToThirdParty(articleId);
+            showToast('✓ ' + (i18n.t('article.save_success') || 'Saved'), 2000, false);
+        } catch (err) {
+            showToast('✕ ' + (err.message || i18n.t('article.save_failed') || 'Save failed'), 3000, true);
+        }
+    },
+
+    _refresh() {
+        const btn = document.getElementById('articles-refresh-btn');
+        if (btn) btn.click();
+    },
+
+    _openSearch() {
+        const btn = document.getElementById('articles-search-btn');
+        if (btn) btn.click();
+    },
+
+    _nextArticle() {
+        if (!AppState.articles || !AppState.content.currentArticleId) return;
+        const idx = AppState.articles.findIndex(a => a.id == AppState.content.currentArticleId);
+        if (idx !== -1 && idx < AppState.articles.length - 1) {
+            const nextId = AppState.articles[idx + 1].id;
+            if (this.viewManager) this.viewManager.selectArticle(nextId);
+        } else {
+            // Try load more
+            const loadMoreBtn = DOMElements.contentPanel?.querySelector('.load-more-nav-btn');
+            if (loadMoreBtn) loadMoreBtn.click();
+        }
+    },
+
+    _prevArticle() {
+        if (!AppState.articles || !AppState.content.currentArticleId) return;
+        const idx = AppState.articles.findIndex(a => a.id == AppState.content.currentArticleId);
+        if (idx > 0) {
+            const prevId = AppState.articles[idx - 1].id;
+            if (this.viewManager) this.viewManager.selectArticle(prevId);
+        }
+    },
+
+    _addFeed() {
+        if (this.viewManager) this.viewManager.showAddFeedDialog();
+    },
+
+    // ==================== Action Dispatch ====================
+
+    /**
+     * Execute an action by name
+     * @param {string} action
+     * @param {boolean} isArticleView
+     * @returns {boolean} whether the action was handled
+     */
+    _dispatch(action, isArticleView) {
+        switch (action) {
+            // j/k: highlight in list only (don't open)
+            case 'nextItem':
+                this._navigateList(1); return true;
+            case 'prevItem':
+                this._navigateList(-1); return true;
+            case 'openItem':
+                this._openActiveItem(); return true;
+
+            // Always available (desktop: list + content panels are both visible)
+            case 'search':
+                this._openSearch(); return true;
+            case 'refresh':
+                this._refresh(); return true;
+            case 'addFeed':
+                this._addFeed(); return true;
+
+            // Article actions: require an article to be loaded
+            case 'nextArticle':
+                if (isArticleView) { this._nextArticle(); return true; }
+                return false;
+            case 'prevArticle':
+                if (isArticleView) { this._prevArticle(); return true; }
+                return false;
+            case 'toggleStar':
+                if (isArticleView) { this._toggleStar(); return true; }
+                return false;
+            case 'toggleRead':
+                if (isArticleView) { this._toggleRead(); return true; }
+                return false;
+            case 'openOriginal':
+                if (isArticleView) { this._openOriginal(); return true; }
+                return false;
+            case 'fetchContent':
+                if (isArticleView) { this._fetchContent(); return true; }
+                return false;
+            case 'saveThirdParty':
+                if (isArticleView) { this._saveThirdParty(); return true; }
+                return false;
+            case 'goBack':
+                this._goBack();
+                return true;
+
+            // Global
+            case 'showHelp':
+                this._toggleHelp();
+                return true;
+
+            default:
+                return false;
+        }
+    },
+
+    // ==================== Key Binding ====================
+
+    _bindGlobalKeydown() {
+        document.addEventListener('keydown', (e) => {
+            if (!this.enabled) return;
+
+            // Always allow Escape to close help dialog
+            if (e.key === 'Escape' && this.helpDialog && document.body.contains(this.helpDialog)) {
+                this._closeHelpFn?.();
+                this.helpDialog = null;
+                this._closeHelpFn = null;
+                e.preventDefault();
+                return;
+            }
+
+            // Don't intercept when typing in inputs
+            if (this._isInputFocused()) return;
+
+            // Don't intercept when dialog is open
+            if (this._isDialogOpen()) return;
+
+            // Don't intercept with modifier keys (Ctrl, Cmd, Alt)
+            // Exception: Shift is allowed (needed for ? = Shift+/)
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            const key = e.key;
+            const mapping = this._keyToAction[key];
+            if (!mapping) return;
+
+            const isArticleView = this._isArticleViewActive();
+            const handled = this._dispatch(mapping.action, isArticleView);
+            if (handled) {
+                e.preventDefault();
+            }
+        });
+    },
+
+    // ==================== Shortcuts Dialog ====================
+
+    _toggleHelp() {
+        if (this.helpDialog && document.body.contains(this.helpDialog)) {
+            this._closeHelpFn?.();
+            this.helpDialog = null;
+            this._closeHelpFn = null;
+        } else {
+            this._showHelp();
+        }
+    },
+
+    /**
+     * Format key display
+     * @param {string} key
+     * @returns {string}
+     */
+    _formatKey(key) {
+        const map = {
+            'Escape': 'Esc',
+            'Enter': '↵',
+            'ArrowUp': '↑',
+            'ArrowDown': '↓',
+            'ArrowLeft': '←',
+            'ArrowRight': '→',
+            ' ': 'Space',
+        };
+        return map[key] || key;
+    },
+
+    _showHelp() {
+        if (this.helpDialog && document.body.contains(this.helpDialog)) return;
+        this.helpDialog = null;
+
+        // Defensive: ensure shortcuts are loaded
+        if (!this.shortcuts) {
+            this.shortcuts = this._loadShortcuts();
+            this._buildReverseMap();
+        }
+
+        const isZh = (AppState.user?.language || navigator.language || 'zh-CN').startsWith('zh');
+        const title = isZh ? '快捷键管理' : 'Keyboard Shortcuts';
+        const resetText = isZh ? '恢复默认' : 'Reset to Defaults';
+        const saveText = isZh ? '保存' : 'Save';
+        const hintText = isZh ? '点击按键框可自定义快捷键' : 'Click a key box to customize';
+
+        const groupOrder = ['list', 'reading', 'global'];
+        const groups = {};
+        for (const [action, meta] of Object.entries(ACTION_META)) {
+            if (!groups[meta.group]) groups[meta.group] = [];
+            groups[meta.group].push({
+                action,
+                keys: [...(this.shortcuts[action] || [])],
+                label: isZh ? meta.zhLabel : meta.enLabel,
+            });
+        }
+
+        const CloseIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+        const { dialog, close } = createDialog('settings-dialog', `
+            <div class="settings-dialog-content" style="position: relative; max-width: 480px;">
+                <button class="icon-btn close-dialog-btn" title="${isZh ? '关闭' : 'Close'}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; z-index: 10;">
+                    ${CloseIcon}
+                </button>
+                <h3>${title}</h3>
+                <div class="keyboard-customize-hint" style="margin-bottom: 12px;">${hintText}</div>
+                <div style="max-height: 55vh; overflow-y: auto; margin: 0 -24px; padding: 0 24px;">
+                    ${groupOrder.map(g => `
+                        <div class="keyboard-help-section">
+                            <h3>${isZh ? GROUP_LABELS[g].zh : GROUP_LABELS[g].en}</h3>
+                            <div class="keyboard-customize-items">
+                                ${(groups[g] || []).map(item => `
+                                    <div class="keyboard-customize-row" data-action="${item.action}">
+                                        <span class="keyboard-customize-label">${item.label}</span>
+                                        <div class="keyboard-customize-key-input" tabindex="0" data-action="${item.action}">
+                                            ${item.keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                    <div class="appearance-mode-group" style="gap: 8px;">
+                        <button type="button" id="keyboard-reset-btn" class="appearance-mode-btn" style="flex: 1; justify-content: center;">${resetText}</button>
+                        <button type="button" id="keyboard-save-btn" class="appearance-mode-btn active" style="flex: 1; justify-content: center;">${saveText}</button>
+                    </div>
+                </div>
+            </div>
+        `);
+
+        this.helpDialog = dialog;
+        this._closeHelpFn = close;
+
+        // Working copy of shortcuts
+        const draft = JSON.parse(JSON.stringify(this.shortcuts));
+
+        // Key recording
+        let activeInput = null;
+
+        // Helper to cancel active recording
+        const cancelRecording = () => {
+            if (!activeInput) return;
+            activeInput.classList.remove('recording');
+            const prevAction = activeInput.dataset.action;
+            const prevKeys = draft[prevAction] || [];
+            activeInput.innerHTML = prevKeys.length
+                ? prevKeys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')
+                : `<span style="color: var(--meta-color); font-size: 0.8em;">${isZh ? '未设置' : 'None'}</span>`;
+            activeInput = null;
+        };
+
+        const keyInputs = dialog.querySelectorAll('.keyboard-customize-key-input');
+        keyInputs.forEach(input => {
+            input.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Click same input again → cancel
+                if (activeInput === input) {
+                    cancelRecording();
+                    return;
+                }
+                // Cancel previous if any
+                if (activeInput) cancelRecording();
+                activeInput = input;
+                input.classList.add('recording');
+                input.innerHTML = `<span class="recording-hint">${isZh ? '请按键...' : 'Press a key...'}</span>`;
+            });
+        });
+
+        // Click on blank area → cancel recording
+        dialog.addEventListener('click', (e) => {
+            if (!activeInput) return;
+            if (!e.target.closest('.keyboard-customize-key-input')) {
+                cancelRecording();
+            }
+        });
+
+        const keyHandler = (e) => {
+            if (!activeInput) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const key = e.key;
+            if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return;
+
+            const action = activeInput.dataset.action;
+
+            // Check for conflicts with other actions
+            for (const [otherAction, otherKeys] of Object.entries(draft)) {
+                if (otherAction === action) continue;
+                if (otherKeys.includes(key)) {
+                    // Found conflict - show warning and clear the conflicting binding
+                    const meta = ACTION_META[otherAction];
+                    const conflictLabel = meta ? (isZh ? meta.zhLabel : meta.enLabel) : otherAction;
+                    showToast(
+                        isZh
+                            ? `⚠️ "${this._formatKey(key)}" 已被「${conflictLabel}」使用，已自动解除`
+                            : `⚠️ "${this._formatKey(key)}" was used by "${conflictLabel}", auto-removed`,
+                        3000,
+                        true
+                    );
+
+                    // Clear conflicting action's key
+                    draft[otherAction] = draft[otherAction].filter(k => k !== key);
+
+                    // Update the conflicting row's display
+                    const conflictInput = dialog.querySelector(`.keyboard-customize-key-input[data-action="${otherAction}"]`);
+                    if (conflictInput) {
+                        const remainingKeys = draft[otherAction];
+                        conflictInput.innerHTML = remainingKeys.length
+                            ? remainingKeys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')
+                            : `<span style="color: var(--meta-color); font-size: 0.8em;">${isZh ? '未设置' : 'None'}</span>`;
+                        // Flash the conflicting row
+                        const row = conflictInput.closest('.keyboard-customize-row');
+                        if (row) {
+                            row.style.background = 'color-mix(in srgb, var(--accent-color), transparent 85%)';
+                            setTimeout(() => { row.style.background = ''; }, 1500);
+                        }
+                    }
+                    break;
+                }
+            }
+
+            draft[action] = [key];
+            activeInput.innerHTML = `<kbd>${this._formatKey(key)}</kbd>`;
+            activeInput.classList.remove('recording');
+            activeInput = null;
+        };
+
+        dialog.addEventListener('keydown', keyHandler, true);
+
+        // Reset
+        dialog.querySelector('#keyboard-reset-btn')?.addEventListener('click', () => {
+            const defaults = this.getDefaults();
+            Object.assign(draft, defaults);
+            keyInputs.forEach(input => {
+                const action = input.dataset.action;
+                const keys = defaults[action] || [];
+                input.innerHTML = keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ');
+                input.classList.remove('recording');
+            });
+            activeInput = null;
+        });
+
+        // Save
+        dialog.querySelector('#keyboard-save-btn')?.addEventListener('click', () => {
+            this.shortcuts = draft;
+            this._buildReverseMap();
+            this._saveShortcuts();
+            close();
+            showToast(isZh ? '✓ 快捷键已保存' : '✓ Shortcuts saved', 2000, false);
+        });
+    },
+};

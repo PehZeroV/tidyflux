@@ -21,6 +21,7 @@
 @import url('./css/search.css');
 @import url('./css/context-menu.css');
 @import url('./css/skeleton.css');
+@import url('./css/keyboard.css');
 
 /* 认证页面 */
 @import url('./css/auth.css');

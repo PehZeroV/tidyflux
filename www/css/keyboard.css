@@ -1,0 +1,139 @@
+/* ========================================
+   Keyboard Shortcuts
+   ======================================== */
+
+/* keyboard-active highlight on article items */
+.article-item.keyboard-active,
+.digest-item.keyboard-active {
+    outline: 2px solid var(--accent-color);
+    outline-offset: -2px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent-color), transparent 92%) !important;
+}
+
+/* ========================================
+   Shortcuts Dialog Content (inside settings-dialog)
+   ======================================== */
+
+/* Section */
+.keyboard-help-section {
+    margin-bottom: 20px;
+}
+
+.keyboard-help-section:last-child {
+    margin-bottom: 0;
+}
+
+.keyboard-help-section h3 {
+    margin: 0 0 10px;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--meta-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Hint text */
+.keyboard-customize-hint {
+    font-size: 0.82em;
+    color: var(--meta-color);
+}
+
+/* Customize items */
+.keyboard-customize-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.keyboard-customize-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    transition: background 0.15s;
+}
+
+.keyboard-customize-row:hover {
+    background: var(--hover-bg);
+}
+
+.keyboard-customize-label {
+    font-size: 0.88em;
+    color: var(--text-color);
+    flex: 1;
+}
+
+/* Key input box */
+.keyboard-customize-key-input {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    min-height: 32px;
+    padding: 3px 10px;
+    gap: 4px;
+    font-family: inherit;
+    background: var(--card-bg);
+    border-radius: calc(var(--radius) - 4px);
+    box-shadow: var(--card-shadow);
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+    user-select: none;
+}
+
+.keyboard-customize-key-input * {
+    pointer-events: none;
+}
+
+.keyboard-customize-key-input:hover {
+    box-shadow: var(--card-shadow-hover);
+}
+
+.keyboard-customize-key-input:focus,
+.keyboard-customize-key-input.recording {
+    box-shadow: 0 0 0 2px var(--accent-color), var(--card-shadow-hover);
+}
+
+.keyboard-customize-key-input.recording {
+    background: color-mix(in srgb, var(--accent-color), transparent 92%);
+}
+
+.keyboard-customize-key-input kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 0.8em;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-color);
+    background: var(--hover-bg);
+    border-radius: calc(var(--radius) - 8px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    line-height: 1;
+}
+
+/* Recording animation */
+.recording-hint {
+    font-size: 0.8em;
+    color: var(--accent-color);
+    font-weight: 500;
+    animation: pulse-recording 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}

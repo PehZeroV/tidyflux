@@ -91,6 +91,7 @@ export default {
         env_var: '（环境变量）',
         manual_config: '（手动配置）',
         edit_config: '修改提示词',
+        keyboard_shortcuts: '快捷键管理',
         edit_connection: '修改配置',
         editing: '编辑中',
         enter_new_password: '请输入新密码',

@@ -39,6 +39,7 @@ cat "$ROOT_DIR/www/css/variables.css" \
     "$ROOT_DIR/www/css/search.css" \
     "$ROOT_DIR/www/css/context-menu.css" \
     "$ROOT_DIR/www/css/skeleton.css" \
+    "$ROOT_DIR/www/css/keyboard.css" \
     "$ROOT_DIR/www/css/auth.css" \
     | esbuild --loader=css --minify > "$DIST_DIR/www/style-${BUILD_VERSION}.css"
 

@@ -8,6 +8,7 @@ import { DOMElements } from '../dom.js';
 import { AppState } from '../state.js';
 import { showToast } from './view/utils.js';
 import { i18n } from './i18n.js';
+import { KeyboardShortcuts } from './keyboard.js';
 
 const GESTURE_EDGE_THRESHOLD = 30;
 const GESTURE_MIN_SWIPE_DISTANCE = 80;
@@ -288,5 +289,5 @@ export function setupEventListeners(viewManager) {
     setupPullToRefresh(viewManager);
     setupSwipeGesture();
     setupListSwipeGesture();
-
+    KeyboardShortcuts.init(viewManager);
 }
