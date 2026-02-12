@@ -162,6 +162,10 @@ export class MinifluxClient {
         return this.request(`/categories/${categoryId}/refresh`, { method: 'PUT' });
     }
 
+    async getFeedIcon(feedId) {
+        return this.request(`/feeds/${feedId}/icon`);
+    }
+
     // --- Entries ---
 
     async getEntries(params = {}) {
@@ -201,6 +205,16 @@ export class MinifluxClient {
         return this.request(`/entries/${entryId}/fetch-content?update_content=false`, { method: 'GET' });
     }
 
+    async saveEntry(entryId) {
+        return this.request(`/entries/${entryId}/save`, { method: 'POST' });
+    }
+
+    // --- Integrations ---
+
+    async getIntegrationsStatus() {
+        return this.request('/integrations/status');
+    }
+
     // --- Categories ---
 
     async getCategories() { return this.request('/categories'); }
@@ -221,6 +235,29 @@ export class MinifluxClient {
 
     async deleteCategory(categoryId) {
         return this.request(`/categories/${categoryId}`, { method: 'DELETE' });
+    }
+
+    // --- Mark All As Read ---
+
+    async markFeedAsRead(feedId) {
+        return this.request(`/feeds/${feedId}/mark-all-as-read`, { method: 'PUT' });
+    }
+
+    async markCategoryAsRead(categoryId) {
+        return this.request(`/categories/${categoryId}/mark-all-as-read`, { method: 'PUT' });
+    }
+
+    async markUserAsRead(userId) {
+        return this.request(`/users/${userId}/mark-all-as-read`, { method: 'PUT' });
+    }
+
+    // --- Discover ---
+
+    async discover(url) {
+        return this.request('/discover', {
+            method: 'POST',
+            body: JSON.stringify({ url })
+        });
     }
 
     // --- OPML ---

@@ -137,6 +137,17 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+// Get integrations status (must be before /:id to avoid route conflict)
+router.get('/integrations/status', authenticateToken, async (req, res) => {
+    try {
+        const status = await req.miniflux.getIntegrationsStatus();
+        res.json(status); // { has_integrations: true/false }
+    } catch (error) {
+        console.error('Get integrations status error:', error);
+        res.status(500).json({ error: '获取集成状态失败' });
+    }
+});
+
 // Get single article
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
@@ -208,21 +219,15 @@ router.post('/batch-read', authenticateToken, async (req, res) => {
 router.post('/mark-all-read', authenticateToken, async (req, res) => {
     try {
         const { feed_id, group_id } = req.body;
-        // Miniflux API: PUT /v1/feeds/{feedID}/mark-all-as-read
-        // Miniflux API: PUT /v1/categories/{categoryID}/mark-all-as-read
-        // Miniflux API: PUT /v1/entries/mark-all-as-read
-
-
 
         if (feed_id) {
-            await req.miniflux.request(`/feeds/${feed_id}/mark-all-as-read`, { method: 'PUT' });
+            await req.miniflux.markFeedAsRead(feed_id);
         } else if (group_id) {
-            await req.miniflux.request(`/categories/${group_id}/mark-all-as-read`, { method: 'PUT' });
+            await req.miniflux.markCategoryAsRead(group_id);
         } else {
             // Mark all entries as read for the current user
-            // Endpoint: /v1/users/{userID}/mark-all-as-read
             const me = await req.miniflux.me();
-            await req.miniflux.request(`/users/${me.id}/mark-all-as-read`, { method: 'PUT' });
+            await req.miniflux.markUserAsRead(me.id);
         }
 
         res.json({ success: true });
@@ -295,5 +300,19 @@ router.put('/:id/fetch-content', authenticateToken, async (req, res) => {
         res.status(500).json({ error: '获取全文失败' });
     }
 });
+
+// Save entry to third-party services
+router.post('/:id/save', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await req.miniflux.saveEntry(id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Save entry error:', error);
+        res.status(500).json({ error: '保存到第三方服务失败: ' + error.message });
+    }
+});
+
+
 
 export default router;

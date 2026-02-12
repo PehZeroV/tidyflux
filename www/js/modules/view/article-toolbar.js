@@ -215,6 +215,136 @@ export const ArticleToolbarMixin = {
 
         // 绑定 AI 按钮事件
         this.bindAIButtons(article);
+
+        // 更多操作菜单（三个点）
+        const moreBtn = document.getElementById('article-more-btn');
+
+        if (moreBtn) {
+            let activeMenu = null;
+            let activeCloseHandler = null;
+
+            const closeMenu = () => {
+                if (activeMenu) {
+                    activeMenu.remove();
+                    activeMenu = null;
+                }
+                if (activeCloseHandler) {
+                    document.removeEventListener('click', activeCloseHandler, true);
+                    activeCloseHandler = null;
+                }
+            };
+
+            moreBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+
+                // Toggle: if already open, close
+                if (activeMenu) {
+                    closeMenu();
+                    return;
+                }
+
+                // Create menu and append to body
+                const menu = document.createElement('div');
+                menu.className = 'context-menu';
+                menu.style.maxWidth = '240px';
+                menu.innerHTML = `
+                    <div class="context-menu-label">${i18n.t('article.save_to_third_party')}</div>
+                    <div class="article-more-menu-content">
+                        <div class="context-menu-item" style="opacity: 0.5; cursor: default; font-size: 0.85em;">${i18n.t('common.loading')}</div>
+                    </div>
+                `;
+                document.body.appendChild(menu);
+                activeMenu = menu;
+
+                // Position below the button
+                const positionMenu = () => {
+                    const rect = moreBtn.getBoundingClientRect();
+                    const mw = menu.offsetWidth;
+                    let x = rect.right - mw;
+                    const y = rect.bottom + 4;
+                    if (x < 10) x = 10;
+                    if (x + mw > window.innerWidth - 10) x = window.innerWidth - mw - 10;
+                    menu.style.left = `${x}px`;
+                    menu.style.top = `${y}px`;
+                };
+                positionMenu();
+
+                // Click-outside to close (capture phase, same as other context menus)
+                const closeHandler = (ce) => {
+                    if (!menu.contains(ce.target) && ce.target !== moreBtn && !moreBtn.contains(ce.target)) {
+                        ce.preventDefault();
+                        ce.stopPropagation();
+                        ce.stopImmediatePropagation();
+                        closeMenu();
+                    }
+                };
+                activeCloseHandler = closeHandler;
+                setTimeout(() => document.addEventListener('click', closeHandler, true), 0);
+
+                // Always fetch integration status (FeedManager has 5-min cache)
+                const moreMenuContent = menu.querySelector('.article-more-menu-content');
+                try {
+                    const status = await FeedManager.getIntegrationsStatus();
+                    if (status.has_integrations) {
+                        moreMenuContent.innerHTML = `
+                            <div class="context-menu-item" data-action="save-third-party">
+                                ${Icons.save_alt}
+                                <span>${i18n.t('article.save_to_third_party')}</span>
+                            </div>
+                        `;
+                    } else {
+                        moreMenuContent.innerHTML = `
+                            <div class="context-menu-item" style="cursor: default; opacity: 0.7; font-size: 0.85em; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div style="font-weight: 500;">${i18n.t('article.no_integrations')}</div>
+                                <div style="opacity: 0.7; font-size: 0.9em; white-space: normal; line-height: 1.4;">${i18n.t('article.no_integrations_hint')}</div>
+                            </div>
+                        `;
+                    }
+                } catch (err) {
+                    moreMenuContent.innerHTML = `
+                        <div class="context-menu-item" style="color: #ff4444; cursor: default;">
+                            ${i18n.t('article.integrations_check_failed')}
+                        </div>
+                    `;
+                }
+                // Reposition after content loaded
+                positionMenu();
+
+                // Bind save action
+                menu.addEventListener('click', async (ce) => {
+                    const item = ce.target.closest('[data-action="save-third-party"]');
+                    if (!item) return;
+                    ce.stopPropagation();
+
+                    const label = item.querySelector('span');
+                    const originalText = label.textContent;
+                    label.textContent = i18n.t('article.saving');
+                    item.style.opacity = '0.6';
+                    item.style.pointerEvents = 'none';
+
+                    try {
+                        await FeedManager.saveToThirdParty(article.id);
+                        label.textContent = '✓ ' + i18n.t('article.save_success');
+                        item.style.color = 'var(--accent-color)';
+                        setTimeout(() => {
+                            label.textContent = originalText;
+                            item.style.color = '';
+                            item.style.opacity = '';
+                            item.style.pointerEvents = '';
+                        }, 2000);
+                    } catch (err) {
+                        label.textContent = '✕ ' + (err.message || i18n.t('article.save_failed'));
+                        item.style.color = '#ff4444';
+                        setTimeout(() => {
+                            label.textContent = originalText;
+                            item.style.color = '';
+                            item.style.opacity = '';
+                            item.style.pointerEvents = '';
+                        }, 3000);
+                    }
+                });
+            });
+        }
     },
 
     /**

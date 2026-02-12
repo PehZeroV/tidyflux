@@ -387,6 +387,10 @@ export const ArticleContentView = {
                     <button class="article-toolbar-btn" id="article-summarize-btn" title="${i18n.t('ai.summarize_btn')}">
                         ${Icons.summarize}
                     </button>
+                    <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>
+                    <button class="article-toolbar-btn" id="article-more-btn" title="${i18n.t('article.more_actions')}">
+                        ${Icons.more_vert}
+                    </button>
                 </div>
             </div>
         `;

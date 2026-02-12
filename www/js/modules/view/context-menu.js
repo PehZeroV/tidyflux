@@ -211,7 +211,7 @@ export const ContextMenu = {
         const rect = btn.getBoundingClientRect();
 
         // 清理旧的菜单和事件监听器
-        document.querySelectorAll('.context-menu').forEach(m => m.remove());
+        document.querySelectorAll('body > .context-menu').forEach(m => m.remove());
         if (articlesMenuCloseHandler) {
             document.removeEventListener('click', articlesMenuCloseHandler, true);
             articlesMenuCloseHandler = null;

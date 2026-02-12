@@ -105,7 +105,7 @@ async function _fetchAndCacheIcon(feedId, miniflux) {
     const cacheFile = path.join(CACHE_DIR, `feed_${feedId}.png`);
     const cacheMetaFile = path.join(CACHE_DIR, `feed_${feedId}.json`);
 
-    const iconData = await miniflux.request(`/feeds/${feedId}/icon`);
+    const iconData = await miniflux.getFeedIcon(feedId);
     if (!iconData?.data) {
         throw new Error('No icon data');
     }

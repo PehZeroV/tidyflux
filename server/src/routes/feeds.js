@@ -4,6 +4,24 @@ import { sanitizeHtml } from '../utils.js';
 
 const router = express.Router();
 
+// Discover feeds from a website URL
+router.post('/discover', authenticateToken, async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL is required' });
+
+        const results = await req.miniflux.discover(url);
+        res.json(results || []);
+    } catch (error) {
+        console.error('Discover feeds error:', error);
+        // If Miniflux returns error (e.g. no feeds found), return empty array instead of 500
+        if (error.status === 400 || error.status === 404) {
+            return res.json([]);
+        }
+        res.status(500).json({ error: '发现订阅失败: ' + error.message });
+    }
+});
+
 // Get all feeds
 router.get('/', authenticateToken, async (req, res) => {
     try {

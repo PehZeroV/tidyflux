@@ -266,7 +266,7 @@
 .article-toolbar-left,
 .article-toolbar-right {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
 }
 

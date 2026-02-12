@@ -13,11 +13,14 @@ export const API_ENDPOINTS = {
     },
     FEEDS: {
         BASE: '/api/feeds',
+        DISCOVER: '/api/feeds/discover',
         REFRESH: '/api/feeds/refresh',
         COUNTERS: '/api/feeds/counters',
     },
     ARTICLES: {
         BASE: '/api/articles',
+        SAVE: '/api/articles/{id}/save',
+        INTEGRATIONS_STATUS: '/api/articles/integrations/status',
     },
     GROUPS: {
         BASE: '/api/groups',

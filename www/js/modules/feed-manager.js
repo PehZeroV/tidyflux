@@ -37,6 +37,21 @@ export const FeedManager = {
         return data;
     },
 
+    async discoverFeeds(url) {
+        const response = await AuthManager.fetchWithAuth('/api/feeds/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || i18n.t('feed.discover_failed'));
+        }
+
+        return data;
+    },
+
     async getFeed(feedId) {
         const response = await AuthManager.fetchWithAuth(`/api/feeds/${feedId}`);
 
@@ -160,6 +175,33 @@ export const FeedManager = {
 
         if (!response.ok) {
             throw new Error(i18n.t('feed.fetch_content_failed'));
+        }
+
+        return response.json();
+    },
+
+    async saveToThirdParty(articleId) {
+        const response = await AuthManager.fetchWithAuth(`/api/articles/${articleId}/save`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || i18n.t('article.save_failed'));
+        }
+
+        return data;
+    },
+
+    // Cache integrations status for 5 minutes
+    _integrationsCache: null,
+    _integrationsCacheTime: 0,
+
+    async getIntegrationsStatus() {
+        const response = await AuthManager.fetchWithAuth('/api/articles/integrations/status');
+
+        if (!response.ok) {
+            throw new Error(i18n.t('article.integrations_check_failed'));
         }
 
         return response.json();

@@ -258,8 +258,8 @@ let activeContextMenuCloseHandler = null;
  * @returns {{menu: HTMLElement, cleanup: Function}} 菜单元素和清理函数
  */
 export function createContextMenu(event, innerHTML) {
-    // 移除已有的上下文菜单和事件监听器
-    document.querySelectorAll('.context-menu').forEach(m => m.remove());
+    // 移除已有的动态上下文菜单（只清理 body 直接子元素，不影响嵌套在工具栏等处的静态菜单）
+    document.querySelectorAll('body > .context-menu').forEach(m => m.remove());
     if (activeContextMenuCloseHandler) {
         document.removeEventListener('click', activeContextMenuCloseHandler, true);
         activeContextMenuCloseHandler = null;
