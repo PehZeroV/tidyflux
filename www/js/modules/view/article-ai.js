@@ -54,7 +54,7 @@ export const ArticleAIMixin = {
                     if (node.tagName === 'BR') {
                         textContent += '\n';
                     } else {
-                        textContent += node.innerText || node.textContent || '';
+                        textContent += node.textContent || '';
                     }
                 } else {
                     textContent += node.textContent || '';
@@ -93,7 +93,7 @@ export const ArticleAIMixin = {
                             return;
                         }
 
-                        const text = node.innerText ? node.innerText.trim() : '';
+                        const text = node.textContent ? node.textContent.trim() : '';
                         if (text.length >= 2 && isMeaningfulText(text)) {
                             blocks.push({ el: node, text: text });
                         }
@@ -108,8 +108,8 @@ export const ArticleAIMixin = {
                 pendingInlineNodes.push(node);
             });
             flushInlineBlock();
-        } else if (bodyEl.innerText.trim().length > 0) {
-            const text = bodyEl.innerText.trim();
+        } else if (bodyEl.textContent.trim().length > 0) {
+            const text = bodyEl.textContent.trim();
             if (text.length >= 2 && isMeaningfulText(text)) {
                 blocks.push({ el: bodyEl, text: text });
             }
@@ -254,7 +254,7 @@ export const ArticleAIMixin = {
                 let textContent = '';
                 pendingInlineNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        textContent += node.tagName === 'BR' ? '\n' : (node.innerText || node.textContent || '');
+                        textContent += node.tagName === 'BR' ? '\n' : (node.textContent || '');
                     } else {
                         textContent += node.textContent || '';
                     }
@@ -276,7 +276,7 @@ export const ArticleAIMixin = {
                         if (blockTags.has(tag)) {
                             flushInlineBlock();
                             if (node.querySelector('math, pre, table')) return;
-                            const text = node.innerText ? node.innerText.trim() : '';
+                            const text = node.textContent ? node.textContent.trim() : '';
                             if (text.length >= 2 && isMeaningfulText(text)) blocks.push({ el: node, text });
                             return;
                         }
