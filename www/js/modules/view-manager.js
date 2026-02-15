@@ -645,7 +645,7 @@ export const ViewManager = {
         try {
             const savedW = parseInt(localStorage.getItem(STORAGE_WIDTH), 10);
             if (!isNaN(savedW)) applyWidth(savedW);
-        } catch (_) {}
+        } catch (_) { }
 
         let startX = 0, startW = 0;
         handle.addEventListener('mousedown', (e) => {
@@ -663,7 +663,7 @@ export const ViewManager = {
                 document.removeEventListener('mouseup', onUp);
                 try {
                     localStorage.setItem(STORAGE_WIDTH, String(panel.offsetWidth));
-                } catch (_) {}
+                } catch (_) { }
             };
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
@@ -767,6 +767,12 @@ export const ViewManager = {
             this.showArticlesContextMenu(e);
         });
 
+        // 移动端显示订阅源面板按钮
+        document.getElementById('show-feeds-btn')?.addEventListener('click', () => {
+            this.isProgrammaticNav = true;
+            window.location.hash = '#/feeds';
+        });
+
         // Throttled scroll handler
         let scrollTicking = false;
         DOMElements.articlesList?.addEventListener('scroll', () => {
@@ -783,11 +789,12 @@ export const ViewManager = {
         document.addEventListener('click', (e) => {
             if (window.innerWidth > BREAKPOINT_MOBILE && window.innerWidth <= BREAKPOINT_TABLET) {
                 const feedsPanel = DOMElements.feedsPanel;
+                const toggleBtn = document.getElementById('show-feeds-btn');
 
                 // 如果面板是激活的
                 if (feedsPanel && feedsPanel.classList.contains('active')) {
-                    // 如果点击不在面板内
-                    if (!feedsPanel.contains(e.target)) {
+                    // 如果点击不在面板内，也不在切换按钮上
+                    if (!feedsPanel.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
                         if (window.location.hash === '#/feeds') {
                             this.isProgrammaticNav = true;
                             history.back();

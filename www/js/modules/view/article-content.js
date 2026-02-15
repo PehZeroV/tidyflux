@@ -403,7 +403,7 @@ export const ArticleContentView = {
                     <button class="article-toolbar-btn ${isFavorited ? 'active' : ''}" id="article-toggle-fav-btn" title="${isFavorited ? i18n.t('article.unstar') : i18n.t('article.star')}">
                         ${isFavorited ? Icons.star : Icons.star_border}
                     </button>
-                    <button class="article-toolbar-btn" id="article-fetch-content-btn" title="${i18n.t('feed.fetch_content_failed').replace('Failed to fetch', 'Fetch')}">
+                    <button class="article-toolbar-btn" id="article-fetch-content-btn" title="${i18n.t('feed.fetch_content')}">
                         ${Icons.fetch_original}
                     </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>

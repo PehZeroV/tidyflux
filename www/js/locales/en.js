@@ -245,6 +245,7 @@ export default {
         refresh_feed_failed: 'Failed to refresh feed',
         refresh_group_failed: 'Failed to refresh group',
         fetch_articles_failed: 'Failed to fetch articles',
+        fetch_content: 'Fetch Full Content',
         fetch_content_failed: 'Failed to fetch full content',
         mark_all_read_failed: 'Failed to mark all as read',
         mark_unread_failed: 'Failed to mark as unread',

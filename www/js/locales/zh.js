@@ -245,6 +245,7 @@ export default {
         refresh_feed_failed: '刷新订阅失败',
         refresh_group_failed: '刷新分组失败',
         fetch_articles_failed: '获取文章失败',
+        fetch_content: '获取全文',
         fetch_content_failed: '获取全文失败',
         mark_all_read_failed: '标记全部已读失败',
         mark_unread_failed: '标记未读失败',

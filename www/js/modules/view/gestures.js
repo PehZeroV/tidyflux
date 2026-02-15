@@ -14,7 +14,8 @@ const GESTURE_CONFIG = {
     EDGE_SIZE: 25,            // 边缘屏蔽区域 (px) - 原生手势保留区
     VELOCITY_THRESHOLD: 0.3,  // 最小爆发速度 (px/ms)
     MOVEMENT_THRESHOLD: 10,   // 开始滑动判定阈值
-    QUICK_SWIPE_MIN: 20       // 结合速度判定的最小距离
+    QUICK_SWIPE_MIN: 20,      // 结合速度判定的最小距离
+    ANGLE_THRESHOLD: 35       // 水平滑动最大允许角度 (度)
 };
 
 /**
@@ -179,10 +180,11 @@ export const Gestures = {
             const diffX = touch.clientX - startX;
             const diffY = touch.clientY - startY;
 
-            // 确定是水平还是垂直滑动
+            // 确定是水平还是垂直滑动（使用显式角度判定）
             if (!isSwiping && (Math.abs(diffX) > GESTURE_CONFIG.MOVEMENT_THRESHOLD || Math.abs(diffY) > GESTURE_CONFIG.MOVEMENT_THRESHOLD)) {
                 isSwiping = true;
-                isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+                const angle = Math.atan2(Math.abs(diffY), Math.abs(diffX)) * (180 / Math.PI);
+                isHorizontalSwipe = angle < GESTURE_CONFIG.ANGLE_THRESHOLD;
 
                 if (!isHorizontalSwipe) {
                     startX = 0;
