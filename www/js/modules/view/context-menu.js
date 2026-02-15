@@ -153,6 +153,10 @@ export const ContextMenu = {
 
         if (isDigests) {
             itemsHtml += `
+            <div class="context-menu-item" data-action="generate-digest-all">
+                ${Icons.newspaper}
+                ${i18n.t('digest.generate_all')}
+            </div>
             <div class="context-menu-item" data-action="manage-scheduled-digests">
                 ${Icons.schedule}
                 ${i18n.t('digest.manage_scheduled')}
@@ -321,6 +325,9 @@ export const ContextMenu = {
                 } finally {
                     isManualRefreshing = false;
                 }
+            } else if (action === 'generate-digest-all') {
+                // 手动触发生成全部简报
+                this.viewManager.generateDigest('all');
             } else if (action === 'manage-scheduled-digests') {
                 Dialogs.showDigestManagerDialog();
             } else if (action === 'generate-digest') {
