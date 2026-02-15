@@ -38,6 +38,17 @@
     color: var(--meta-color);
 }
 
+/* 简报管理器内区块 */
+.digest-manager-section {
+    margin-bottom: 4px;
+}
+
+.digest-manager-empty {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+}
+
 .settings-user-info {
     padding: 10px 12px;
     border-radius: var(--radius);

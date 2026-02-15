@@ -4,6 +4,7 @@ import { FeedManager } from '../feed-manager.js';
 import { VirtualList } from '../virtual-list.js';
 import { formatDate, isMobileDevice, extractFirstImage, getThumbnailUrl, showToast, escapeHtml } from './utils.js';
 import { i18n } from '../i18n.js';
+import { AIService } from '../ai-service.js';
 
 /**
  * 列表判定与功能常量配置
@@ -52,6 +53,8 @@ export const ArticlesView = {
     _scrollReadPendingIds: new Set(),
     /** 滚动标记已读批量处理定时器 */
     _scrollReadBatchTimer: null,
+    /** 标题翻译进行中的 AbortController */
+    _titleTranslationAbort: null,
 
 
     /**
@@ -261,6 +264,9 @@ export const ArticlesView = {
             DOMElements.articlesList.innerHTML = html;
             this.bindArticleItemEvents();
         }
+
+        // 触发标题翻译
+        this.triggerTitleTranslations(articles);
     },
 
     /**
@@ -291,6 +297,9 @@ export const ArticlesView = {
 
         // Bind events for new items
         this.bindArticleItemEvents();
+
+        // 触发标题翻译
+        this.triggerTitleTranslations(articles);
     },
 
     /**
@@ -352,9 +361,13 @@ export const ArticlesView = {
                 </div>`;
         }
 
+        // 生成标题 HTML（支持翻译）
+        const titleHtml = this._buildTitleHtml(article);
+        const hasTranslation = titleHtml.includes('article-title-translated');
+
         return `
             <div class="article-item-content">
-                <div class="article-item-title">${escapeHtml(article.title)}</div>
+                <div class="article-item-title ${hasTranslation ? 'has-translation' : ''}" data-article-id="${article.id}">${titleHtml}</div>
                 <div class="article-item-meta">
                     ${isFavorited ? '<span class="favorited-icon">★</span>' : ''}
                     <span class="feed-title">${escapeHtml(article.feed_title || '')}</span>
@@ -437,10 +450,14 @@ export const ArticlesView = {
                     </div>`;
             }
 
+            // 生成标题 HTML（支持翻译）
+            const titleHtml = this._buildTitleHtml(article);
+            const hasTranslation = titleHtml.includes('article-title-translated');
+
             return `
                 <div class="article-item ${unreadClass} ${hasImage ? 'has-image' : ''} ${AppState.currentArticleId == article.id ? 'active' : ''}" data-id="${article.id}">
                     <div class="article-item-content">
-                        <div class="article-item-title">${escapeHtml(article.title)}</div>
+                        <div class="article-item-title ${hasTranslation ? 'has-translation' : ''}" data-article-id="${article.id}">${titleHtml}</div>
                         <div class="article-item-meta">
                             ${isFavorited ? '<span class="favorited-icon">★</span>' : ''}
                             <span class="feed-title">${escapeHtml(article.feed_title || '')}</span>
@@ -451,6 +468,99 @@ export const ArticlesView = {
                 </div>
             `;
         }).join('');
+    },
+
+    /**
+     * 构建标题 HTML（支持翻译缓存显示）
+     * @param {Object} article - 文章对象
+     * @returns {string} 标题 HTML
+     */
+    _buildTitleHtml(article) {
+        const aiConfig = AIService.getConfig();
+        const escaped = escapeHtml(article.title);
+
+        // 未开启标题翻译或 AI 未配置
+        if (!aiConfig.titleTranslation || !AIService.isConfigured()) {
+            return escaped;
+        }
+
+        const targetLangId = aiConfig.targetLang || 'zh-CN';
+        const cached = AIService.getTitleCache(article.title, targetLangId);
+        const mode = aiConfig.titleTranslationMode || 'bilingual';
+
+        if (cached) {
+            if (mode === 'translated') {
+                return `<div class="article-title-translated">${escapeHtml(cached)}</div>`;
+            }
+            // 双语模式
+            return `<div class="article-title-translated">${escapeHtml(cached)}</div><div class="article-title-original">${escaped}</div>`;
+        }
+
+        // 尚未翻译，显示原标题 + loading 占位
+        return `<span class="article-title-original">${escaped}</span><span class="title-translating">…</span>`;
+    },
+
+    /**
+     * 异步批量触发标题翻译并更新 DOM
+     * @param {Array} articles - 文章数组
+     */
+    async triggerTitleTranslations(articles) {
+        const aiConfig = AIService.getConfig();
+        if (!aiConfig.titleTranslation || !AIService.isConfigured()) return;
+
+        // 取消上一次的翻译任务
+        if (this._titleTranslationAbort) {
+            this._titleTranslationAbort.abort();
+        }
+        this._titleTranslationAbort = new AbortController();
+        const signal = this._titleTranslationAbort.signal;
+
+        const targetLangId = aiConfig.targetLang || 'zh-CN';
+        const mode = aiConfig.titleTranslationMode || 'bilingual';
+
+        // 过滤出需要翻译的文章（未缓存且非 digest）
+        const needTranslate = articles.filter(a => {
+            if (a.type === 'digest') return false;
+            return !AIService.getTitleCache(a.title, targetLangId);
+        });
+
+        if (needTranslate.length === 0) return;
+
+        // 分批翻译，每批 10 个
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < needTranslate.length; i += BATCH_SIZE) {
+            if (signal.aborted) break;
+
+            const batch = needTranslate.slice(i, i + BATCH_SIZE);
+            try {
+                // 传入 signal 给 translateTitlesBatch (需要 ai-service 支持，或者仅仅在这里中断 loop)
+                // 目前 AI Service 的 callAPI 支持 signal，但 translateTitlesBatch 还没传。
+                // 即使 callAPI 不传 signal，我们在这里 break loop 也能停止后续的 batch。
+                const resultMap = await AIService.translateTitlesBatch(batch, targetLangId);
+                
+                if (signal.aborted) break;
+
+                // 更新 DOM
+                resultMap.forEach((translated, articleId) => {
+                    const titleEl = DOMElements.articlesList.querySelector(`.article-item-title[data-article-id="${articleId}"]`);
+                    if (!titleEl) return;
+
+                    const article = articles.find(a => a.id == articleId);
+                    if (!article) return;
+
+                    const escaped = escapeHtml(article.title);
+                    if (mode === 'translated') {
+                        titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div>`;
+                    } else {
+                        // 双语模式
+                        titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div><div class="article-title-original">${escaped}</div>`;
+                    }
+                    titleEl.classList.add('has-translation');
+                });
+            } catch (e) {
+                console.error('[ArticlesView] Title translation batch failed:', e);
+            }
+        }
     },
 
     /**

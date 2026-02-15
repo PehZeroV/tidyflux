@@ -4,6 +4,8 @@
   一个基于 Miniflux API 开发的简洁美观的网页客户端
 </p>
 
+> ⚠️ **说明**：此版本基于原 [TidyFlux](https://github.com/PehZeroV/tidyflux) 仓库二次开发，已进行了大量功能增强与优化（含AI标题翻译、全新的摘要调度机制、更完善的移动端适配等）。
+
 > 👋 **写在前面**：我是个**完全不懂代码的小白**，这个项目是**完全靠 Google Antigravity 写出来的**。特别感谢 AI 的强大能力，让想象力不再受限于代码能力。期待未来 AI 能帮助更多普通人实现自己的一个个小想法！🚀
 
 [English](README_EN.md)
@@ -38,10 +40,10 @@
 - 🎧 内置播客播放器，支持后台播放和进度控制
 - 🔄 个性化设置和 AI 配置云端存储，多设备自动同步
 - 🤖 **AI 增强功能**：
-    - 📝 **文章总结**：一键提取文章核心观点和摘要
-    - 🌍 **全文翻译**：支持多种语言的全文翻译
-    - 📅 **智能简报**：支持手动或定时生成每日内容简报，支持 Webhook 推送（钉钉、企业微信、飞书等）
-    - ⚙️ **自定义 AI 接口**：支持所有兼容 OpenAI 格式的 API
+  - 📝 **文章总结**：一键提取文章核心观点和摘要
+  - 🌍 **全文翻译**：支持多种语言的全文翻译
+  - 📅 **智能简报**：支持手动或定时生成每日内容简报，支持 Webhook 推送（钉钉、企业微信、飞书等）
+  - ⚙️ **自定义 AI 接口**：支持所有兼容 OpenAI 格式的 API
 
 ### 支持的操作
 
@@ -81,7 +83,7 @@ curl -O https://raw.githubusercontent.com/PehZeroV/tidyflux/main/docker-compose.
 environment:
   - TZ=Asia/Shanghai
   - MINIFLUX_URL=https://你的miniflux地址
-  - MINIFLUX_API_KEY=你的miniflux_api_key  # 优先推荐
+  - MINIFLUX_API_KEY=你的miniflux_api_key # 优先推荐
   # 或者使用用户名密码：
   # - MINIFLUX_USERNAME=Miniflux用户名
   # - MINIFLUX_PASSWORD=Miniflux密码
@@ -96,10 +98,11 @@ docker compose up -d
 > 💡 **提示**：如果你使用简报定时生成功能，请通过 `TZ` 环境变量设置正确的时区（默认为 `Asia/Shanghai`）。
 
 **默认账号**：
+
 - 地址: `http://localhost:8812`
 - 账号: `admin`
 - 密码: `admin`
-- *建议登录后修改密码*
+- _建议登录后修改密码_
 
 ### 二、全新部署（包含 Miniflux + Tidyflux）
 

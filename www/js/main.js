@@ -10,6 +10,7 @@ import { AuthManager } from './modules/auth-manager.js';
 import { initTheme } from './modules/theme-manager.js';
 import { i18n } from './modules/i18n.js';
 import { AIService } from './modules/ai-service.js';
+import { initPanelResizer } from './modules/panel-resizer.js';
 
 async function initApp() {
     // 初始化主题（在登录页面也需要）
@@ -44,6 +45,9 @@ async function initApp() {
 
     // 初始化三栏布局
     await ViewManager.initThreeColumnLayout();
+
+    // 初始化面板拖拽调节功能
+    initPanelResizer();
 
     Router.handleInitialHash();
 

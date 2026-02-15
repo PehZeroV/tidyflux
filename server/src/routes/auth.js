@@ -41,6 +41,17 @@ async function verifyMinifluxConnection(url, username, password, apiKey) {
     const testClient = new MinifluxClient(url, username, password, apiKey);
     return await testClient.request('/me');
 }
+
+function formatMinifluxTestError(err) {
+    if (err.status === 401 || err.status === 403) {
+        return '用户名或密码错误，请检查 Miniflux 登录信息';
+    }
+    const msg = err.message || '';
+    if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed') || msg.includes('ENOTFOUND')) {
+        return '无法连接到 Miniflux，请确认地址和端口正确（本机可试 http://127.0.0.1:8080）';
+    }
+    return '连接测试失败：' + (msg || '请检查 URL 和登录信息');
+}
 const router = express.Router();
 
 // Login
@@ -157,7 +168,8 @@ router.post('/miniflux-config', authenticateToken, async (req, res) => {
             await verifyMinifluxConnection(url, username, password, apiKey);
         } catch (testError) {
             console.error('Miniflux connection test failed:', testError);
-            return res.status(400).json({ error: '连接测试失败，请检查 URL 和登录信息是否正确' });
+            const msg = formatMinifluxTestError(testError);
+            return res.status(400).json({ error: msg });
         }
 
         // 保存配置
@@ -207,7 +219,8 @@ router.post('/miniflux-test', authenticateToken, async (req, res) => {
             });
         } catch (testError) {
             console.error('Miniflux connection test failed:', testError);
-            res.status(400).json({ error: '连接失败: ' + (testError.message || '请检查配置') });
+            const msg = formatMinifluxTestError(testError);
+            res.status(400).json({ error: msg });
         }
     } catch (error) {
         console.error('Test miniflux config error:', error);

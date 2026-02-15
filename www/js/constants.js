@@ -38,6 +38,7 @@ export const API_ENDPOINTS = {
         GENERATE: '/api/digest/generate',
         PREVIEW: '/api/digest/preview',
         TEST_PUSH: '/api/digest/test-push',
+        RUN_TASK: '/api/digest/run-task',
     },
     FAVICON: {
         BASE: '/api/favicon',

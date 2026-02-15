@@ -357,4 +357,90 @@ export const ArticleAIMixin = {
             });
         }
     },
+
+    /**
+     * 自动摘要：文章打开时自动生成 AI 摘要
+     * @param {Object} article - 文章对象
+     */
+    async autoSummarize(article) {
+        // 检查是否已配置 AI 且开启自动摘要
+        const aiConfig = AIService.getConfig();
+        if (!aiConfig.autoSummary || !AIService.isConfigured()) return;
+
+        // 简报类型跳过
+        if (article._isDigest || article.is_digest) return;
+
+        const summaryBox = document.getElementById('article-ai-summary');
+        const summarizeBtn = document.getElementById('article-summarize-btn');
+        if (!summaryBox) return;
+
+        const summaryContent = summaryBox.querySelector('.ai-content');
+        if (!summaryContent) return;
+
+        // 如果已有缓存的摘要，直接显示
+        if (article._aiSummary) {
+            summaryBox.style.display = 'block';
+            summaryContent.innerHTML = this.parseMarkdown(article._aiSummary);
+            if (summarizeBtn) summarizeBtn.classList.add('active');
+            return;
+        }
+
+        // 如果手动总结按钮正在加载或已完成，不重复触发
+        if (summarizeBtn && (summarizeBtn.classList.contains('loading') || summarizeBtn.classList.contains('active'))) {
+            return;
+        }
+
+        // 获取文章内容
+        const rawContent = AIService.extractText(article.content || '');
+        if (!rawContent || rawContent.trim().length < 50) return; // 内容太短不总结
+
+        // 显示加载状态
+        summaryBox.style.display = 'block';
+        summaryContent.innerHTML = `<div class="loading-spinner">${i18n.t('ai.summarizing')}</div>`;
+        if (summarizeBtn) summarizeBtn.classList.add('loading');
+
+        // 绑定关闭按钮
+        const closeBtn = summaryBox.querySelector('.ai-close-btn');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                summaryBox.style.display = 'none';
+                // 如果正在加载，取消请求
+                if (article._autoSummarizeController) {
+                    article._autoSummarizeController.abort();
+                    article._autoSummarizeController = null;
+                    if (summarizeBtn) summarizeBtn.classList.remove('loading');
+                }
+            };
+        }
+
+        try {
+            article._autoSummarizeController = new AbortController();
+            const signal = article._autoSummarizeController.signal;
+
+            const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+
+            let streamedText = '';
+            await AIService.summarize(rawContent, targetLang, (chunk) => {
+                streamedText += chunk;
+                summaryContent.innerHTML = this.parseMarkdown(streamedText);
+            }, signal);
+
+            // 缓存结果
+            article._aiSummary = streamedText;
+            if (summarizeBtn) {
+                summarizeBtn.classList.remove('loading');
+                summarizeBtn.classList.add('active');
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log('[AutoSummary] 已取消');
+                return;
+            }
+            console.error('[AutoSummary] 失败:', err);
+            summaryContent.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${i18n.t('ai.api_error')}: ${err.message}</span>`;
+            if (summarizeBtn) summarizeBtn.classList.remove('loading');
+        } finally {
+            article._autoSummarizeController = null;
+        }
+    },
 };

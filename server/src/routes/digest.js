@@ -9,6 +9,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { DigestStore } from '../utils/digest-store.js';
 import { DigestService, getRecentUnreadArticles } from '../services/digest-service.js';
 import { PreferenceStore } from '../utils/preference-store.js';
+import { DigestRunner } from '../services/digest-runner.js';
 
 const router = express.Router();
 
@@ -341,6 +342,39 @@ router.post('/test-push', authenticateToken, async (req, res) => {
         res.status(500).json({
             error: error.message
         });
+    }
+});
+
+/**
+ * POST /api/digest/run-task
+ * 手动触发指定的定时简报任务
+ */
+router.post('/run-task', authenticateToken, async (req, res) => {
+    try {
+        const { taskIndex } = req.body;
+        if (typeof taskIndex !== 'number') {
+            return res.status(400).json({ error: 'Task index required' });
+        }
+
+        const userId = PreferenceStore.getUserId(req.user);
+        const prefs = await PreferenceStore.get(userId);
+
+        if (!prefs.digest_schedules || !prefs.digest_schedules[taskIndex]) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const task = prefs.digest_schedules[taskIndex];
+        
+        const result = await DigestRunner.runTask(userId, task, prefs, { force: true, forcePush: true });
+
+        if (result.success) {
+            res.json({ success: true, digest: result.digest, push: result.push });
+        } else {
+            res.status(500).json({ error: result.error });
+        }
+    } catch (error) {
+        console.error('Run task error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

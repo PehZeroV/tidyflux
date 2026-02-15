@@ -1,6 +1,5 @@
-import { getMinifluxClient } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
-import { DigestService } from '../services/digest-service.js';
+import { DigestRunner } from '../services/digest-runner.js';
 
 /**
  * 获取当前时间字符串 (HH:mm)
@@ -29,118 +28,6 @@ function getCurrentTimeStr(timezone) {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
-}
-
-/**
- * 将文本按段落/换行边界拆分为不超过 maxLen 的块
- */
-function splitText(text, maxLen) {
-    if (text.length <= maxLen) return [text];
-
-    const chunks = [];
-    let remaining = text;
-
-    while (remaining.length > 0) {
-        if (remaining.length <= maxLen) {
-            chunks.push(remaining);
-            break;
-        }
-
-        // 优先在段落边界 (\n\n) 处拆分
-        let splitPos = remaining.lastIndexOf('\n\n', maxLen);
-        if (splitPos < maxLen * 0.3) {
-            // 段落边界太靠前，尝试在单个换行处拆分
-            splitPos = remaining.lastIndexOf('\n', maxLen);
-        }
-        if (splitPos < maxLen * 0.3) {
-            // 最后兜底：硬切
-            splitPos = maxLen;
-        }
-
-        chunks.push(remaining.substring(0, splitPos));
-        remaining = remaining.substring(splitPos).replace(/^\n+/, '');
-    }
-
-    return chunks;
-}
-
-/**
- * 发送推送通知，自动检测内容长度限制并分段发送
- * 支持 Discord content (2000) / embeds.description (4096) 等常见限制
- */
-async function sendPushNotification(pushConfig, title, content, userId) {
-    const pushMethod = (pushConfig.method || 'POST').toUpperCase();
-
-    // ---- GET 模式：URL 编码，单条发送 ----
-    if (pushMethod === 'GET') {
-        const pushUrl = pushConfig.url
-            .replace(/\{\{title\}\}/g, encodeURIComponent(title))
-            .replace(/\{\{digest_content\}\}/g, encodeURIComponent(content));
-        const resp = await fetch(pushUrl, { method: 'GET' });
-        console.log(`Push notification sent for user ${userId} [GET ${pushUrl}]: ${resp.status}`);
-        if (!resp.ok) {
-            try { const errBody = await resp.text(); console.error(`Push response body:`, errBody); } catch { }
-        }
-        return;
-    }
-
-    // ---- POST 模式：检测限制 & 自动分段 ----
-    const bodyTemplate = pushConfig.body || '{}';
-
-    let contentChunks = [content]; // 默认不拆分
-
-    // 通过 URL 判断推送服务的内容长度限制
-    const pushUrl = pushConfig.url.toLowerCase();
-    let fieldLimit = 0;
-    if (pushUrl.includes('discord.com') || pushUrl.includes('discordapp.com')) {
-        fieldLimit = 2000;  // Discord content 限制
-    } else if (pushUrl.includes('api.telegram.org')) {
-        fieldLimit = 4096;  // Telegram text 限制
-    } else if (pushUrl.includes('qyapi.weixin.qq.com')) {
-        fieldLimit = 2048;  // 企业微信 text.content 限制
-    }
-
-    if (fieldLimit > 0 && content.length > fieldLimit) {
-        // 计算模板中除 digest_content 以外的开销（标题、固定文字等）
-        const templateOverhead = bodyTemplate
-            .replace(/\{\{title\}\}/g, title)
-            .replace(/\{\{digest_content\}\}/g, '').length;
-        // 粗略估算：可用空间 = 限制 - 开销比例
-        const availablePerChunk = fieldLimit - Math.min(templateOverhead, fieldLimit * 0.3);
-        if (availablePerChunk > 100) {
-            contentChunks = splitText(content, availablePerChunk);
-            console.log(`Push content split into ${contentChunks.length} chunk(s) for user ${userId} (${pushUrl.split('/')[2]}, limit: ${fieldLimit})`);
-        }
-    }
-
-    // 逐条发送
-    for (let i = 0; i < contentChunks.length; i++) {
-        // 第一段保留标题，后续段不带标题
-        const chunkTitle = i === 0 ? title : '';
-        const chunkSafeTitle = JSON.stringify(chunkTitle).slice(1, -1);
-        const chunkSafeContent = JSON.stringify(contentChunks[i]).slice(1, -1);
-
-        const body = bodyTemplate
-            .replace(/\{\{title\}\}/g, chunkSafeTitle)
-            .replace(/\{\{digest_content\}\}/g, chunkSafeContent);
-
-        const resp = await fetch(pushConfig.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: body
-        });
-
-        const chunkLabel = contentChunks.length > 1 ? ` (${i + 1}/${contentChunks.length})` : '';
-        console.log(`Push notification sent for user ${userId} [POST ${pushConfig.url}]${chunkLabel}: ${resp.status}`);
-        if (!resp.ok) {
-            try { const errBody = await resp.text(); console.error(`Push response body:`, errBody); } catch { }
-        }
-
-        // 多条之间加延迟，保证 Discord 等服务按顺序接收
-        if (i < contentChunks.length - 1) {
-            await new Promise(r => setTimeout(r, 500));
-        }
-    }
 }
 
 export const DigestScheduler = {
@@ -195,83 +82,25 @@ export const DigestScheduler = {
 
                     console.log(`Triggering scheduled digest for user ${userId} [Scope: ${task.scope}] at ${currentTime}`);
 
-                    const aiConfig = prefs.ai_config;
-                    if (!aiConfig?.apiKey) {
-                        console.error(`Skipping digest for ${userId}: AI not configured.`);
-                        continue;
-                    }
-
-                    const minifluxClient = await getMinifluxClient();
-                    if (!minifluxClient) {
-                        console.error(`Skipping digest for ${userId}: Miniflux client not available.`);
-                        continue;
-                    }
-
-                    const targetLang = aiConfig.targetLang || aiConfig.summarizeLang || 'zh-CN';
-
-                    const digestOptions = {
-                        scope: task.scope || 'all',
-                        hours: task.hours || 24,
-                        targetLang: targetLang,
-                        aiConfig: aiConfig,
-                        prompt: aiConfig.digestPrompt,
-                        unreadOnly: task.unreadOnly !== false, // default true
-                        timezone: userTimezone || ''
-                    };
-
-                    if (task.scope === 'feed') {
-                        digestOptions.feedId = task.feedId || task.scopeId;
-                        // Validate feed still exists
-                        try {
-                            await minifluxClient.getFeed(parseInt(digestOptions.feedId));
-                        } catch (e) {
-                            console.warn(`Skipping digest for user ${userId}: feed ${digestOptions.feedId} no longer exists. Disabling task.`);
-                            task.enabled = false;
-                            await PreferenceStore.save(userId, prefs);
-                            continue;
-                        }
-                    } else if (task.scope === 'group') {
-                        digestOptions.groupId = task.groupId || task.scopeId;
-                        // Validate group still exists
-                        try {
-                            const categories = await minifluxClient.getCategories();
-                            const exists = categories.some(c => c.id === parseInt(digestOptions.groupId));
-                            if (!exists) throw new Error('not found');
-                        } catch (e) {
-                            console.warn(`Skipping digest for user ${userId}: group ${digestOptions.groupId} no longer exists. Disabling task.`);
-                            task.enabled = false;
-                            await PreferenceStore.save(userId, prefs);
-                            continue;
-                        }
-                    }
-
-                    // 串行执行：生成 → 推送 → 下一个（防止 AI API 429 限流）
-                    const pushConfig = prefs.digest_push_config;
                     try {
-                        const result = await DigestService.generate(minifluxClient, userId, digestOptions);
+                        const result = await DigestRunner.runTask(userId, task, prefs);
 
                         if (!result.success) {
-                            console.error(`Digest generation failed for user ${userId} [Task: ${task.scope}]:`, result);
+                            console.error(`Digest generation logic failed for user ${userId} [Task: ${task.scope}]:`, result.error);
+                            
+                            // Check if we should disable the task (resource not found)
+                            if (result.error === 'Feed not found' || result.error === 'Group not found') {
+                                console.warn(`Disabling invalid task for user ${userId}`);
+                                task.enabled = false;
+                                await PreferenceStore.save(userId, prefs);
+                            }
                             continue;
                         }
+                        
+                        console.log(`Digest task completed for user ${userId} [Task ID: ${result.digest.id}]`);
 
-                        console.log(`Digest generated for user ${userId} [Task: ${task.scope}]:`, result.digest.id);
-
-                        // Push notification (per-task enabled + global config)
-                        if (task.pushEnabled && pushConfig?.url) {
-                            try {
-                                await sendPushNotification(
-                                    pushConfig,
-                                    result.digest.title || '',
-                                    result.digest.content || '',
-                                    userId
-                                );
-                            } catch (pushErr) {
-                                console.error(`Push notification failed for user ${userId}:`, pushErr.message);
-                            }
-                        }
                     } catch (err) {
-                        console.error(`Error in digest generation for user ${userId}:`, err);
+                        console.error(`Error in digest task execution for user ${userId}:`, err);
                     }
                 }
             } catch (error) {

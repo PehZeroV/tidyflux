@@ -34,6 +34,8 @@ export const AIService = {
      * @returns {Object} AI 配置对象
      */
     _configCache: null,
+    // 标题翻译缓存 (key: title+langId, value: translated title)
+    _titleCache: new Map(),
 
     /**
      * 初始化 AI 服务
@@ -89,7 +91,10 @@ export const AIService = {
             translatePrompt: '',
             summarizePrompt: '',
             digestPrompt: '',
-            targetLang: 'zh-CN'
+            targetLang: 'zh-CN',
+            autoSummary: false,
+            titleTranslation: false,
+            titleTranslationMode: 'bilingual'
         };
     },
 
@@ -320,6 +325,85 @@ export const AIService = {
             .replace('{{content}}', content);
 
         return this.callAPI(prompt, onChunk, signal);
+    },
+
+    /**
+     * 翻译单个标题
+     * @param {string} title - 原始标题
+     * @param {string} targetLangId - 目标语言 ID
+     * @returns {Promise<string>} 翻译后的标题
+     */
+    async translateTitle(title, targetLangId) {
+        if (!title || !title.trim()) return title;
+        const cacheKey = `${title}||${targetLangId}`;
+        if (this._titleCache.has(cacheKey)) {
+            return this._titleCache.get(cacheKey);
+        }
+        const targetLang = this.getLanguageName(targetLangId);
+        const prompt = `Translate the following title into ${targetLang}. Output ONLY the translated title, nothing else:\n\n${title}`;
+        const result = await this.callAPI(prompt);
+        const translated = result.trim();
+        this._titleCache.set(cacheKey, translated);
+        return translated;
+    },
+
+    /**
+     * 批量翻译标题（单次 API 调用）
+     * @param {Array<{id: string|number, title: string}>} items - 文章对象数组
+     * @param {string} targetLangId - 目标语言 ID
+     * @returns {Promise<Map<string|number, string>>} id -> 翻译结果 Map
+     */
+    async translateTitlesBatch(items, targetLangId) {
+        const resultMap = new Map();
+        if (!items || items.length === 0) return resultMap;
+
+        // 过滤已缓存的
+        const needTranslate = items.filter(item => {
+            const cacheKey = `${item.title}||${targetLangId}`;
+            if (this._titleCache.has(cacheKey)) {
+                resultMap.set(item.id, this._titleCache.get(cacheKey));
+                return false;
+            }
+            return true;
+        });
+
+        if (needTranslate.length === 0) return resultMap;
+
+        const targetLang = this.getLanguageName(targetLangId);
+        // 构建批量翻译提示词
+        const titlesBlock = needTranslate.map((item, i) => `${i + 1}. ${item.title}`).join('\n');
+        const prompt = `Translate each of the following titles into ${targetLang}. Output ONLY the translated titles, one per line, in the same numbered format (e.g. "1. translated title"). Do not add any extra text:\n\n${titlesBlock}`;
+
+        try {
+            const result = await this.callAPI(prompt);
+            const lines = result.trim().split('\n').filter(l => l.trim());
+
+            for (let i = 0; i < needTranslate.length; i++) {
+                let translated = needTranslate[i].title; // 回退到原标题
+                if (i < lines.length) {
+                    // 去除行号前缀 (如 "1. ", "2. ")
+                    translated = lines[i].replace(/^\d+\.\s*/, '').trim();
+                }
+                const cacheKey = `${needTranslate[i].title}||${targetLangId}`;
+                this._titleCache.set(cacheKey, translated);
+                resultMap.set(needTranslate[i].id, translated);
+            }
+        } catch (e) {
+            console.error('[AIService] Batch title translation failed:', e);
+        }
+
+        return resultMap;
+    },
+
+    /**
+     * 获取标题翻译缓存
+     * @param {string} title - 原始标题
+     * @param {string} targetLangId - 目标语言 ID
+     * @returns {string|null} 缓存的翻译结果，无缓存返回 null
+     */
+    getTitleCache(title, targetLangId) {
+        const cacheKey = `${title}||${targetLangId}`;
+        return this._titleCache.has(cacheKey) ? this._titleCache.get(cacheKey) : null;
     },
 
     /**

@@ -1,50 +1,73 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-
-<head>
+  <head>
     <script src="/js/theme-init.js"></script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title data-i18n="title">Tidyflux</title>
-    <meta name="description" content="简洁优雅的 RSS 阅读器" data-i18n="app.description">
+    <meta
+      name="description"
+      content="简洁优雅的 RSS 阅读器"
+      data-i18n="app.description"
+    />
 
-    <link rel="icon" href="/icons/icon-512x512.svg" type="image/svg+xml">
-    <link rel="alternate icon" href="/icons/favicon.png" type="image/png">
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" href="/icons/icon-512x512.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/icons/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="/style.css" as="style">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="/style.css" as="style" />
 
     <!-- Fonts loaded via standard stylesheet link to avoid CSP issues with inline handlers -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700&display=swap">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700&display=swap"
+    />
     <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700&display=swap">
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700&display=swap"
+      />
     </noscript>
-    <link rel="stylesheet" href="/style.css">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="manifest" href="/manifest.json" />
 
-    <meta name="theme-color" content="#f7f3ed" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1a1816" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Tidyflux">
-</head>
+    <meta
+      name="theme-color"
+      content="#f7f3ed"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#1a1816"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Tidyflux" />
+  </head>
 
-<body>
+  <body>
     <!-- 认证容器 -->
-    <div id="auth-container" class="auth-container" style="display: none;"></div>
+    <div id="auth-container" class="auth-container" style="display: none"></div>
 
     <!-- 三栏布局主容器 -->
     <div id="app-container" class="app-container three-column-layout" style="display: none;">
         <!-- 左栏：订阅源列表 -->
         <aside id="feeds-panel" class="feeds-panel">
             <div class="panel-header">
-                <div class="app-logo">
+                <div class="app-logo feeds-panel-logo">
                     <img src="/icons/icon-512x512.svg" alt="Tidyflux Logo" width="100%" height="100%">
                 </div>
-                <h2 data-i18n="nav.feeds">订阅源</h2>
+                <h2 class="feeds-panel-title" data-i18n="nav.feeds">订阅源</h2>
                 <button id="add-feed-btn" class="icon-btn" title="添加订阅" data-i18n="dialogs.add_subscription">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20"
                         height="20">
@@ -58,24 +81,16 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18"
                         height="18">
                         <path
-                            d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.64-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                            d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.64-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38s1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
                     </svg>
                 </button>
             </div>
         </aside>
+        <div id="feeds-panel-resize-handle" class="feeds-panel-resize-handle" title="拖拽调整宽度" aria-label="调整订阅栏宽度"></div>
 
         <!-- 中栏：文章列表 -->
         <div id="articles-panel" class="articles-panel">
             <div class="panel-header">
-                <button id="show-feeds-btn" class="icon-btn" title="订阅源" data-i18n="nav.feeds"
-                    style="margin-right: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24"
-                        height="24">
-                        <path
-                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
-                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                    </svg>
-                </button>
                 <h2 id="current-feed-title" data-i18n="nav.all">全部文章</h2>
                 <button id="articles-search-btn" class="icon-btn" title="搜索" data-i18n="common.search"
                     style="margin-left: auto;">
@@ -108,20 +123,18 @@
             </button>
         </div>
 
-        <!-- 右栏：文章内容 -->
-        <main id="content-panel" class="content-panel">
-            <div id="article-content" class="article-content">
-                <div class="empty-content">
-                    <p data-i18n="welcome">选择一篇文章开始阅读</p>
-                </div>
-            </div>
-        </main>
+      <!-- 右栏：文章内容 -->
+      <main id="content-panel" class="content-panel">
+        <div id="article-content" class="article-content">
+          <div class="empty-content">
+            <p data-i18n="welcome">选择一篇文章开始阅读</p>
+          </div>
+        </div>
+      </main>
     </div>
 
     <!-- 移动端底部导航 -->
 
-
     <script src="/js/main.js" type="module"></script>
-</body>
-
+  </body>
 </html>

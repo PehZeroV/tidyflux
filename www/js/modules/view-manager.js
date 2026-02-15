@@ -624,9 +624,56 @@ export const ViewManager = {
         }
     },
 
+    // ==================== 订阅栏宽度调节（仅桌面端） ====================
+
+    initFeedsPanelResize() {
+        const panel = DOMElements.feedsPanel;
+        const handle = document.getElementById('feeds-panel-resize-handle');
+        if (!panel || !handle) return;
+
+        const STORAGE_WIDTH = 'tidyflux_feedsPanelWidth';
+        const MIN_W = 160;
+        const MAX_W = 400;
+
+        const applyWidth = (w) => {
+            const px = Math.round(Math.max(MIN_W, Math.min(MAX_W, w))) + 'px';
+            panel.style.width = px;
+            panel.style.minWidth = px;
+            panel.style.maxWidth = px;
+        };
+
+        try {
+            const savedW = parseInt(localStorage.getItem(STORAGE_WIDTH), 10);
+            if (!isNaN(savedW)) applyWidth(savedW);
+        } catch (_) {}
+
+        let startX = 0, startW = 0;
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startW = panel.offsetWidth;
+            handle.classList.add('feeds-panel-resize-handle--dragging');
+            const onMove = (e2) => {
+                const dx = e2.clientX - startX;
+                applyWidth(startW + dx);
+            };
+            const onUp = () => {
+                handle.classList.remove('feeds-panel-resize-handle--dragging');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                try {
+                    localStorage.setItem(STORAGE_WIDTH, String(panel.offsetWidth));
+                } catch (_) {}
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    },
+
     // ==================== Event Binding ====================
 
     bindEvents() {
+        this.initFeedsPanelResize();
         this.bindSwipeGestures();
 
         // 绑定窗口调整事件，解决从桌面端切换到移动端时的空白问题
@@ -720,12 +767,6 @@ export const ViewManager = {
             this.showArticlesContextMenu(e);
         });
 
-        // 移动端显示订阅源面板按钮
-        document.getElementById('show-feeds-btn')?.addEventListener('click', () => {
-            this.isProgrammaticNav = true;
-            window.location.hash = '#/feeds';
-        });
-
         // Throttled scroll handler
         let scrollTicking = false;
         DOMElements.articlesList?.addEventListener('scroll', () => {
@@ -742,12 +783,11 @@ export const ViewManager = {
         document.addEventListener('click', (e) => {
             if (window.innerWidth > BREAKPOINT_MOBILE && window.innerWidth <= BREAKPOINT_TABLET) {
                 const feedsPanel = DOMElements.feedsPanel;
-                const toggleBtn = document.getElementById('show-feeds-btn');
 
                 // 如果面板是激活的
                 if (feedsPanel && feedsPanel.classList.contains('active')) {
-                    // 如果点击不在面板内，也不在切换按钮上
-                    if (!feedsPanel.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
+                    // 如果点击不在面板内
+                    if (!feedsPanel.contains(e.target)) {
                         if (window.location.hash === '#/feeds') {
                             this.isProgrammaticNav = true;
                             history.back();
