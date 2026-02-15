@@ -184,7 +184,11 @@ export default {
         thumbnails_on: '已开启缩略图显示',
         thumbnails_off: '已关闭缩略图显示',
         manual_refresh: '手动刷新订阅',
-        refresh_miniflux: '刷新 Miniflux 订阅'
+        refresh_miniflux: '刷新 Miniflux 订阅',
+        title_translate: '标题翻译',
+        translate_inherit: '跟随上级',
+        translate_on: '开启',
+        translate_off: '关闭'
     },
     auth: {
         title: 'Tidyflux',
@@ -309,12 +313,19 @@ export default {
         reset_prompts: '恢复默认提示词',
         copy: '复制',
         copied: '已复制',
-        title_translation: 'AI 标题翻译',
-        title_translation_hint: '对文章列表中的标题进行翻译（消耗少量 Token）',
+        title_translation: '标题自动翻译',
+        title_translation_hint: '选择需要自动翻译标题的分组或订阅源',
         title_translation_mode: '显示模式',
         title_translation_bilingual: '双语显示',
         title_translation_translated: '仅显示翻译',
-        not_configured: 'AI 服务未配置，请先在设置中配置'
+        auto_summary_hint_panel: '选择需要自动生成摘要的分组或订阅源',
+        auto_translate_article: '全文自动翻译',
+        auto_translate_hint_panel: '选择需要全文自动翻译的分组或订阅源',
+        ai_automation: 'AI 自动化',
+        rate_limit_warning: '快速滚动文章列表或者快速切换文章极易触发 API 速率限制，建议按需开启',
+        not_configured: 'AI 服务未配置，请先在设置中配置',
+        translate_failed: '翻译失败',
+        auto_translate_failed: '自动翻译失败'
     },
     theme: {
         default: '默认',

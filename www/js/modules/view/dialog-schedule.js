@@ -103,7 +103,7 @@ export const ScheduleDialogMixin = {
 
                 <div style="margin-bottom: 20px;">
                     <div class="settings-item-label" style="margin-bottom: 8px;">${i18n.t('ai.digest_target')}</div>
-                    <div id="schedule-scope-list" style="max-height: 200px; overflow-y: auto; border-radius: var(--radius); background: color-mix(in srgb, var(--bg-color), #fff 95%); box-shadow: var(--card-shadow); padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px;">
+                    <div id="schedule-scope-list" style="max-height: 200px; overflow-y: auto; border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--card-shadow); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px;">
                         ${scopeListHtml}
                     </div>
                     <div id="scope-selection-hint" style="font-size: 0.8em; margin-top: 6px;"></div>

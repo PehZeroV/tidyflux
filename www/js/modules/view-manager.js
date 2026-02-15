@@ -556,7 +556,12 @@ export const ViewManager = {
     // ==================== Settings/Filter 相关 ====================
 
     loadFilterSetting(key) {
-        if (AppState.preferences && AppState.preferences[key] !== undefined) {
+        // 优先从 list_filters 命名空间读取
+        if (AppState.preferences?.list_filters?.[key] !== undefined) {
+            return AppState.preferences.list_filters[key];
+        }
+        // 向下兼容：旧版可能存在顶层
+        if (AppState.preferences?.[key] !== undefined) {
             return AppState.preferences[key];
         }
         try {
@@ -569,10 +574,12 @@ export const ViewManager = {
 
     async saveFilterSetting(key, value) {
         AppState.preferences = AppState.preferences || {};
-        AppState.preferences[key] = value;
+        AppState.preferences.list_filters = AppState.preferences.list_filters || {};
+        AppState.preferences.list_filters[key] = value;
 
         try {
-            await FeedManager.setPreference(key, value);
+            // 以 list_filters 整体保存，避免散装 key
+            await FeedManager.setPreference('list_filters', AppState.preferences.list_filters);
         } catch (err) {
             console.error('Sync preference error:', err);
         }

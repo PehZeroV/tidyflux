@@ -10,6 +10,7 @@ import { AuthManager } from './modules/auth-manager.js';
 import { initTheme } from './modules/theme-manager.js';
 import { i18n } from './modules/i18n.js';
 import { AIService } from './modules/ai-service.js';
+import { AICache } from './modules/ai-cache.js';
 import { initPanelResizer } from './modules/panel-resizer.js';
 
 async function initApp() {
@@ -23,8 +24,9 @@ async function initApp() {
         return;
     }
 
-    // 初始化 AI 服务配置（从后端同步）
+    // 初始化 AI 服务配置（从后端同步）+ 缓存清理
     await AIService.init();
+    AICache.init(); // 异步清理过期缓存，不阻塞启动
 
     // 检查 Miniflux 配置
     try {

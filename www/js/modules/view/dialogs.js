@@ -19,6 +19,7 @@ import { Icons } from '../icons.js';
 import { SettingsDialogMixin } from './dialog-settings.js';
 import { ScheduleDialogMixin } from './dialog-schedule.js';
 import { ManagerDialogMixin } from './dialog-manager.js';
+import { TranslationDialogMixin } from './dialog-ai-automation.js';
 
 
 /**
@@ -605,5 +606,6 @@ export const Dialogs = {
     ...SettingsDialogMixin,
     ...ScheduleDialogMixin,
     ...ManagerDialogMixin,
+    ...TranslationDialogMixin,
 };
 

@@ -36,6 +36,25 @@ function structuredCloneCompat(obj) {
 }
 
 export const PreferenceStore = {
+    // Per-user write locks to prevent concurrent read-modify-write
+    _locks: new Map(),
+
+    async _withLock(userId, fn) {
+        // Wait for any pending write to finish
+        while (this._locks.get(userId)) {
+            await this._locks.get(userId);
+        }
+        let resolve;
+        const promise = new Promise(r => { resolve = r; });
+        this._locks.set(userId, promise);
+        try {
+            return await fn();
+        } finally {
+            this._locks.delete(userId);
+            resolve();
+        }
+    },
+
     /**
      * 异步读取用户偏好设置
      */
@@ -89,6 +108,28 @@ export const PreferenceStore = {
     },
 
     /**
+     * 原子更新：在锁内 读取 → 合并 → 保存，防止并发覆盖
+     */
+    async update(userId, updates) {
+        return this._withLock(userId, async () => {
+            const currentPrefs = await this.get(userId);
+
+            // Special handling for ai_config: preserve API Key if masked
+            if (updates.ai_config?.apiKey === '********') {
+                if (currentPrefs.ai_config?.apiKey) {
+                    updates.ai_config.apiKey = currentPrefs.ai_config.apiKey;
+                } else {
+                    delete updates.ai_config.apiKey;
+                }
+            }
+
+            const newPrefs = { ...currentPrefs, ...updates };
+            const success = await this.save(userId, newPrefs);
+            return { success, preferences: newPrefs };
+        });
+    },
+
+    /**
      * 异步获取所有用户的 ID 列表
      */
     async getAllUserIds() {
@@ -111,5 +152,35 @@ export const PreferenceStore = {
         if (!user) return 'default';
         const username = user.miniflux_username || user.username || 'default';
         return Buffer.from(username).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
+    },
+
+    /**
+     * 启动时迁移：将散落在顶层的 feed_*、group_*、all 过滤设置
+     * 归入 list_filters 对象。已迁移的文件跳过。
+     */
+    async migrateAll() {
+        const FILTER_KEY_RE = /^(feed_\d+|group_\d+|all)$/;
+        try {
+            const userIds = await this.getAllUserIds();
+            for (const userId of userIds) {
+                const prefs = await this.get(userId);
+                const keysToMove = Object.keys(prefs).filter(k => FILTER_KEY_RE.test(k));
+                if (keysToMove.length === 0) continue;
+
+                // 归入 list_filters
+                const filters = prefs.list_filters || {};
+                for (const key of keysToMove) {
+                    if (filters[key] === undefined) {
+                        filters[key] = prefs[key];
+                    }
+                    delete prefs[key];
+                }
+                prefs.list_filters = filters;
+                await this.save(userId, prefs);
+                console.log(`[PreferenceStore] Migrated ${keysToMove.length} filter keys for user ${userId}`);
+            }
+        } catch (err) {
+            console.error('[PreferenceStore] Migration error:', err);
+        }
     }
 };

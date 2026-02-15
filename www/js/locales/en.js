@@ -184,7 +184,11 @@ export default {
         thumbnails_on: 'Thumbnails enabled',
         thumbnails_off: 'Thumbnails disabled',
         manual_refresh: 'Refresh Feeds',
-        refresh_miniflux: 'Refresh Miniflux Feeds'
+        refresh_miniflux: 'Refresh Miniflux Feeds',
+        title_translate: 'Title Translation',
+        translate_inherit: 'Inherit',
+        translate_on: 'On',
+        translate_off: 'Off'
     },
     auth: {
         title: 'Tidyflux',
@@ -309,12 +313,19 @@ export default {
         reset_prompts: 'Reset to Default Prompts',
         copy: 'Copy',
         copied: 'Copied',
-        title_translation: 'AI Title Translation',
-        title_translation_hint: 'Translate article titles in the list (consumes small amount of tokens)',
+        title_translation: 'Auto Title Translation',
+        title_translation_hint: 'Select groups or feeds to auto-translate article titles',
         title_translation_mode: 'Display Mode',
         title_translation_bilingual: 'Bilingual',
         title_translation_translated: 'Translated Only',
-        not_configured: 'AI service not configured, please configure in settings'
+        auto_summary_hint_panel: 'Select groups or feeds to auto-generate summaries when articles are opened',
+        auto_translate_article: 'Auto Translate Article',
+        auto_translate_hint_panel: 'Select groups or feeds to auto-translate full articles when opened',
+        ai_automation: 'AI Automation',
+        rate_limit_warning: 'Rapidly scrolling through the article list or quickly switching articles may easily trigger API rate limits. Enable only as needed.',
+        not_configured: 'AI service not configured, please configure in settings',
+        translate_failed: 'Translation failed',
+        auto_translate_failed: 'Auto translation failed'
     },
     theme: {
         default: 'Default',

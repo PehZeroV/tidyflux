@@ -299,6 +299,14 @@ body.panel-resizing .panel-resize-handle {
     color: var(--accent-color);
 }
 
+.article-item.active .article-title-translated {
+    color: var(--accent-color);
+}
+
+.article-item.active .article-title-original {
+    color: color-mix(in srgb, var(--accent-color) 60%, transparent);
+}
+
 /* 标题翻译相关样式 */
 .article-item-title.has-translation {
     display: block !important;
@@ -340,8 +348,9 @@ body.panel-resizing .panel-resize-handle {
     font-size: 0.8em;
     color: var(--meta-color);
     animation: title-translate-pulse 1.5s ease-in-out infinite;
-    display: inline-block;
-    margin-left: 4px;
+    display: block;
+    margin-bottom: 4px;
+    line-height: 1.4;
 }
 
 @keyframes title-translate-pulse {

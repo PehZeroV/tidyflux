@@ -72,7 +72,7 @@ router.post('/chat', authenticateToken, async (req, res) => {
             }
             // 不要直接透传上游 AI 的 401/403，否则前端会误判为登录过期
             const statusCode = (response.status === 401 || response.status === 403) ? 502 : response.status;
-            return res.status(statusCode).json({ error: errorMsg });
+            return res.status(statusCode).json({ error: errorMsg, status: response.status });
         }
 
         if (stream) {

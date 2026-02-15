@@ -27,11 +27,10 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// Update preferences (merge with existing)
+// Update preferences (atomic merge with existing)
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const userId = PreferenceStore.getUserId(req.user);
-        const currentPrefs = await PreferenceStore.get(userId);
 
         let updates = req.body;
 
@@ -40,23 +39,11 @@ router.post('/', authenticateToken, async (req, res) => {
             updates = { [updates.key]: updates.value };
         }
 
-        // Special handling for ai_config updates to preserve API Key if masked
-        if (updates.ai_config?.apiKey === '********') {
-            if (currentPrefs.ai_config?.apiKey) {
-                updates.ai_config.apiKey = currentPrefs.ai_config.apiKey;
-            } else {
-                delete updates.ai_config.apiKey;
-            }
-        }
+        // 使用原子更新（内含锁 + 合并 + 保存）
+        const { success, preferences: newPrefs } = await PreferenceStore.update(userId, updates);
 
-        // 合并更新
-        const newPrefs = { ...currentPrefs, ...updates };
-
-        if (await PreferenceStore.save(userId, newPrefs)) {
-            // Return masked key in response
-            // Create a copy to mask without affecting what was just saved
-            const responsePrefs = JSON.parse(JSON.stringify(newPrefs));
-            res.json({ success: true, preferences: maskSensitiveData(responsePrefs) });
+        if (success) {
+            res.json({ success: true, preferences: maskSensitiveData(newPrefs) });
         } else {
             res.status(500).json({ error: '保存偏好设置失败' });
         }

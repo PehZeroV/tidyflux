@@ -220,6 +220,9 @@ export const ArticleToolbarMixin = {
         // 自动摘要（如果已启用）
         this.autoSummarize(article);
 
+        // 自动翻译全文（如果已启用）
+        this.autoTranslate(article);
+
         // 更多操作菜单（三个点）
         const moreBtn = document.getElementById('article-more-btn');
 

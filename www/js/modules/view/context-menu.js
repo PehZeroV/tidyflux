@@ -11,6 +11,7 @@ import { Modal } from './components.js';
 import { Icons } from '../icons.js';
 import { Dialogs } from './dialogs.js';
 
+
 /**
  * 上下文菜单管理
  */
@@ -50,7 +51,6 @@ export const ContextMenu = {
                 ${Icons.refresh}
                 ${i18n.t('context.refresh_group')}
             </div>
-
             <div class="context-menu-item" data-action="rename" data-group-id="${groupId}">
                 ${Icons.edit}
                 ${i18n.t('context.rename')}
@@ -102,7 +102,6 @@ export const ContextMenu = {
      * @param {string|number} feedId - 订阅源 ID
      */
     showFeedContextMenu(event, feedId) {
-
 
         const html = `
             <div class="context-menu-item" data-action="refresh" data-feed-id="${feedId}">

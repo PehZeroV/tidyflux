@@ -25,6 +25,8 @@ import { ArticleToolbarMixin } from './article-toolbar.js';
 export const ArticleContentView = {
     /** 视图管理器引用 */
     viewManager: null,
+    /** 当前正在显示的文章对象（用于切换时取消 AI 请求） */
+    _currentArticle: null,
 
     /**
      * 初始化模块
@@ -214,6 +216,9 @@ export const ArticleContentView = {
             this.updateLocalUnreadCount(feedId);
         }
 
+        // 取消上一篇文章的 AI 请求
+        this._cancelPendingAI();
+
         // 清除旧的工具栏
         this._clearToolbar();
 
@@ -256,10 +261,12 @@ export const ArticleContentView = {
 
                 if (article && article.content) {
                     article.is_read = 1;
+                    this._currentArticle = article;
                     this.renderArticleContent(article);
                 } else {
                     article = await FeedManager.getArticle(articleId);
                     article.is_read = 1;
+                    this._currentArticle = article;
                     this.renderArticleContent(article);
                 }
 
@@ -551,6 +558,29 @@ export const ArticleContentView = {
     },
 
     // translateBilingual, bindAIButtons → article-ai.js (ArticleAIMixin)
+
+    /**
+     * 取消当前文章的所有进行中 AI 请求
+     */
+    _cancelPendingAI() {
+        const article = this._currentArticle;
+        if (!article) return;
+
+        if (article._autoSummarizeController) {
+            article._autoSummarizeController.abort();
+            article._autoSummarizeController = null;
+        }
+        if (article._summarizeController) {
+            article._summarizeController.abort();
+            article._summarizeController = null;
+        }
+        if (article._translateController) {
+            article._translateController.abort();
+            article._translateController = null;
+        }
+
+        this._currentArticle = null;
+    },
 
     /**
      * 增强代码块显示

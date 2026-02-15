@@ -38,9 +38,11 @@
 - 🎧 Built-in podcast player, supporting background playback and progress control
 - 🔄 Personalized settings and AI configuration cloud storage, automatic synchronization across multiple devices
 - 🤖 **AI Enhanced Features**:
-    - 📝 **Article Summary**: Extract core viewpoints and summaries of articles with one click
-    - 🌍 **Full Text Translation**: Support full text translation in multiple languages
+    - 🏷️ **Auto Title Translation**: Automatically translate feed titles to your target language, configurable per feed/category
+    - 📝 **Auto Summarization**: Automatically generate AI summaries when opening articles, configurable per feed/category
+    - 🌍 **Auto Full-Text Translation**: Automatically translate articles with bilingual side-by-side view, configurable per feed/category
     - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
+    - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in IndexedDB — zero token cost on repeat visits
     - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
 
 ### Supported Operations

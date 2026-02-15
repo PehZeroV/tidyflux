@@ -289,6 +289,8 @@ export const ArticlesView = {
 
             // 正常追加
             this.virtualList.appendItems(articles);
+            // 触发标题翻译（虚拟列表路径也需要，不取消之前的翻译任务）
+            this.triggerTitleTranslations(articles, false);
             return;
         }
 
@@ -298,8 +300,8 @@ export const ArticlesView = {
         // Bind events for new items
         this.bindArticleItemEvents();
 
-        // 触发标题翻译
-        this.triggerTitleTranslations(articles);
+        // 触发标题翻译（追加模式，不取消之前的翻译任务）
+        this.triggerTitleTranslations(articles, false);
     },
 
     /**
@@ -476,14 +478,14 @@ export const ArticlesView = {
      * @returns {string} 标题 HTML
      */
     _buildTitleHtml(article) {
-        const aiConfig = AIService.getConfig();
         const escaped = escapeHtml(article.title);
 
-        // 未开启标题翻译或 AI 未配置
-        if (!aiConfig.titleTranslation || !AIService.isConfigured()) {
+        // 检查该订阅源是否应翻译标题（三级继承：订阅源 > 分组 > 全局）
+        if (!AIService.shouldTranslateFeed(article.feed_id)) {
             return escaped;
         }
 
+        const aiConfig = AIService.getConfig();
         const targetLangId = aiConfig.targetLang || 'zh-CN';
         const cached = AIService.getTitleCache(article.title, targetLangId);
         const mode = aiConfig.titleTranslationMode || 'bilingual';
@@ -496,31 +498,37 @@ export const ArticlesView = {
             return `<div class="article-title-translated">${escapeHtml(cached)}</div><div class="article-title-original">${escaped}</div>`;
         }
 
-        // 尚未翻译，显示原标题 + loading 占位
-        return `<span class="article-title-original">${escaped}</span><span class="title-translating">…</span>`;
+        // 尚未翻译，显示 loading 占位 + 原标题（与翻译后布局一致：翻译在上，原文在下）
+        return `<div class="title-translating">…</div><div class="article-title-original">${escaped}</div>`;
     },
 
     /**
      * 异步批量触发标题翻译并更新 DOM
      * @param {Array} articles - 文章数组
+     * @param {boolean} cancelPrevious - 是否取消上一次的翻译任务（默认 true，追加模式下传 false）
      */
-    async triggerTitleTranslations(articles) {
+    async triggerTitleTranslations(articles, cancelPrevious = true) {
         const aiConfig = AIService.getConfig();
-        if (!aiConfig.titleTranslation || !AIService.isConfigured()) return;
+        // AI 未配置则直接返回
+        if (!AIService.isConfigured()) return;
 
-        // 取消上一次的翻译任务
-        if (this._titleTranslationAbort) {
+        // 仅在全量加载时取消上一次的翻译任务；追加模式下不取消
+        if (cancelPrevious && this._titleTranslationAbort) {
             this._titleTranslationAbort.abort();
         }
-        this._titleTranslationAbort = new AbortController();
-        const signal = this._titleTranslationAbort.signal;
+        const abortController = new AbortController();
+        if (cancelPrevious) {
+            this._titleTranslationAbort = abortController;
+        }
+        const signal = abortController.signal;
 
         const targetLangId = aiConfig.targetLang || 'zh-CN';
         const mode = aiConfig.titleTranslationMode || 'bilingual';
 
-        // 过滤出需要翻译的文章（未缓存且非 digest）
+        // 过滤出需要翻译的文章（未缓存、非 digest、且该订阅源允许翻译）
         const needTranslate = articles.filter(a => {
             if (a.type === 'digest') return false;
+            if (!AIService.shouldTranslateFeed(a.feed_id)) return false;
             return !AIService.getTitleCache(a.title, targetLangId);
         });
 
@@ -537,7 +545,7 @@ export const ArticlesView = {
                 // 目前 AI Service 的 callAPI 支持 signal，但 translateTitlesBatch 还没传。
                 // 即使 callAPI 不传 signal，我们在这里 break loop 也能停止后续的 batch。
                 const resultMap = await AIService.translateTitlesBatch(batch, targetLangId);
-                
+
                 if (signal.aborted) break;
 
                 // 更新 DOM

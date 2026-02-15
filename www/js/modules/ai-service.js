@@ -1,6 +1,8 @@
 import { i18n } from './i18n.js';
 import { AuthManager } from './auth-manager.js';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../constants.js';
+import { AppState } from '../state.js';
+import { AICache } from './ai-cache.js';
 
 const DEFAULT_AI_MODEL = 'gpt-4.1-mini';
 
@@ -34,14 +36,317 @@ export const AIService = {
      * @returns {Object} AI 配置对象
      */
     _configCache: null,
-    // 标题翻译缓存 (key: title+langId, value: translated title)
+    // 标题翻译缓存 (key: title||langId, value: translated title)
     _titleCache: new Map(),
+    // 标题缓存上限
+    _TITLE_CACHE_MAX: 5000,
+    // 标题缓存是否有未持久化的变更
+    _titleCacheDirty: false,
+    // 标题翻译覆盖设置 { feeds: { feedId: 'on'|'off' }, groups: { groupId: 'on'|'off' } }
+    _titleTranslationOverrides: { feeds: {}, groups: {} },
+    // 自动摘要覆盖设置（同结构）
+    _autoSummaryOverrides: { feeds: {}, groups: {} },
+    // 自动翻译全文覆盖设置（同结构）
+    _autoTranslateOverrides: { feeds: {}, groups: {} },
 
     /**
      * 初始化 AI 服务
      */
     async init() {
         await this.loadConfig();
+        await this._loadTitleCache();
+        this._loadTranslationOverrides();
+        this._loadSummaryOverrides();
+        this._loadAutoTranslateOverrides();
+    },
+
+    /**
+     * 从 IndexedDB 加载标题翻译缓存
+     */
+    async _loadTitleCache() {
+        try {
+            const cached = await AICache.loadTitleCache();
+            if (cached && cached.size > 0) {
+                this._titleCache = cached;
+                console.debug(`[AIService] Title cache loaded: ${this._titleCache.size} entries`);
+            }
+        } catch (e) {
+            console.warn('[AIService] Failed to load title cache:', e);
+            this._titleCache = new Map();
+        }
+    },
+
+    /**
+     * 将标题翻译缓存持久化到 IndexedDB
+     */
+    _saveTitleCache() {
+        if (!this._titleCacheDirty) return;
+        this._titleCacheDirty = false;
+        AICache.saveTitleCache(this._titleCache, this._TITLE_CACHE_MAX).catch((e) => {
+            console.warn('[AIService] Failed to save title cache:', e);
+        });
+    },
+
+    /**
+     * 从 AppState.preferences 加载翻译覆盖设置
+     */
+    _loadTranslationOverrides() {
+        try {
+            // 尝试从 AppState.preferences 读取（服务端同步的数据）
+            const prefs = AppState?.preferences || {};
+            if (prefs.title_translation_overrides) {
+                this._titleTranslationOverrides = prefs.title_translation_overrides;
+                return;
+            }
+        } catch (e) { /* ignore */ }
+        this._titleTranslationOverrides = { feeds: {}, groups: {} };
+    },
+
+    /**
+     * 保存翻译覆盖设置到服务端
+     */
+    async _saveTranslationOverrides() {
+        try {
+            // 引入时避免循环依赖，动态获取 FeedManager
+            const { FeedManager } = await import('./feed-manager.js');
+            await FeedManager.setPreference('title_translation_overrides', this._titleTranslationOverrides);
+            // 同步到 AppState
+            if (AppState?.preferences) {
+                AppState.preferences.title_translation_overrides = this._titleTranslationOverrides;
+            }
+        } catch (e) {
+            console.error('[AIService] Failed to save translation overrides:', e);
+        }
+    },
+
+    /**
+     * 获取订阅源的翻译覆盖状态
+     * @param {string|number} feedId
+     * @returns {'on'|'off'|'inherit'}
+     */
+    getFeedTranslationOverride(feedId) {
+        return this._titleTranslationOverrides.feeds?.[feedId] || 'inherit';
+    },
+
+    /**
+     * 获取分组的翻译覆盖状态
+     * @param {string|number} groupId
+     * @returns {'on'|'off'|'inherit'}
+     */
+    getGroupTranslationOverride(groupId) {
+        return this._titleTranslationOverrides.groups?.[groupId] || 'inherit';
+    },
+
+    /**
+     * 设置订阅源的翻译覆盖
+     * @param {string|number} feedId
+     * @param {'on'|'off'|'inherit'} value
+     */
+    async setFeedTranslationOverride(feedId, value) {
+        if (!this._titleTranslationOverrides.feeds) this._titleTranslationOverrides.feeds = {};
+        if (value === 'inherit') {
+            delete this._titleTranslationOverrides.feeds[feedId];
+        } else {
+            this._titleTranslationOverrides.feeds[feedId] = value;
+        }
+        await this._saveTranslationOverrides();
+    },
+
+    /**
+     * 设置分组的翻译覆盖
+     * @param {string|number} groupId
+     * @param {'on'|'off'|'inherit'} value
+     */
+    async setGroupTranslationOverride(groupId, value) {
+        if (!this._titleTranslationOverrides.groups) this._titleTranslationOverrides.groups = {};
+        if (value === 'inherit') {
+            delete this._titleTranslationOverrides.groups[groupId];
+        } else {
+            this._titleTranslationOverrides.groups[groupId] = value;
+        }
+        await this._saveTranslationOverrides();
+    },
+
+    /**
+     * 判断某个订阅源是否应该翻译标题
+     * 优先级：订阅源设置 > 分组设置 > 默认关闭
+     * @param {string|number} feedId
+     * @returns {boolean}
+     */
+    shouldTranslateFeed(feedId) {
+        // AI 未配置时直接返回 false
+        if (!AIService.isConfigured()) return false;
+
+        // 1. 检查订阅源级别设置
+        const feedOverride = this.getFeedTranslationOverride(feedId);
+        if (feedOverride === 'on') return true;
+        if (feedOverride === 'off') return false;
+
+        // 2. 检查分组级别设置
+        const feeds = AppState?.feeds || [];
+        const feed = feeds.find(f => f.id == feedId);
+        if (feed && feed.group_id) {
+            const groupOverride = this.getGroupTranslationOverride(feed.group_id);
+            if (groupOverride === 'on') return true;
+            if (groupOverride === 'off') return false;
+        }
+
+        // 3. 默认不翻译
+        return false;
+    },
+
+    // ==================== 自动摘要覆盖 ====================
+
+    _loadSummaryOverrides() {
+        try {
+            const prefs = AppState?.preferences || {};
+            if (prefs.auto_summary_overrides) {
+                this._autoSummaryOverrides = prefs.auto_summary_overrides;
+                return;
+            }
+        } catch (e) { /* ignore */ }
+        this._autoSummaryOverrides = { feeds: {}, groups: {} };
+    },
+
+    async _saveSummaryOverrides() {
+        try {
+            const { FeedManager } = await import('./feed-manager.js');
+            await FeedManager.setPreference('auto_summary_overrides', this._autoSummaryOverrides);
+            if (AppState?.preferences) {
+                AppState.preferences.auto_summary_overrides = this._autoSummaryOverrides;
+            }
+        } catch (e) {
+            console.error('[AIService] Failed to save summary overrides:', e);
+        }
+    },
+
+    getFeedSummaryOverride(feedId) {
+        return this._autoSummaryOverrides.feeds?.[feedId] || 'inherit';
+    },
+
+    getGroupSummaryOverride(groupId) {
+        return this._autoSummaryOverrides.groups?.[groupId] || 'inherit';
+    },
+
+    async setFeedSummaryOverride(feedId, value) {
+        if (!this._autoSummaryOverrides.feeds) this._autoSummaryOverrides.feeds = {};
+        if (value === 'inherit') {
+            delete this._autoSummaryOverrides.feeds[feedId];
+        } else {
+            this._autoSummaryOverrides.feeds[feedId] = value;
+        }
+        await this._saveSummaryOverrides();
+    },
+
+    async setGroupSummaryOverride(groupId, value) {
+        if (!this._autoSummaryOverrides.groups) this._autoSummaryOverrides.groups = {};
+        if (value === 'inherit') {
+            delete this._autoSummaryOverrides.groups[groupId];
+        } else {
+            this._autoSummaryOverrides.groups[groupId] = value;
+        }
+        await this._saveSummaryOverrides();
+    },
+
+    /**
+     * 判断某个订阅源是否应该自动摘要
+     * 优先级：订阅源设置 > 分组设置 > 默认关闭
+     * @param {string|number} feedId
+     * @returns {boolean}
+     */
+    shouldAutoSummarize(feedId) {
+        if (!AIService.isConfigured()) return false;
+
+        const feedOverride = this.getFeedSummaryOverride(feedId);
+        if (feedOverride === 'on') return true;
+        if (feedOverride === 'off') return false;
+
+        const feeds = AppState?.feeds || [];
+        const feed = feeds.find(f => f.id == feedId);
+        if (feed && feed.group_id) {
+            const groupOverride = this.getGroupSummaryOverride(feed.group_id);
+            if (groupOverride === 'on') return true;
+            if (groupOverride === 'off') return false;
+        }
+
+        return false;
+    },
+
+    // ==================== 自动翻译全文覆盖 ====================
+
+    _loadAutoTranslateOverrides() {
+        try {
+            const prefs = AppState?.preferences || {};
+            if (prefs.auto_translate_overrides) {
+                this._autoTranslateOverrides = prefs.auto_translate_overrides;
+                return;
+            }
+        } catch (e) { /* ignore */ }
+        this._autoTranslateOverrides = { feeds: {}, groups: {} };
+    },
+
+    async _saveAutoTranslateOverrides() {
+        try {
+            const { FeedManager } = await import('./feed-manager.js');
+            await FeedManager.setPreference('auto_translate_overrides', this._autoTranslateOverrides);
+            if (AppState?.preferences) {
+                AppState.preferences.auto_translate_overrides = this._autoTranslateOverrides;
+            }
+        } catch (e) {
+            console.error('[AIService] Failed to save auto-translate overrides:', e);
+        }
+    },
+
+    getFeedAutoTranslateOverride(feedId) {
+        return this._autoTranslateOverrides.feeds?.[feedId] || 'inherit';
+    },
+
+    getGroupAutoTranslateOverride(groupId) {
+        return this._autoTranslateOverrides.groups?.[groupId] || 'inherit';
+    },
+
+    async setFeedAutoTranslateOverride(feedId, value) {
+        if (!this._autoTranslateOverrides.feeds) this._autoTranslateOverrides.feeds = {};
+        if (value === 'inherit') {
+            delete this._autoTranslateOverrides.feeds[feedId];
+        } else {
+            this._autoTranslateOverrides.feeds[feedId] = value;
+        }
+        await this._saveAutoTranslateOverrides();
+    },
+
+    async setGroupAutoTranslateOverride(groupId, value) {
+        if (!this._autoTranslateOverrides.groups) this._autoTranslateOverrides.groups = {};
+        if (value === 'inherit') {
+            delete this._autoTranslateOverrides.groups[groupId];
+        } else {
+            this._autoTranslateOverrides.groups[groupId] = value;
+        }
+        await this._saveAutoTranslateOverrides();
+    },
+
+    /**
+     * 判断某个订阅源是否应该自动翻译全文
+     * 优先级：订阅源设置 > 分组设置 > 默认关闭
+     * @param {string|number} feedId
+     * @returns {boolean}
+     */
+    shouldAutoTranslate(feedId) {
+        if (!AIService.isConfigured()) return false;
+
+        const feedOverride = this.getFeedAutoTranslateOverride(feedId);
+        if (feedOverride === 'on') return true;
+        if (feedOverride === 'off') return false;
+
+        const feeds = AppState?.feeds || [];
+        const feed = feeds.find(f => f.id == feedId);
+        if (feed && feed.group_id) {
+            const groupOverride = this.getGroupAutoTranslateOverride(feed.group_id);
+            if (groupOverride === 'on') return true;
+            if (groupOverride === 'off') return false;
+        }
+
+        return false;
     },
 
     /**
@@ -92,7 +397,6 @@ export const AIService = {
             summarizePrompt: '',
             digestPrompt: '',
             targetLang: 'zh-CN',
-            autoSummary: false,
             titleTranslation: false,
             titleTranslationMode: 'bilingual'
         };
@@ -248,7 +552,11 @@ export const AIService = {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || `AI API Error: ${response.status}`);
+            const statusCode = error.status || response.status;
+            const msg = error.error || `AI API Error`;
+            const err = new Error(`[${statusCode}] ${msg}`);
+            err.statusCode = statusCode;
+            throw err;
         }
 
         if (onChunk) {
@@ -344,6 +652,8 @@ export const AIService = {
         const result = await this.callAPI(prompt);
         const translated = result.trim();
         this._titleCache.set(cacheKey, translated);
+        this._titleCacheDirty = true;
+        this._saveTitleCache();
         return translated;
     },
 
@@ -388,6 +698,9 @@ export const AIService = {
                 this._titleCache.set(cacheKey, translated);
                 resultMap.set(needTranslate[i].id, translated);
             }
+            // 批次翻译完成，持久化缓存
+            this._titleCacheDirty = true;
+            this._saveTitleCache();
         } catch (e) {
             console.error('[AIService] Batch title translation failed:', e);
         }

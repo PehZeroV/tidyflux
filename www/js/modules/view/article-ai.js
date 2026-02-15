@@ -8,6 +8,7 @@
  */
 
 import { AIService } from '../ai-service.js';
+import { AICache } from '../ai-cache.js';
 import { Modal } from './components.js';
 import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
@@ -20,8 +21,9 @@ export const ArticleAIMixin = {
      * @param {HTMLElement} bodyEl
      * @param {HTMLElement} titleEl
      * @param {AbortSignal} signal
+     * @param {number|string} [entryId] - 文章ID，用于缓存
      */
-    async translateBilingual(bodyEl, titleEl, signal = null) {
+    async translateBilingual(bodyEl, titleEl, signal = null, entryId = null) {
         // 1. 识别需要翻译的块
         const blocks = [];
         if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
@@ -170,10 +172,21 @@ export const ArticleAIMixin = {
                 try {
                     const aiConfig = AIService.getConfig();
                     const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
-                    const translation = await AIService.translate(block.text, targetLang, signal);
+
+                    // 标题块优先读取标题翻译缓存（列表自动翻译已缓存）
+                    if (block.isTitle) {
+                        const cachedTitle = AIService.getTitleCache(block.text, targetLang);
+                        if (cachedTitle) {
+                            block.transEl.innerHTML = this.parseMarkdown(cachedTitle);
+                            continue;
+                        }
+                    }
+
+                    const translation = await AIService.translate(block.text, targetLang, null, signal);
                     if (signal?.aborted) return;
                     block.transEl.innerHTML = this.parseMarkdown(translation);
                 } catch (err) {
+                    if (err.name === 'AbortError') return;
                     console.error('Block translate error:', err);
                     block.transEl.innerHTML = `<span style="color:red; font-size: 0.85em;">Translation failed</span>`;
                 }
@@ -186,6 +199,142 @@ export const ArticleAIMixin = {
         }
 
         await Promise.all(workers);
+
+        // 翻译完成后写入 IndexedDB 缓存
+        if (entryId && !signal?.aborted) {
+            try {
+                const aiConfig = AIService.getConfig();
+                const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                const cacheData = blocks.map(b => ({
+                    text: b.text,
+                    html: b.transEl.innerHTML,
+                    isTitle: !!b.isTitle
+                }));
+                AICache.setTranslation(entryId, lang, JSON.stringify(cacheData)).catch(() => { });
+            } catch { /* ignore */ }
+        }
+    },
+
+    /**
+     * 从 IndexedDB 恢复翻译缓存
+     * @param {HTMLElement} bodyEl
+     * @param {HTMLElement} titleEl
+     * @param {number|string} entryId
+     * @returns {Promise<boolean>} 是否成功恢复
+     */
+    async _restoreTranslationFromCache(bodyEl, titleEl, entryId) {
+        try {
+            const aiConfig = AIService.getConfig();
+            const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+            const raw = await AICache.getTranslation(entryId, lang);
+            if (!raw) return false;
+
+            const cacheData = JSON.parse(raw);
+            if (!Array.isArray(cacheData) || cacheData.length === 0) return false;
+
+            // 重新识别文本块（与 translateBilingual 相同逻辑）
+            const blocks = [];
+            if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
+
+            const blockTags = new Set([
+                'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CANVAS', 'DD', 'DIV', 'DL', 'DT',
+                'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5',
+                'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'NOSCRIPT', 'OL', 'P', 'SECTION',
+                'TABLE', 'TFOOT', 'UL', 'VIDEO'
+            ]);
+
+            const isMeaningfulText = (text) => {
+                const cleanText = text.replace(/[\p{P}\p{S}\p{Z}\p{N}]+/gu, '').trim();
+                return cleanText.length >= 1;
+            };
+
+            let pendingInlineNodes = [];
+            const flushInlineBlock = () => {
+                if (pendingInlineNodes.length === 0) return;
+                let textContent = '';
+                pendingInlineNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        textContent += node.tagName === 'BR' ? '\n' : (node.innerText || node.textContent || '');
+                    } else {
+                        textContent += node.textContent || '';
+                    }
+                });
+                const trimmedText = textContent.trim();
+                if (trimmedText.length >= 2 && isMeaningfulText(trimmedText)) {
+                    blocks.push({ el: pendingInlineNodes[pendingInlineNodes.length - 1], text: trimmedText });
+                }
+                pendingInlineNodes = [];
+            };
+
+            if (bodyEl.childNodes.length > 0) {
+                Array.from(bodyEl.childNodes).forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const tag = node.tagName.toUpperCase();
+                        if (['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'].includes(tag)) return;
+                        if (['MATH', 'PRE', 'TABLE'].includes(tag)) { flushInlineBlock(); return; }
+                        if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar')) return;
+                        if (blockTags.has(tag)) {
+                            flushInlineBlock();
+                            if (node.querySelector('math, pre, table')) return;
+                            const text = node.innerText ? node.innerText.trim() : '';
+                            if (text.length >= 2 && isMeaningfulText(text)) blocks.push({ el: node, text });
+                            return;
+                        }
+                    }
+                    if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim() && pendingInlineNodes.length === 0) return;
+                    pendingInlineNodes.push(node);
+                });
+                flushInlineBlock();
+            }
+
+            // 建立文本到缓存翻译的映射
+            const cacheMap = new Map(cacheData.map(d => [d.text, d]));
+
+            let restored = 0;
+            blocks.forEach(block => {
+                const cached = cacheMap.get(block.text);
+                if (!cached) return;
+
+                const transEl = document.createElement('div');
+                transEl.className = block.isTitle ? 'ai-title-trans-block' : 'ai-trans-block';
+                transEl.innerHTML = cached.html;
+
+                if (block.isTitle) {
+                    const computedStyle = window.getComputedStyle(block.el);
+                    transEl.style.fontFamily = computedStyle.fontFamily;
+                    transEl.style.fontSize = computedStyle.fontSize;
+                    transEl.style.fontWeight = computedStyle.fontWeight;
+                    transEl.style.lineHeight = computedStyle.lineHeight;
+                    transEl.style.color = computedStyle.color;
+                    transEl.style.letterSpacing = computedStyle.letterSpacing;
+                    transEl.style.textTransform = computedStyle.textTransform;
+                    transEl.style.marginTop = '8px';
+                    transEl.style.marginBottom = '24px';
+                    const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
+                    parent.insertAdjacentElement('afterend', transEl);
+                } else {
+                    transEl.style.color = 'var(--text-secondary)';
+                    transEl.style.fontSize = '0.95em';
+                    transEl.style.marginTop = '6px';
+                    transEl.style.marginBottom = '20px';
+                    transEl.style.padding = '8px 12px';
+                    transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 96%)';
+                    transEl.style.borderRadius = 'var(--radius)';
+                    if (block.el.nodeType === Node.ELEMENT_NODE) {
+                        block.el.insertAdjacentElement('afterend', transEl);
+                    } else if (block.el.parentNode) {
+                        block.el.parentNode.insertBefore(transEl, block.el.nextSibling);
+                    }
+                }
+                restored++;
+            });
+
+            console.debug(`[AICache] Restored ${restored}/${blocks.length} translation blocks from cache`);
+            return restored > 0;
+        } catch (e) {
+            console.warn('[AICache] Restore translation failed:', e);
+            return false;
+        }
     },
 
     /**
@@ -240,6 +389,16 @@ export const ArticleAIMixin = {
                 summaryContent.innerHTML = `<div class="loading-spinner">${i18n.t('ai.summarizing')}</div>`;
 
                 try {
+                    // 先检查 IndexedDB 缓存
+                    const cached = await AICache.getSummary(article.id);
+                    if (cached) {
+                        summaryContent.innerHTML = this.parseMarkdown(cached);
+                        article._aiSummary = cached;
+                        summarizeBtn.classList.remove('loading');
+                        summarizeBtn.classList.add('active');
+                        return;
+                    }
+
                     // 创建 AbortController
                     article._summarizeController = new AbortController();
                     const signal = article._summarizeController.signal;
@@ -256,6 +415,9 @@ export const ArticleAIMixin = {
                         streamedText += chunk;
                         summaryContent.innerHTML = this.parseMarkdown(streamedText);
                     }, signal);
+
+                    // 写入 IndexedDB 缓存
+                    AICache.setSummary(article.id, streamedText).catch(() => { });
 
                     summarizeBtn.classList.remove('loading');
                     summarizeBtn.classList.add('active');
@@ -339,12 +501,20 @@ export const ArticleAIMixin = {
                     return;
                 }
 
+                // 先检查 IndexedDB 翻译缓存
+                const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
+                if (cacheRestored) {
+                    translateBtn.classList.add('active');
+                    translateBtn.title = i18n.t('ai.original_content');
+                    return;
+                }
+
                 // 开始双语翻译
                 translateBtn.classList.add('loading');
 
                 try {
                     article._translateController = new AbortController();
-                    await this.translateBilingual(bodyEl, titleEl, article._translateController.signal);
+                    await this.translateBilingual(bodyEl, titleEl, article._translateController.signal, article.id);
                     translateBtn.classList.remove('loading');
                     translateBtn.classList.add('active');
                     translateBtn.title = i18n.t('ai.original_content');
@@ -363,9 +533,9 @@ export const ArticleAIMixin = {
      * @param {Object} article - 文章对象
      */
     async autoSummarize(article) {
-        // 检查是否已配置 AI 且开启自动摘要
-        const aiConfig = AIService.getConfig();
-        if (!aiConfig.autoSummary || !AIService.isConfigured()) return;
+        // 检查是否已配置 AI 且该订阅源启用了自动摘要
+        if (!AIService.isConfigured()) return;
+        if (!AIService.shouldAutoSummarize(article.feed_id)) return;
 
         // 简报类型跳过
         if (article._isDigest || article.is_digest) return;
@@ -389,6 +559,18 @@ export const ArticleAIMixin = {
         if (summarizeBtn && (summarizeBtn.classList.contains('loading') || summarizeBtn.classList.contains('active'))) {
             return;
         }
+
+        // 先检查 IndexedDB 缓存
+        try {
+            const cached = await AICache.getSummary(article.id);
+            if (cached) {
+                article._aiSummary = cached;
+                summaryBox.style.display = 'block';
+                summaryContent.innerHTML = this.parseMarkdown(cached);
+                if (summarizeBtn) summarizeBtn.classList.add('active');
+                return;
+            }
+        } catch { /* ignore */ }
 
         // 获取文章内容
         const rawContent = AIService.extractText(article.content || '');
@@ -417,6 +599,7 @@ export const ArticleAIMixin = {
             article._autoSummarizeController = new AbortController();
             const signal = article._autoSummarizeController.signal;
 
+            const aiConfig = AIService.getConfig();
             const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
 
             let streamedText = '';
@@ -425,8 +608,9 @@ export const ArticleAIMixin = {
                 summaryContent.innerHTML = this.parseMarkdown(streamedText);
             }, signal);
 
-            // 缓存结果
+            // 缓存结果到内存和 IndexedDB
             article._aiSummary = streamedText;
+            AICache.setSummary(article.id, streamedText).catch(() => { });
             if (summarizeBtn) {
                 summarizeBtn.classList.remove('loading');
                 summarizeBtn.classList.add('active');
@@ -441,6 +625,65 @@ export const ArticleAIMixin = {
             if (summarizeBtn) summarizeBtn.classList.remove('loading');
         } finally {
             article._autoSummarizeController = null;
+        }
+    },
+
+    /**
+     * 自动翻译全文：文章打开时自动触发双语翻译
+     * @param {Object} article - 文章对象
+     */
+    async autoTranslate(article) {
+        // 检查是否已配置 AI 且该订阅源启用了自动翻译
+        if (!AIService.isConfigured()) return;
+        if (!AIService.shouldAutoTranslate(article.feed_id)) return;
+
+        // 简报类型跳过
+        if (article._isDigest || article.is_digest) return;
+
+        const translateBtn = document.getElementById('article-translate-btn');
+        const bodyEl = document.querySelector('.article-body');
+        const titleHeader = document.querySelector('.article-header h1');
+        const titleLink = titleHeader ? titleHeader.querySelector('a') : null;
+        const titleEl = titleLink || titleHeader;
+
+        if (!bodyEl) return;
+
+        // 如果已经有翻译块（说明已翻译过），跳过
+        const existingBlocks = bodyEl.querySelectorAll('.ai-trans-block');
+        const existingTitleBlock = document.querySelector('.ai-title-trans-block');
+        if (existingBlocks.length > 0 || existingTitleBlock) return;
+
+        // 如果翻译按钮正在加载或已完成，不重复触发
+        if (translateBtn && (translateBtn.classList.contains('loading') || translateBtn.classList.contains('active'))) {
+            return;
+        }
+
+        // 先检查 IndexedDB 翻译缓存
+        const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
+        if (cacheRestored) {
+            if (translateBtn) {
+                translateBtn.classList.add('active');
+                translateBtn.title = i18n.t('ai.original_content');
+            }
+            return;
+        }
+
+        // 开始自动翻译
+        if (translateBtn) translateBtn.classList.add('loading');
+
+        try {
+            article._translateController = new AbortController();
+            await this.translateBilingual(bodyEl, titleEl, article._translateController.signal, article.id);
+            if (translateBtn) {
+                translateBtn.classList.remove('loading');
+                translateBtn.classList.add('active');
+                translateBtn.title = i18n.t('ai.original_content');
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('[AutoTranslate] 失败:', err);
+            showToast(`${i18n.t('ai.auto_translate_failed')}: ${err.message}`);
+            if (translateBtn) translateBtn.classList.remove('loading');
         }
     },
 };

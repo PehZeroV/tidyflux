@@ -15,6 +15,7 @@ import aiRoutes from './routes/ai.js';
 import helmet from 'helmet';
 import { UserStore } from './utils/user-store.js';
 import { DigestScheduler } from './jobs/digest-scheduler.js';
+import { PreferenceStore } from './utils/preference-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -83,6 +84,9 @@ async function startServer() {
         app.get('*', (req, res) => {
             res.sendFile(join(wwwPath, 'index.html'));
         });
+
+        // 启动前迁移偏好设置结构
+        await PreferenceStore.migrateAll();
 
         app.listen(PORT, () => {
             console.log(`Tidyflux Adapter running on http://localhost:${PORT}`);

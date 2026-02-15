@@ -11,6 +11,7 @@ import { i18n } from '../i18n.js';
 import { Icons } from '../icons.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { KeyboardShortcuts } from '../keyboard.js';
+import { AIService } from '../ai-service.js';
 
 const STORAGE_KEY_COLLAPSED = 'tidyflux_collapsed_groups';
 const STORAGE_KEY_PINNED = 'tidyflux_pinned_groups';
@@ -89,6 +90,11 @@ export const FeedsView = {
 
             // Sync keyboard shortcuts from server preferences
             KeyboardShortcuts.syncFromPreferences();
+
+            // 重新加载 AI 覆盖设置（init 时 preferences 可能尚未就绪）
+            AIService._loadTranslationOverrides();
+            AIService._loadSummaryOverrides();
+            AIService._loadAutoTranslateOverrides();
 
             return { feeds, groups, digestsData };
         } catch (err) {
