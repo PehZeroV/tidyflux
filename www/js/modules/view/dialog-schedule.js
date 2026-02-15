@@ -6,7 +6,6 @@
 import { AppState } from '../../state.js';
 import { AuthManager } from '../auth-manager.js';
 import { createDialog } from './utils.js';
-import { CustomSelect } from './components.js';
 import { i18n } from '../i18n.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { Icons } from '../icons.js';
@@ -47,36 +46,52 @@ export const ScheduleDialogMixin = {
             scopeId = feedId;
         }
 
-        // Build scope options
+        // Build scope checkbox list
         const groups = AppState.groups || [];
         const feeds = AppState.feeds || [];
         const initialScopeValue = scope === 'all' ? 'all' : `${scope}_${scopeId}`;
 
-        let scopeOptionsHtml = `<option value="all">${i18n.t('nav.all')}</option>`;
+        const checkboxStyle = 'display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; border-radius: calc(var(--radius) - 2px); font-size: 0.82em; overflow: hidden;';
+        const cbInputStyle = 'width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent-color);';
+        const groupLabelStyle = 'padding: 6px 8px 2px; font-size: 0.72em; font-weight: 700; color: var(--meta-color); border-top: 1px solid var(--border-color); margin-top: 2px; grid-column: 1 / -1;';
 
-        // Categories group
+        let scopeListHtml = `
+            <label style="${checkboxStyle}" title="${i18n.t('nav.all')}">
+                <input type="checkbox" value="all" style="${cbInputStyle}">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${i18n.t('nav.all')}</span>
+            </label>`;
+
         if (groups.length > 0) {
-            scopeOptionsHtml += `<optgroup label="${i18n.t('nav.categories')}">`;
+            scopeListHtml += `<div style="${groupLabelStyle}">${i18n.t('nav.categories')}</div>`;
             groups.forEach(g => {
-                scopeOptionsHtml += `<option value="group_${g.id}">${g.name}</option>`;
+                scopeListHtml += `
+                    <label style="${checkboxStyle}" title="${g.name}">
+                        <input type="checkbox" value="group_${g.id}" style="${cbInputStyle}">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${g.name}</span>
+                    </label>`;
             });
-            scopeOptionsHtml += `</optgroup>`;
         }
 
-        // Feeds group
         if (feeds.length > 0) {
-            scopeOptionsHtml += `<optgroup label="${i18n.t('nav.feeds')}">`;
+            scopeListHtml += `<div style="${groupLabelStyle}">${i18n.t('nav.feeds')}</div>`;
             groups.forEach(g => {
                 const groupFeeds = feeds.filter(f => f.category?.id == g.id);
                 groupFeeds.forEach(f => {
-                    scopeOptionsHtml += `<option value="feed_${f.id}">${f.title}</option>`;
+                    scopeListHtml += `
+                        <label style="${checkboxStyle}" title="${f.title}">
+                            <input type="checkbox" value="feed_${f.id}" style="${cbInputStyle}">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.title}</span>
+                        </label>`;
                 });
             });
             const ungroupedFeeds = feeds.filter(f => !f.category?.id || !groups.find(g => g.id == f.category?.id));
             ungroupedFeeds.forEach(f => {
-                scopeOptionsHtml += `<option value="feed_${f.id}">${f.title}</option>`;
+                scopeListHtml += `
+                    <label style="${checkboxStyle}" title="${f.title}">
+                        <input type="checkbox" value="feed_${f.id}" style="${cbInputStyle}">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.title}</span>
+                    </label>`;
             });
-            scopeOptionsHtml += `</optgroup>`;
         }
 
         const { dialog, close } = createDialog('settings-dialog', `
@@ -88,9 +103,10 @@ export const ScheduleDialogMixin = {
 
                 <div style="margin-bottom: 20px;">
                     <div class="settings-item-label" style="margin-bottom: 8px;">${i18n.t('ai.digest_target')}</div>
-                    <select id="schedule-scope-select" class="dialog-select">
-                        ${scopeOptionsHtml}
-                    </select>
+                    <div id="schedule-scope-list" style="max-height: 200px; overflow-y: auto; border-radius: var(--radius); background: color-mix(in srgb, var(--bg-color), #fff 95%); box-shadow: var(--card-shadow); padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px;">
+                        ${scopeListHtml}
+                    </div>
+                    <div id="scope-selection-hint" style="font-size: 0.8em; margin-top: 6px;"></div>
                 </div>
 
                 <div class="schedule-loader" style="text-align: center; padding: 20px;">
@@ -179,7 +195,8 @@ export const ScheduleDialogMixin = {
         const form = dialog.querySelector('#schedule-form');
         const enabledInput = dialog.querySelector('#schedule-enabled');
         const configArea = dialog.querySelector('#schedule-config-area');
-        const scopeSelect = dialog.querySelector('#schedule-scope-select');
+        const scopeList = dialog.querySelector('#schedule-scope-list');
+        const hintEl = dialog.querySelector('#scope-selection-hint');
         const includeReadInput = dialog.querySelector('#schedule-include-read');
 
         const freqOnceBtn = dialog.querySelector('#freq-once');
@@ -193,12 +210,11 @@ export const ScheduleDialogMixin = {
         const manageOthersBtn = dialog.querySelector('#manage-others-btn');
         const pushEnabledInput = dialog.querySelector('#schedule-push-enabled');
 
-        // Set initial scope value
-        scopeSelect.value = initialScopeValue;
-
-        // Init CustomSelects
-        const contentContainer = dialog.querySelector('.settings-dialog-content');
-        if (contentContainer) CustomSelect.replaceAll(contentContainer);
+        // Pre-check the initial scope only if opened from a specific context
+        if (feedId || groupId) {
+            const initialCheckbox = scopeList.querySelector(`input[value="${initialScopeValue}"]`);
+            if (initialCheckbox) initialCheckbox.checked = true;
+        }
 
         // Scope parser helper
         const parseScope = (val) => {
@@ -304,31 +320,56 @@ export const ScheduleDialogMixin = {
             };
         };
 
-        // Load schedule data for current scope
+        // Get all selected scope values
+        const getSelectedScopes = () => {
+            return Array.from(scopeList.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        };
+
+        // Load schedule data for current selection
         const loadScheduleForScope = () => {
-            const parsed = parseScope(scopeSelect.value);
-            scope = parsed.scope;
-            scopeId = parsed.scopeId;
+            const selected = getSelectedScopes();
 
-            const existingTasks = allSchedules.filter(t =>
-                t.scope === scope && String(t.scopeId || '') === String(scopeId || '')
-            );
+            // Update hint
+            if (selected.length > 1) {
+                hintEl.textContent = i18n.t('digest.batch_hint', { count: selected.length });
+                hintEl.style.color = 'var(--accent-color)';
+            } else if (selected.length === 0) {
+                hintEl.textContent = i18n.t('digest.no_target_selected');
+                hintEl.style.color = 'var(--meta-color)';
+            } else {
+                hintEl.textContent = '';
+            }
 
-            isTwiceDaily = existingTasks.length > 1;
+            let initialTime = '08:00';
 
-            const firstTask = existingTasks[0];
-            const initialTime = firstTask ? firstTask.time : '08:00';
-            const isEnabled = existingTasks.length > 0 && existingTasks.some(t => t.enabled);
-            const isUnreadOnly = firstTask ? (firstTask.unreadOnly !== false) : true;
+            if (selected.length === 1) {
+                // Single selection - load existing settings
+                const parsed = parseScope(selected[0]);
+                scope = parsed.scope;
+                scopeId = parsed.scopeId;
+                const existingTasks = allSchedules.filter(t =>
+                    t.scope === scope && String(t.scopeId || '') === String(scopeId || '')
+                );
 
-            enabledInput.checked = isEnabled;
-            includeReadInput.checked = !isUnreadOnly;
-            configArea.style.opacity = isEnabled ? '1' : '0.5';
-            configArea.style.pointerEvents = isEnabled ? 'auto' : 'none';
+                isTwiceDaily = existingTasks.length > 1;
+                const firstTask = existingTasks[0];
+                initialTime = firstTask ? firstTask.time : '08:00';
+                const isEnabled = existingTasks.length > 0 && existingTasks.some(t => t.enabled);
+                const isUnreadOnly = firstTask ? (firstTask.unreadOnly !== false) : true;
 
-            // Load push enabled state
-            pushEnabledInput.checked = !!firstTask?.pushEnabled;
+                enabledInput.checked = isEnabled;
+                includeReadInput.checked = !isUnreadOnly;
+                pushEnabledInput.checked = !!firstTask?.pushEnabled;
+            } else {
+                // Multiple or none: show defaults
+                enabledInput.checked = true;
+                includeReadInput.checked = false;
+                pushEnabledInput.checked = false;
+                isTwiceDaily = false;
+            }
 
+            configArea.style.opacity = enabledInput.checked ? '1' : '0.5';
+            configArea.style.pointerEvents = enabledInput.checked ? 'auto' : 'none';
             getPickerTime = setupTimePicker(pickerContainer, initialTime);
             updateFrequencyUI();
 
@@ -337,8 +378,6 @@ export const ScheduleDialogMixin = {
         };
 
         // --- Events ---
-
-
 
         freqOnceBtn.addEventListener('click', () => { isTwiceDaily = false; updateFrequencyUI(); });
         freqTwiceBtn.addEventListener('click', () => { isTwiceDaily = true; updateFrequencyUI(); });
@@ -353,7 +392,7 @@ export const ScheduleDialogMixin = {
         });
 
         // Scope change: reload schedule data
-        scopeSelect.addEventListener('change', () => {
+        scopeList.addEventListener('change', () => {
             loadScheduleForScope();
         });
 
@@ -382,6 +421,14 @@ export const ScheduleDialogMixin = {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = form.querySelector('button[type="submit"]');
+
+            const selectedScopes = getSelectedScopes();
+            if (selectedScopes.length === 0) {
+                msgEl.textContent = i18n.t('digest.no_target_selected');
+                msgEl.style.color = 'var(--danger-color)';
+                return;
+            }
+
             submitBtn.disabled = true;
             submitBtn.textContent = i18n.t('settings.saving');
             msgEl.textContent = '';
@@ -390,65 +437,37 @@ export const ScheduleDialogMixin = {
             const isEnabled = enabledInput.checked;
             const unreadOnly = !includeReadInput.checked;
 
-            // Build new tasks
+            // Build new tasks for all selected scopes
             const newTasks = [];
+            const selectedParsed = selectedScopes.map(parseScope);
 
-            if (isTwiceDaily) {
-                // Task 1
-                newTasks.push({
-                    id: generateUUID(),
-                    scope: scope,
-                    scopeId: scopeId,
-                    feedId: scope === 'feed' ? scopeId : null,
-                    groupId: scope === 'group' ? scopeId : null,
-                    time: time,
+            selectedParsed.forEach(({ scope: s, scopeId: sid }) => {
+                const baseTask = {
+                    scope: s,
+                    scopeId: sid,
+                    feedId: s === 'feed' ? sid : null,
+                    groupId: s === 'group' ? sid : null,
                     enabled: isEnabled,
-                    hours: 12, // 12h range
                     unreadOnly: unreadOnly,
                     pushEnabled: pushEnabledInput.checked,
-                });
-                // Task 2 (+12h)
-                const [h, m] = time.split(':').map(Number);
-                const nextH = (h + 12) % 24;
-                const nextTime = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                };
 
-                newTasks.push({
-                    id: generateUUID(),
-                    scope: scope,
-                    scopeId: scopeId,
-                    feedId: scope === 'feed' ? scopeId : null,
-                    groupId: scope === 'group' ? scopeId : null,
-                    time: nextTime,
-                    enabled: isEnabled,
-                    hours: 12, // 12h range
-                    unreadOnly: unreadOnly,
-                    pushEnabled: pushEnabledInput.checked,
-                });
-            } else {
-                // Task 1 (Once)
-                newTasks.push({
-                    id: generateUUID(),
-                    scope: scope,
-                    scopeId: scopeId,
-                    feedId: scope === 'feed' ? scopeId : null,
-                    groupId: scope === 'group' ? scopeId : null,
-                    time: time,
-                    enabled: isEnabled,
-                    hours: 24, // 24h range for once daily
-                    unreadOnly: unreadOnly,
-                    pushEnabled: pushEnabledInput.checked,
-                });
-            }
+                if (isTwiceDaily) {
+                    newTasks.push({ ...baseTask, id: generateUUID(), time: time, hours: 12 });
+                    const [h, m] = time.split(':').map(Number);
+                    const nextH = (h + 12) % 24;
+                    const nextTime = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                    newTasks.push({ ...baseTask, id: generateUUID(), time: nextTime, hours: 12 });
+                } else {
+                    newTasks.push({ ...baseTask, id: generateUUID(), time: time, hours: 24 });
+                }
+            });
 
-            // Merge with backend data
-            // Remove OLD tasks for this scope
-            const isMatch = (t) => {
-                if (t.scope !== scope) return false;
-                if (t.scopeId == scopeId) return true;
-                return String(t.scopeId || '') === String(scopeId || '');
-            };
-            const otherTasks = allSchedules.filter(t => !isMatch(t));
-
+            // Remove old tasks for all selected scopes, keep others
+            const isSelected = (t) => selectedParsed.some(p =>
+                t.scope === p.scope && String(t.scopeId || '') === String(p.scopeId || '')
+            );
+            const otherTasks = allSchedules.filter(t => !isSelected(t));
             const finalTasks = [...otherTasks, ...newTasks];
 
             try {

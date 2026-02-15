@@ -153,10 +153,6 @@ export const ContextMenu = {
 
         if (isDigests) {
             itemsHtml += `
-            <div class="context-menu-item" data-action="generate-digest-all">
-                ${Icons.newspaper}
-                ${i18n.t('digest.generate_all')}
-            </div>
             <div class="context-menu-item" data-action="manage-scheduled-digests">
                 ${Icons.schedule}
                 ${i18n.t('digest.manage_scheduled')}
@@ -171,7 +167,7 @@ export const ContextMenu = {
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="generate-digest">
                 ${Icons.newspaper}
-                ${i18n.t('digest.generate')}
+                ${AppState.currentFeedId ? i18n.t('digest.generate_for_feed') : AppState.currentGroupId ? i18n.t('digest.generate_for_group') : i18n.t('digest.generate_all')}
             </div>
             <div class="context-menu-item" data-action="schedule-digest">
                 ${Icons.schedule}
@@ -325,12 +321,34 @@ export const ContextMenu = {
                 } finally {
                     isManualRefreshing = false;
                 }
-            } else if (action === 'generate-digest-all') {
-                // 手动触发生成全部简报
-                this.viewManager.generateDigest('all');
             } else if (action === 'manage-scheduled-digests') {
                 Dialogs.showDigestManagerDialog();
             } else if (action === 'generate-digest') {
+                const skipKey = 'tidyflux_skip_digest_confirm';
+                if (!localStorage.getItem(skipKey)) {
+                    const confirmed = await Modal._renderDialog({
+                        body: `<p>${i18n.t('digest.confirm_generate')}</p>
+                            <label style="display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 0.85em; color: var(--meta-color); cursor: pointer;">
+                                <input type="checkbox" id="digest-dont-show-again" style="cursor: pointer;">
+                                ${i18n.t('common.dont_show_again')}
+                            </label>`,
+                        footer: `
+                            <button class="appearance-mode-btn cancel-btn">${i18n.t('common.cancel')}</button>
+                            <button class="appearance-mode-btn active confirm-btn">${i18n.t('common.confirm')}</button>
+                        `,
+                        onReady: (dialog, finalize) => {
+                            dialog.querySelector('.confirm-btn').addEventListener('click', () => {
+                                if (dialog.querySelector('#digest-dont-show-again').checked) {
+                                    localStorage.setItem(skipKey, '1');
+                                }
+                                finalize(true);
+                            });
+                            dialog.querySelector('.cancel-btn').addEventListener('click', () => finalize(false));
+                            dialog.addEventListener('click', (e) => { if (e.target === dialog) finalize(false); });
+                        }
+                    });
+                    if (!confirmed) return;
+                }
                 if (AppState.currentFeedId) {
                     this.viewManager.generateDigestForFeed(AppState.currentFeedId);
                 } else if (AppState.currentGroupId) {

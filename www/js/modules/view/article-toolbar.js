@@ -13,6 +13,7 @@ import { DOMElements } from '../../dom.js';
 import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
 import { showToast } from './utils.js';
+import { Modal } from './components.js';
 
 export const ArticleToolbarMixin = {
     /**
@@ -387,7 +388,7 @@ export const ArticleToolbarMixin = {
         if (deleteBtn && digest) {
             deleteBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                if (!confirm(i18n.t('digest.confirm_delete'))) return;
+                if (!await Modal.confirm(i18n.t('digest.confirm_delete'))) return;
 
                 try {
                     const success = await FeedManager.deleteDigest(digest.id);

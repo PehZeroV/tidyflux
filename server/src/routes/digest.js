@@ -364,8 +364,8 @@ router.post('/run-task', authenticateToken, async (req, res) => {
         }
 
         const task = prefs.digest_schedules[taskIndex];
-        
-        const result = await DigestRunner.runTask(userId, task, prefs, { force: true, forcePush: true });
+
+        const result = await DigestRunner.runTask(userId, task, prefs, { force: true });
 
         if (result.success) {
             res.json({ success: true, digest: result.digest, push: result.push });

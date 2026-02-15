@@ -26,7 +26,8 @@ export default {
         global_settings: '全局设置',
         view: '查看',
         go_to_settings: '前往设置',
-        retry: '重试'
+        retry: '重试',
+        dont_show_again: '不再提示'
     },
     nav: {
         all: '全部文章',
@@ -328,9 +329,12 @@ export default {
         generated: '简报生成成功', // Keep compatible if needed, or remove
         success: '成功生成简报，点击查看',
         generate: '生成简报',
-        generate_for_feed: '生成此订阅的简报',
-        generate_for_group: '生成此分组的简报',
-        generate_all: '生成全部简报',
+        generate_for_feed: '生成此订阅源简报',
+        generate_for_group: '生成此分组简报',
+        generate_all: '生成全部文章简报',
+        confirm_generate: '将获取过去 12 小时内的未读文章，提取正文摘要后发送给 AI 生成简报。\n\n文章数量较多时可能消耗大量 Token，甚至超出模型上下文窗口限制导致生成失败。\n\n确定要继续吗？',
+        batch_hint: '已选 {count} 个目标，将批量配置',
+        no_target_selected: '请至少选择一个目标',
         no_articles: '在过去 {hours} 小时内没有未读文章',
         article_count: '共 {count} 篇文章',
         scope: '范围',
@@ -357,6 +361,12 @@ export default {
         schedule_frequency: '频率',
         schedule_status: '状态',
         status_enabled: '已启用',
-        status_disabled: '已禁用'
+        status_disabled: '已禁用',
+        run_now: '手动运行',
+        manager_success: '简报生成成功',
+        push_success: '已推送（{status} ✅）',
+        push_failed: '推送失败 {status} ❌',
+        push_not_configured: '未配置推送 ⚠️',
+        push_disabled: '未开启推送'
     }
 };

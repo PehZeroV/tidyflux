@@ -76,29 +76,37 @@ export const DigestRunner = {
 
             console.log(`Digest generated for user ${userId} [Task: ${task.scope}]:`, result.digest.id);
 
-            // Push notification
+            // Push notification - skip if no articles were found
             const pushConfig = prefs.digest_push_config;
             let pushResult = { attempted: false };
-            
-            if ((task.pushEnabled || options.forcePush) && pushConfig?.url) {
-                pushResult.attempted = true;
-                try {
-                    const pushResp = await sendPushNotification(
-                        pushConfig,
-                        result.digest.title || '',
-                        result.digest.content || '',
-                        userId
-                    );
-                    pushResult.success = true;
-                    if (pushResp && pushResp.status) {
-                        pushResult.status = pushResp.status;
+
+            if (result.digest.articleCount === 0) {
+                pushResult.reason = 'no_articles';
+            } else if (task.pushEnabled) {
+                if (pushConfig?.url) {
+                    pushResult.attempted = true;
+                    try {
+                        const pushResp = await sendPushNotification(
+                            pushConfig,
+                            result.digest.title || '',
+                            result.digest.content || '',
+                            userId
+                        );
+                        pushResult.success = true;
+                        if (pushResp && pushResp.status) {
+                            pushResult.status = pushResp.status;
+                        }
+                    } catch (pushErr) {
+                        console.error(`Push notification failed for user ${userId}:`, pushErr.message);
+                        pushResult.success = false;
+                        pushResult.error = pushErr.message;
+                        pushResult.status = 'ERR';
                     }
-                } catch (pushErr) {
-                    console.error(`Push notification failed for user ${userId}:`, pushErr.message);
-                    pushResult.success = false;
-                    pushResult.error = pushErr.message;
-                    pushResult.status = 'ERR';
+                } else {
+                    pushResult.reason = 'not_configured';
                 }
+            } else {
+                pushResult.reason = 'disabled';
             }
 
             return { success: true, digest: result.digest, push: pushResult };

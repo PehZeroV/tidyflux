@@ -332,7 +332,7 @@ export const ManagerDialogMixin = {
                         .replace(/\{\{digest_content\}\}/g, encodeURIComponent('This is a test push notification.'));
                 } else {
                     let bodyTemplate = globalPushBody.value.trim();
-                    
+
                     // Intelligent Body Auto-fill
                     if (!bodyTemplate) {
                         const lowerUrl = urlTemplate.toLowerCase();
@@ -350,15 +350,15 @@ export const ManagerDialogMixin = {
                         }
                         // Auto-fill the textarea for the user
                         globalPushBody.value = bodyTemplate;
-                        
+
                         // Flash message to inform user
                         showToast(i18n.t('settings.push_autofill_hint') || 'Auto-filled body template', 2000);
                     } else {
-                         // Validate existing JSON
-                         try {
+                        // Validate existing JSON
+                        try {
                             JSON.parse(bodyTemplate);
                         } catch (e) {
-                             // Only warn if it looks like they are trying to write JSON
+                            // Only warn if it looks like they are trying to write JSON
                             if (bodyTemplate.startsWith('{')) {
                                 globalPushMsg.textContent = `✗ ${i18n.t('common.error')}: Invalid JSON format`;
                                 globalPushMsg.style.color = 'var(--danger-color)';
@@ -606,7 +606,7 @@ export const ManagerDialogMixin = {
                 card.querySelector('.run-task-btn').addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
                     if (btn.disabled) return;
-                    
+
                     // Find index of the first task in this group within allSchedules
                     // We trigger the first one as representative (layout/hours usually same)
                     const taskIndex = allSchedules.indexOf(tasks[0]);
@@ -616,7 +616,7 @@ export const ManagerDialogMixin = {
                     btn.style.opacity = '0.5';
                     const originalIcon = btn.innerHTML;
                     btn.innerHTML = Icons.spinner; // Spinner icon
-                    
+
                     showToast(i18n.t('digest.generating') || 'Generating digest...', 3000);
 
                     try {
@@ -628,17 +628,19 @@ export const ManagerDialogMixin = {
                             },
                             body: JSON.stringify({ taskIndex })
                         });
-                        
+
                         const result = await response.json();
                         if (response.ok && result.success) {
-                            let msg = i18n.t('digest.manager_success') || 'Digest generated successfully';
+                            let msg = i18n.t('digest.manager_success');
                             if (result.push) {
                                 if (result.push.attempted) {
-                                    msg += result.push.success 
-                                        ? ` & Pushed (${result.push.status || 'OK'} ✅)` 
-                                        : ` (Push Failed ${result.push.status || ''} ❌)`;
-                                } else {
-                                    msg += ' (Push Skipped ⚠️)';
+                                    msg += result.push.success
+                                        ? ` & ${i18n.t('digest.push_success', { status: result.push.status || 'OK' })}`
+                                        : ` (${i18n.t('digest.push_failed', { status: result.push.status || '' })})`;
+                                } else if (result.push.reason === 'not_configured') {
+                                    msg += ` (${i18n.t('digest.push_not_configured')})`;
+                                } else if (result.push.reason === 'disabled') {
+                                    msg += ` (${i18n.t('digest.push_disabled')})`;
                                 }
                             }
                             showToast(msg, 3000, true);

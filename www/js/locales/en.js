@@ -26,7 +26,8 @@ export default {
         global_settings: 'Global Settings',
         view: 'View',
         go_to_settings: 'Go to Settings',
-        retry: 'Retry'
+        retry: 'Retry',
+        dont_show_again: "Don't show again"
     },
     nav: {
         all: 'All Articles',
@@ -328,9 +329,12 @@ export default {
         generated: 'Digest generated',
         success: 'Digest generated successfully, click to view',
         generate: 'Generate Digest',
-        generate_for_feed: 'Generate digest for this feed',
-        generate_for_group: 'Generate digest for this group',
-        generate_all: 'Generate full digest',
+        generate_for_feed: 'Generate Feed Digest',
+        generate_for_group: 'Generate Group Digest',
+        generate_all: 'Generate All Articles Digest',
+        confirm_generate: 'This will fetch unread articles from the past 12 hours, extract content summaries, and send them to AI for digest generation.\n\nA large number of articles may consume significant tokens and could exceed the model\'s context window limit.\n\nContinue?',
+        batch_hint: '{count} targets selected, batch configuration',
+        no_target_selected: 'Please select at least one target',
         no_articles: 'No unread articles in the past {hours} hours',
         article_count: '{count} articles',
         scope: 'Scope',
@@ -357,6 +361,12 @@ export default {
         schedule_frequency: 'Frequency',
         schedule_status: 'Status',
         status_enabled: 'Enabled',
-        status_disabled: 'Disabled'
+        status_disabled: 'Disabled',
+        run_now: 'Run Manually',
+        manager_success: 'Digest generated successfully',
+        push_success: 'Pushed ({status} ✅)',
+        push_failed: 'Push Failed {status} ❌',
+        push_not_configured: 'Push Not Configured ⚠️',
+        push_disabled: 'Push Disabled'
     }
 };
