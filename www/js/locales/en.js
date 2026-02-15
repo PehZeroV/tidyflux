@@ -351,7 +351,7 @@ export default {
         task_list_hint: 'After adding a schedule, briefings will be generated automatically and can be sent to your webhook.',
         add_scheduled: 'Add Scheduled Digest',
         no_scheduled_tasks: 'No scheduled tasks',
-        prompt_hint: 'Use {{targetLang}} for output language and {{articleList}} is filled by the system.',
+        prompt_hint: 'Use {{targetLang}} for output language and {{content}} is filled by the system.',
         schedule_scope: 'Scope',
         schedule_time: 'Time',
         schedule_frequency: 'Frequency',

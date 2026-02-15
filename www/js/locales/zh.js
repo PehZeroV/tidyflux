@@ -351,7 +351,7 @@ export default {
         task_list_hint: '添加定时任务后，将按设定时间自动生成简报，并可选择推送到 Webhook。',
         add_scheduled: '添加定时简报',
         no_scheduled_tasks: '暂无定时任务',
-        prompt_hint: '可使用 {{targetLang}} 控制输出语言，{{articleList}} 由系统注入文章列表。',
+        prompt_hint: '可使用 {{targetLang}} 控制输出语言，{{content}} 由系统注入文章列表。',
         schedule_scope: '范围',
         schedule_time: '执行时间',
         schedule_frequency: '频率',
