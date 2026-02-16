@@ -10,6 +10,7 @@ import { DigestStore } from '../utils/digest-store.js';
 import { DigestService, getRecentUnreadArticles } from '../services/digest-service.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { DigestRunner } from '../services/digest-runner.js';
+import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
@@ -47,7 +48,8 @@ router.get('/list', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Get digest list error:', error);
-        res.status(500).json({ error: '获取简报列表失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('fetch_digest_list_failed', lang) });
     }
 });
 
@@ -62,7 +64,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         const digest = await DigestStore.get(userId, id);
 
         if (!digest) {
-            return res.status(404).json({ error: '简报不存在' });
+            const lang = getLang(req);
+            return res.status(404).json({ error: t('digest_not_found', lang) });
         }
 
         res.json({
@@ -71,7 +74,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Get digest error:', error);
-        res.status(500).json({ error: '获取简报失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('fetch_digest_failed', lang) });
     }
 });
 
@@ -171,7 +175,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
             } catch (err) {
                 clearInterval(heartbeat);
                 console.error('Generate digest error:', err);
-                sendEvent({ type: 'error', data: { error: err.message || '生成简报失败' } });
+                const lang = getLang(req);
+                sendEvent({ type: 'error', data: { error: err.message || t('generate_digest_failed', lang) } });
                 res.end();
             }
         } else {
@@ -186,10 +191,12 @@ router.post('/generate', authenticateToken, async (req, res) => {
                 // but if error logic happened before headers.
                 res.status(500);
             }
-            sendEvent({ type: 'error', data: { error: error.message || '生成简报失败' } });
+            const lang = getLang(req);
+            sendEvent({ type: 'error', data: { error: error.message || t('generate_digest_failed', lang) } });
             res.end();
         } else {
-            res.status(500).json({ error: error.message || '生成简报失败' });
+            const lang = getLang(req);
+            res.status(500).json({ error: error.message || t('generate_digest_failed', lang) });
         }
     }
 });
@@ -206,13 +213,15 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
         const success = await DigestStore.markAsRead(userId, id);
 
         if (!success) {
-            return res.status(404).json({ error: '简报不存在' });
+            const lang = getLang(req);
+            return res.status(404).json({ error: t('digest_not_found', lang) });
         }
 
         res.json({ success: true });
     } catch (error) {
         console.error('Mark digest read error:', error);
-        res.status(500).json({ error: '标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('mark_failed', lang) });
     }
 });
 
@@ -227,13 +236,15 @@ router.delete('/:id/read', authenticateToken, async (req, res) => {
         const success = await DigestStore.markAsUnread(userId, id);
 
         if (!success) {
-            return res.status(404).json({ error: '简报不存在' });
+            const lang = getLang(req);
+            return res.status(404).json({ error: t('digest_not_found', lang) });
         }
 
         res.json({ success: true });
     } catch (error) {
         console.error('Mark digest unread error:', error);
-        res.status(500).json({ error: '标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('mark_failed', lang) });
     }
 });
 
@@ -248,13 +259,15 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         const success = await DigestStore.delete(userId, id);
 
         if (!success) {
-            return res.status(404).json({ error: '简报不存在' });
+            const lang = getLang(req);
+            return res.status(404).json({ error: t('digest_not_found', lang) });
         }
 
         res.json({ success: true });
     } catch (error) {
         console.error('Delete digest error:', error);
-        res.status(500).json({ error: '删除失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('delete_failed', lang) });
     }
 });
 
@@ -303,7 +316,7 @@ router.get('/preview', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Preview digest error:', error);
         res.status(500).json({
-            error: '预览失败'
+            error: t('preview_failed', getLang(req))
         });
     }
 });

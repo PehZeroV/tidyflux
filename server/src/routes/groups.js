@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
+import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
@@ -33,7 +34,8 @@ router.get('/', authenticateToken, async (req, res) => {
         res.json(groups);
     } catch (error) {
         console.error('Get groups error:', error.message);
-        res.status(500).json({ error: '获取分组失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('fetch_groups_failed', lang) + ': ' + error.message });
     }
 });
 
@@ -41,7 +43,8 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { name } = req.body;
-        if (!name) return res.status(400).json({ error: '分组名称不能为空' });
+        const lang = getLang(req);
+        if (!name) return res.status(400).json({ error: t('group_name_required', lang) });
 
         const category = await req.miniflux.createCategory(name);
 
@@ -51,7 +54,8 @@ router.post('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Create group error:', error);
-        res.status(500).json({ error: '创建分组失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('create_group_failed', lang) });
     }
 });
 
@@ -72,7 +76,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
         }
     } catch (error) {
         console.error('Update group error:', error);
-        res.status(500).json({ error: '更新分组失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('update_group_failed', lang) });
     }
 });
 
@@ -85,7 +90,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Delete group error:', error);
-        res.status(500).json({ error: '删除分组失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('delete_group_failed', lang) });
     }
 });
 

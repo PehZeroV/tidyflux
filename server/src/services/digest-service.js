@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { DigestStore } from '../utils/digest-store.js';
+import { t } from '../utils/i18n.js';
 
 // 截取文本辅助函数
 // 按 Token 估算截取文本 (1 CJK char ≈ 1 token, 4 non-CJK chars ≈ 1 token)
@@ -167,9 +168,9 @@ ${articlesList}`;
 }
 
 // 调用 AI API 生成简报
-async function callAIForDigest(prompt, aiConfig) {
+async function callAIForDigest(prompt, aiConfig, lang = 'zh') {
     if (!aiConfig || !aiConfig.apiUrl || !aiConfig.apiKey) {
-        throw new Error('AI 未配置，请先在设置中配置 AI API');
+        throw new Error(t('ai_not_configured', lang));
     }
 
     const normalizeApiUrl = (url) => {
@@ -208,7 +209,7 @@ async function callAIForDigest(prompt, aiConfig) {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            throw new Error(error.error?.message || `AI API 错误: ${response.status}`);
+            throw new Error(error.error?.message || (t('ai_api_error', lang) + `: ${response.status}`));
         }
 
         const data = await response.json();
@@ -233,30 +234,32 @@ export const DigestService = {
         } = options;
 
         const isEn = targetLang && (targetLang.toLowerCase().includes('english') || targetLang.toLowerCase().includes('en'));
+        const lang = isEn ? 'en' : 'zh';
 
         // 获取 Scope 名称（需要 Miniflux Client）
-        let scopeName = isEn ? 'All Subscriptions' : '全部订阅';
+        let scopeName = t('all_subscriptions', lang);
         let scopeId = null;
 
         if (scope === 'feed' && feedId) {
             scopeId = parseInt(feedId);
             const feeds = await minifluxClient.getFeeds();
             const feed = feeds.find(f => f.id === parseInt(feedId));
-            scopeName = feed ? feed.title : (isEn ? 'Feed' : '订阅源');
+            scopeName = feed ? feed.title : t('feed', lang);
         } else if (scope === 'group' && groupId) {
             scopeId = parseInt(groupId);
             const categories = await minifluxClient.getCategories();
             const category = categories.find(c => c.id === parseInt(groupId));
-            scopeName = category ? category.title : (isEn ? 'Group' : '分组');
+            scopeName = category ? category.title : t('group', lang);
         }
 
         const fetchOptions = { hours, feedId, groupId, unreadOnly };
         const articles = await getRecentUnreadArticles(minifluxClient, fetchOptions);
 
         if (articles.length === 0) {
-            const noArticlesMsg = isEn
-                ? `No ${unreadOnly ? 'unread ' : ''}articles in the past ${hours} hours.`
-                : `在过去 ${hours} 小时内没有${unreadOnly ? '未读' : ''}文章。`;
+            const noArticlesMsg = t('no_articles_in_hours', lang, {
+                hours,
+                unread: unreadOnly ? t('unread', lang) : ''
+            });
             return {
                 success: true,
                 digest: {
@@ -280,7 +283,7 @@ export const DigestService = {
         });
 
         // 调用 AI
-        const digestContent = await callAIForDigest(prompt, aiConfig);
+        const digestContent = await callAIForDigest(prompt, aiConfig, lang);
 
         // 生成本地化标题 — 使用用户设定的时区
         const now = new Date();
@@ -314,7 +317,7 @@ export const DigestService = {
 
         const timeStr = `${month}-${day}-${hh}:${mm}`;
 
-        const digestWord = isEn ? 'Digest' : '简报';
+        const digestWord = t('digest_word', lang);
         const title = `${scopeName} · ${digestWord} ${timeStr}`;
 
         // 存储简报

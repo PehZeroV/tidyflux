@@ -19,50 +19,51 @@ const AI_PROVIDERS = {
     openai: {
         name: 'OpenAI',
         apiUrl: 'https://api.openai.com/v1',
-        models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-        hasRegion: false,
-        manualModel: false
+        hasRegion: false
     },
-    openrouter: {
-        name: 'OpenRouter',
-        apiUrl: 'https://openrouter.ai/api/v1',
-        models: [], // OpenRouter has many models, user must input manually
-        hasRegion: false,
-        manualModel: true
+    claude: {
+        name: 'Claude',
+        apiUrl: 'https://api.anthropic.com/v1',
+        hasRegion: false
     },
     gemini: {
         name: 'Google Gemini',
-        apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
-        models: ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro', 'gemini-1.5-flash'],
-        hasRegion: false,
-        manualModel: false
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        hasRegion: false
     },
     minimax: {
         name: 'MiniMax',
         apiUrl: {
-            china: 'https://api.minimax.chat/v1',
-            international: 'https://api.minimaxi.com/v1'
+            china: 'https://api.minimaxi.com/v1',
+            international: 'https://api.minimax.io/v1'
         },
-        models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5g-chat', 'abab6.5t-chat', 'abab5.5-chat'],
-        hasRegion: true,
-        manualModel: false
+        hasRegion: true
     },
     zhipu: {
         name: 'ZhiPu AI',
         apiUrl: {
             china: 'https://open.bigmodel.cn/api/paas/v4',
-            international: 'https://open.bigmodel.ai/api/paas/v4'
+            international: 'https://api.z.ai/api/paas/v4'
         },
-        models: ['GLM-4-Plus', 'GLM-4-0520', 'GLM-4-Air', 'GLM-4-AirX', 'GLM-4-Flash', 'glm-4-plus', 'glm-4-flash'],
-        hasRegion: true,
-        manualModel: false
+        hasRegion: true
+    },
+    kimi: {
+        name: 'Kimi',
+        apiUrl: {
+            china: 'https://api.moonshot.cn/v1',
+            international: 'https://api.moonshot.ai/v1'
+        },
+        hasRegion: true
+    },
+    openrouter: {
+        name: 'OpenRouter',
+        apiUrl: 'https://openrouter.ai/api/v1',
+        hasRegion: false
     },
     custom: {
         name: 'Custom',
         apiUrl: '',
-        models: [],
-        hasRegion: false,
-        manualModel: true
+        hasRegion: false
     }
 };
 
@@ -150,10 +151,12 @@ export const SettingsDialogMixin = {
                         <label class="miniflux-input-label">${i18n.t('ai.provider')}</label>
                         <select id="ai-provider" class="dialog-select" style="margin-bottom: 8px;">
                             <option value="openai">${i18n.t('ai.provider_openai')}</option>
-                            <option value="openrouter">${i18n.t('ai.provider_openrouter')}</option>
+                            <option value="claude">${i18n.t('ai.provider_claude')}</option>
                             <option value="gemini">${i18n.t('ai.provider_gemini')}</option>
                             <option value="minimax">${i18n.t('ai.provider_minimax')}</option>
                             <option value="zhipu">${i18n.t('ai.provider_zhipu')}</option>
+                            <option value="kimi">${i18n.t('ai.provider_kimi')}</option>
+                            <option value="openrouter">${i18n.t('ai.provider_openrouter')}</option>
                             <option value="custom">${i18n.t('ai.provider_custom')}</option>
                         </select>
 
@@ -172,12 +175,7 @@ export const SettingsDialogMixin = {
                         <input type="text" id="ai-api-key" class="auth-input auth-input-secret" placeholder="sk-..." style="margin-bottom: 8px;" autocomplete="off" spellcheck="false">
 
                         <label class="miniflux-input-label">${i18n.t('ai.model')}</label>
-                        <div id="ai-model-select-container">
-                            <select id="ai-model-select" class="dialog-select" style="margin-bottom: 8px;">
-                                <option value="">${i18n.t('ai.model_select')}</option>
-                            </select>
-                        </div>
-                        <div id="ai-model-input-container" style="display: none;">
+                        <div id="ai-model-input-container">
                             <input type="text" id="ai-model-input" class="auth-input" placeholder="${i18n.t('ai.model_input_placeholder')}" style="margin-bottom: 8px;" autocomplete="off">
                         </div>
 
@@ -434,9 +432,6 @@ export const SettingsDialogMixin = {
         const aiRegionSelect = dialog.querySelector('#ai-region');
         const aiUrlInput = dialog.querySelector('#ai-api-url');
         const aiKeyInput = dialog.querySelector('#ai-api-key');
-        const aiModelSelectContainer = dialog.querySelector('#ai-model-select-container');
-        const aiModelInputContainer = dialog.querySelector('#ai-model-input-container');
-        const aiModelSelect = dialog.querySelector('#ai-model-select');
         const aiModelInput = dialog.querySelector('#ai-model-input');
         const aiTemperatureInput = dialog.querySelector('#ai-temperature');
         const aiConcurrencyInput = dialog.querySelector('#ai-concurrency');
@@ -456,34 +451,24 @@ export const SettingsDialogMixin = {
         // Helper: Detect provider from API URL
         const detectProviderFromUrl = (url) => {
             if (!url) return 'openai';
+            if (url.includes('anthropic.com')) return 'claude';
             if (url.includes('openrouter.ai')) return 'openrouter';
             if (url.includes('generativelanguage.googleapis.com')) return 'gemini';
-            if (url.includes('minimax.chat')) return 'minimax';
-            if (url.includes('minimaxi.com')) return 'minimax';
-            if (url.includes('bigmodel.cn') || url.includes('bigmodel.ai')) return 'zhipu';
+            if (url.includes('minimaxi.com') || url.includes('minimax.io')) return 'minimax';
+            if (url.includes('bigmodel.cn') || url.includes('z.ai')) return 'zhipu';
+            if (url.includes('moonshot.cn') || url.includes('moonshot.ai')) return 'kimi';
             if (url.includes('openai.com')) return 'openai';
             return 'custom';
         };
 
         // Helper: Get current model value
         const getCurrentModel = () => {
-            const provider = aiProviderSelect.value;
-            const providerConfig = AI_PROVIDERS[provider];
-            if (providerConfig.manualModel) {
-                return aiModelInput.value.trim();
-            }
-            return aiModelSelect.value;
+            return aiModelInput.value.trim();
         };
 
         // Helper: Set model value
         const setModelValue = (model) => {
-            const provider = aiProviderSelect.value;
-            const providerConfig = AI_PROVIDERS[provider];
-            if (providerConfig.manualModel) {
-                aiModelInput.value = model;
-            } else {
-                aiModelSelect.value = model;
-            }
+            aiModelInput.value = model;
         };
 
         // Helper: Update UI based on provider
@@ -498,8 +483,11 @@ export const SettingsDialogMixin = {
             }
 
             // Update API URL
-            if (!preserveUrl && provider !== 'custom') {
-                if (providerConfig.hasRegion) {
+            if (!preserveUrl) {
+                if (provider === 'custom') {
+                    // Restore last custom URL
+                    aiUrlInput.value = lastCustomUrl;
+                } else if (providerConfig.hasRegion) {
                     const region = aiRegionSelect.value;
                     aiUrlInput.value = providerConfig.apiUrl[region];
                 } else {
@@ -507,19 +495,8 @@ export const SettingsDialogMixin = {
                 }
             }
 
-            // Update model selection UI
-            if (providerConfig.manualModel) {
-                aiModelSelectContainer.style.display = 'none';
-                aiModelInputContainer.style.display = 'block';
-            } else {
-                aiModelSelectContainer.style.display = 'block';
-                aiModelInputContainer.style.display = 'none';
-
-                // Populate model dropdown
-                aiModelSelect.innerHTML = providerConfig.models.map(m =>
-                    `<option value="${m}">${m}</option>`
-                ).join('');
-            }
+            // Set model input placeholder
+            aiModelInput.placeholder = i18n.t('ai.model_input_placeholder');
 
             // Disable URL input for non-custom providers
             if (provider === 'custom') {
@@ -531,17 +508,23 @@ export const SettingsDialogMixin = {
             }
         };
 
+        // Track custom URL across provider switches
+        let lastCustomUrl = aiConfig.provider === 'custom' ? (aiConfig.apiUrl || '') : '';
+
         // Initialize from saved config
         const savedProvider = aiConfig.provider || detectProviderFromUrl(aiConfig.apiUrl);
         aiProviderSelect.value = savedProvider;
+        // Notify CustomSelect wrapper to refresh its displayed text
+        aiProviderSelect.dispatchEvent(new Event('change'));
 
         // Set region if applicable
         if (aiConfig.apiUrl) {
-            if (aiConfig.apiUrl.includes('minimaxi.com') || aiConfig.apiUrl.includes('bigmodel.ai')) {
+            if (aiConfig.apiUrl.includes('minimax.io') || aiConfig.apiUrl.includes('z.ai') || aiConfig.apiUrl.includes('moonshot.ai')) {
                 aiRegionSelect.value = 'international';
             } else {
                 aiRegionSelect.value = 'china';
             }
+            aiRegionSelect.dispatchEvent(new Event('change'));
         }
 
         updateProviderUI(savedProvider, true);
@@ -549,9 +532,6 @@ export const SettingsDialogMixin = {
         if (aiUrlInput) aiUrlInput.value = aiConfig.apiUrl || '';
         if (aiKeyInput) aiKeyInput.value = aiConfig.apiKey || '';
         if (aiConfig.model) setModelValue(aiConfig.model);
-        else if (!AI_PROVIDERS[savedProvider].manualModel && AI_PROVIDERS[savedProvider].models.length > 0) {
-            setModelValue(AI_PROVIDERS[savedProvider].models[0]);
-        }
 
         // 温度默认值改为 0.7
         if (aiTemperatureInput) {
@@ -574,7 +554,16 @@ export const SettingsDialogMixin = {
 
         // Provider change handler
         aiProviderSelect.addEventListener('change', () => {
-            updateProviderUI(aiProviderSelect.value);
+            const newProvider = aiProviderSelect.value;
+            const oldProvider = aiProviderSelect._lastProvider || savedProvider;
+
+            // Save current URL if leaving custom
+            if (oldProvider === 'custom') {
+                lastCustomUrl = aiUrlInput.value;
+            }
+
+            aiProviderSelect._lastProvider = newProvider;
+            updateProviderUI(newProvider);
         });
 
         // Region change handler

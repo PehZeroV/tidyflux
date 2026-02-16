@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { t } from './i18n.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,8 +181,8 @@ export const DigestStore = {
             type: 'digest',
             scope: digestData.scope || 'all',
             scopeId: digestData.scopeId || null,
-            scopeName: digestData.scopeName || '全部订阅',
-            title: digestData.title || `${digestData.scopeName || '全部'} · 简报 ${timeStr}`,
+            scopeName: digestData.scopeName || t('all_subscriptions'),
+            title: digestData.title || `${digestData.scopeName || t('all')} · ${t('digest_word')} ${timeStr}`,
             content: digestData.content,
             articleCount: digestData.articleCount || 0,
             hours: digestData.hours || 12,

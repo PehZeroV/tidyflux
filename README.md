@@ -124,7 +124,7 @@ docker compose up -d
 
 **Service Information**:
 
-- **TidyFlux (Reader)**: `http://localhost:8812`
+- **Tidyflux (Reader)**: `http://localhost:8812`
   - Account: `admin`
   - Password: `admin` (Change after login)
 

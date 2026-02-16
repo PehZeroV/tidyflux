@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { extractThumbnailUrl, extractFirstImage, getThumbnailUrl, sanitizeHtml } from '../utils.js';
+import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
@@ -133,7 +134,8 @@ router.get('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Get articles error:', error);
-        res.status(500).json({ error: error.message || '获取文章失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: error.message || t('fetch_articles_failed', lang) });
     }
 });
 
@@ -144,7 +146,8 @@ router.get('/integrations/status', authenticateToken, async (req, res) => {
         res.json(status); // { has_integrations: true/false }
     } catch (error) {
         console.error('Get integrations status error:', error);
-        res.status(500).json({ error: '获取集成状态失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('fetch_integrations_failed', lang) });
     }
 });
 
@@ -167,10 +170,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
         res.json(mapEntryToArticle(entry, thumbnail));
     } catch (error) {
         console.error('Get article error:', error);
+        const lang = getLang(req);
         if (error.message.includes('404')) {
-            return res.status(404).json({ error: '文章不存在' });
+            return res.status(404).json({ error: t('article_not_found', lang) });
         }
-        res.status(500).json({ error: '获取文章失败' });
+        res.status(500).json({ error: t('fetch_articles_failed', lang) });
     }
 });
 
@@ -182,7 +186,8 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Mark read error:', error);
-        res.status(500).json({ error: '标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('mark_failed', lang) });
     }
 });
 
@@ -194,7 +199,8 @@ router.delete('/:id/read', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Mark unread error:', error);
-        res.status(500).json({ error: '标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('mark_failed', lang) });
     }
 });
 
@@ -211,7 +217,8 @@ router.post('/batch-read', authenticateToken, async (req, res) => {
         res.json({ success: true, count: ids.length });
     } catch (error) {
         console.error('Batch mark read error:', error);
-        res.status(500).json({ error: '批量标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('batch_mark_failed', lang) });
     }
 });
 
@@ -233,7 +240,8 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Mark all read error:', error);
-        res.status(500).json({ error: '标记失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('mark_failed', lang) });
     }
 });
 
@@ -245,7 +253,8 @@ router.post('/:id/favorite', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Favorite error:', error);
-        res.status(500).json({ error: '收藏失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('favorite_failed', lang) });
     }
 });
 
@@ -258,7 +267,8 @@ router.delete('/:id/favorite', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Unfavorite error:', error);
-        res.status(500).json({ error: '取消收藏失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('unfavorite_failed', lang) });
     }
 });
 
@@ -293,11 +303,12 @@ router.put('/:id/fetch-content', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Fetch content error:', error);
         console.error('Error details:', error.message);
+        const lang = getLang(req);
         if (error.message.includes('404')) {
             console.error('Miniflux returned 404 for fetch-content. Endpoint might not exist or entry ID is wrong.');
-            return res.status(404).json({ error: '文章不存在' });
+            return res.status(404).json({ error: t('article_not_found', lang) });
         }
-        res.status(500).json({ error: '获取全文失败' });
+        res.status(500).json({ error: t('fetch_content_failed', lang) });
     }
 });
 
@@ -309,7 +320,8 @@ router.post('/:id/save', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Save entry error:', error);
-        res.status(500).json({ error: '保存到第三方服务失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('save_third_party_failed', lang) + ': ' + error.message });
     }
 });
 

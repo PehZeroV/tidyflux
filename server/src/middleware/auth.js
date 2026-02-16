@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { MinifluxClient } from '../miniflux.js';
 import { MinifluxConfigStore } from '../utils/miniflux-config-store.js';
+import { t, getLang } from '../utils/i18n.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -91,7 +92,8 @@ export async function authenticateToken(req, res, next) {
     const token = authHeader?.split(' ')[1];
 
     if (!token) {
-        return res.status(401).json({ error: '未登录' });
+        const lang = getLang(req);
+        return res.status(401).json({ error: t('not_logged_in', lang) });
     }
 
     try {
@@ -107,7 +109,8 @@ export async function authenticateToken(req, res, next) {
         next();
     } catch (err) {
         console.error('JWT verify error:', err.message);
-        return res.status(403).json({ error: '登录已过期' });
+        const lang = getLang(req);
+        return res.status(403).json({ error: t('session_expired', lang) });
     }
 }
 

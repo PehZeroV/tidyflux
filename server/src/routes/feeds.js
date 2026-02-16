@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { sanitizeHtml } from '../utils.js';
+import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
@@ -18,7 +19,8 @@ router.post('/discover', authenticateToken, async (req, res) => {
         if (error.status === 400 || error.status === 404) {
             return res.json([]);
         }
-        res.status(500).json({ error: '发现订阅失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('discover_failed', lang) + ': ' + error.message });
     }
 });
 
@@ -50,7 +52,8 @@ router.get('/', authenticateToken, async (req, res) => {
         res.json(mappedFeeds);
     } catch (error) {
         console.error('Get feeds error:', error.message);
-        res.status(500).json({ error: '获取订阅失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('fetch_feeds_failed', lang) + ': ' + error.message });
     }
 });
 
@@ -63,10 +66,11 @@ router.get('/:id(\\d+)', authenticateToken, async (req, res) => {
         res.json(feed);
     } catch (error) {
         console.error('Get single feed error:', error.message);
+        const lang = getLang(req);
         if (error.message.includes('404')) {
-            return res.status(404).json({ error: '订阅不存在' });
+            return res.status(404).json({ error: t('feed_not_found', lang) });
         }
-        res.status(500).json({ error: '获取订阅详情失败' });
+        res.status(500).json({ error: t('fetch_feed_detail_failed', lang) });
     }
 });
 
@@ -111,7 +115,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
     } catch (error) {
         console.error('Add feed error:', error);
-        res.status(500).json({ error: '添加订阅失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('add_feed_failed', lang) + ': ' + error.message });
     }
 });
 
@@ -135,7 +140,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
         res.json(updated);
     } catch (error) {
         console.error('Update feed error:', error);
-        res.status(500).json({ error: '更新订阅失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('update_feed_failed', lang) });
     }
 });
 
@@ -147,7 +153,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Delete feed error:', error);
-        res.status(500).json({ error: '删除订阅失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('delete_feed_failed', lang) });
     }
 });
 
@@ -159,7 +166,8 @@ router.post('/refresh/:id', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Refresh feed error:', error);
-        res.status(500).json({ error: '刷新失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('refresh_failed', lang) });
     }
 });
 
@@ -183,7 +191,8 @@ router.post('/refresh-group/:groupId', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Refresh group error:', error);
         if (!res.headersSent) {
-            res.status(500).json({ error: '刷新分组失败' });
+            const lang = getLang(req);
+            res.status(500).json({ error: t('refresh_group_failed', lang) });
         }
     }
 });
@@ -207,7 +216,8 @@ router.post('/refresh', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Refresh all error:', error);
         if (!res.headersSent) {
-            res.status(500).json({ error: '刷新失败' });
+            const lang = getLang(req);
+            res.status(500).json({ error: t('refresh_failed', lang) });
         }
     }
 });
@@ -221,7 +231,8 @@ router.get('/opml/export', authenticateToken, async (req, res) => {
         res.send(opmlContent);
     } catch (error) {
         console.error('Export OPML error:', error);
-        res.status(500).json({ error: '导出失败' });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('export_failed', lang) });
     }
 });
 
@@ -238,10 +249,12 @@ router.post('/opml/import', authenticateToken, express.raw({ type: ['application
 
 
         await req.miniflux.importOPML(opmlData);
-        res.json({ success: true, message: '导入已排队处理' });
+        const lang = getLang(req);
+        res.json({ success: true, message: t('import_queued', lang) });
     } catch (error) {
         console.error('Import OPML error:', error);
-        res.status(500).json({ error: '导入失败: ' + error.message });
+        const lang = getLang(req);
+        res.status(500).json({ error: t('import_failed', lang) + ': ' + error.message });
     }
 });
 

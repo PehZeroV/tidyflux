@@ -30,7 +30,7 @@
     border-radius: 0;
     box-shadow: none;
     overflow: hidden;
-    border-right: none;
+    border-right: 1px solid var(--border-color);
     position: relative;
     flex-shrink: 0;
     transition: width 0.2s ease, min-width 0.2s ease;
@@ -39,18 +39,26 @@
 /* 拖拽调整订阅栏宽度（仅桌面三栏模式显示） */
 .feeds-panel-resize-handle {
     display: none;
-    width: 4px;
+    width: 6px;
+    margin-left: -3px;
     flex-shrink: 0;
-    cursor: col-resize;
+    cursor: default;
     background: transparent;
     position: relative;
-    z-index: 5;
+    z-index: 15;
+    opacity: 1;
+    transition: background 0s 300ms, opacity 0s 300ms;
 }
 
 .feeds-panel-resize-handle:hover,
 .feeds-panel-resize-handle.feeds-panel-resize-handle--dragging {
     background: var(--accent-color);
     opacity: 0.4;
+    transition: background 0s 300ms, opacity 0s 300ms;
+}
+
+.feeds-panel-resize-handle:not(:hover) {
+    transition: background 0s 0s, opacity 0s 0s;
 }
 
 @media (min-width: 1101px) {

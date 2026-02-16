@@ -2,6 +2,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
+import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
@@ -25,7 +26,8 @@ router.post('/chat', authenticateToken, async (req, res) => {
         const aiConfig = prefs.ai_config || {};
 
         if (!aiConfig.apiUrl || !aiConfig.apiKey) {
-            return res.status(400).json({ error: 'AI 未在服务端配置' });
+            const lang = getLang(req);
+            return res.status(400).json({ error: t('ai_not_configured_server', lang) });
         }
 
         const apiUrl = normalizeApiUrl(aiConfig.apiUrl);
@@ -130,12 +132,12 @@ router.post('/test', authenticateToken, async (req, res) => {
             if (prefs.ai_config?.apiKey) {
                 apiKey = prefs.ai_config.apiKey;
             } else {
-                return res.status(400).json({ error: '请提供完整的 API URL 和 Key' });
+                return res.status(400).json({ error: t('provide_api_url_and_key', getLang(req)) });
             }
         }
 
         if (!apiUrl || !apiKey) {
-            return res.status(400).json({ error: '请提供完整的 API URL 和 Key' });
+            return res.status(400).json({ error: t('provide_api_url_and_key', getLang(req)) });
         }
 
         const targetUrl = normalizeApiUrl(apiUrl);

@@ -124,7 +124,7 @@ docker compose up -d
 
 **服务信息**：
 
-- **TidyFlux (阅读器)**: `http://localhost:8812`
+- **Tidyflux (阅读器)**: `http://localhost:8812`
   - 账号：`admin`
   - 密码：`admin` (登录后请修改)
 

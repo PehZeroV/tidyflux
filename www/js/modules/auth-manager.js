@@ -28,7 +28,7 @@ export const AuthManager = {
     async register(email, password) {
         const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept-Language': i18n.locale || 'zh' },
             body: JSON.stringify({ email, password })
         });
 
@@ -45,7 +45,7 @@ export const AuthManager = {
         // Send credentials to backend
         const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept-Language': i18n.locale || 'zh' },
             body: JSON.stringify({ username, password })
         });
 
@@ -62,7 +62,8 @@ export const AuthManager = {
         const token = this.getToken();
         const headers = {
             ...options.headers,
-            'Authorization': token ? `Bearer ${token}` : ''
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Accept-Language': i18n.locale || 'zh'
         };
 
         const response = await fetch(url, { ...options, headers });

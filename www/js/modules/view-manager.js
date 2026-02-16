@@ -641,6 +641,7 @@ export const ViewManager = {
         const STORAGE_WIDTH = 'tidyflux_feedsPanelWidth';
         const MIN_W = 160;
         const MAX_W = 400;
+        const HOVER_DELAY = 300; // ms, matches CSS transition-delay
 
         const applyWidth = (w) => {
             const px = Math.round(Math.max(MIN_W, Math.min(MAX_W, w))) + 'px';
@@ -654,9 +655,25 @@ export const ViewManager = {
             if (!isNaN(savedW)) applyWidth(savedW);
         } catch (_) { }
 
+        // Delay cursor change to match CSS transition-delay,
+        // so quick mouse pass-through won't flash col-resize cursor
+        let cursorTimer = null;
+        handle.addEventListener('mouseenter', () => {
+            cursorTimer = setTimeout(() => {
+                handle.style.cursor = 'col-resize';
+            }, HOVER_DELAY);
+        });
+        handle.addEventListener('mouseleave', () => {
+            clearTimeout(cursorTimer);
+            handle.style.cursor = '';
+        });
+
         let startX = 0, startW = 0;
         handle.addEventListener('mousedown', (e) => {
             e.preventDefault();
+            // Immediately show col-resize on drag start
+            clearTimeout(cursorTimer);
+            handle.style.cursor = 'col-resize';
             startX = e.clientX;
             startW = panel.offsetWidth;
             handle.classList.add('feeds-panel-resize-handle--dragging');
