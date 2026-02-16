@@ -893,6 +893,9 @@ export const ArticlesView = {
                 }
 
                 await this.viewManager.refreshFeedCounts();
+
+                // 为新插入的文章触发标题翻译（不取消之前的翻译任务）
+                this.triggerTitleTranslations(newArticles, false);
             }
         } catch (err) {
             console.debug('Check new articles failed', err);
