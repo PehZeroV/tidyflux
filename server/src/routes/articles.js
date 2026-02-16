@@ -262,8 +262,9 @@ router.post('/:id/favorite', authenticateToken, async (req, res) => {
 router.delete('/:id/favorite', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        // To be safe we set it explicitly instead of toggle
-        await req.miniflux.updateEntry(id, { starred: false });
+        // Miniflux's PUT /entries/:id only supports title/content, not starred.
+        // Use toggleBookmark (PUT /entries/:id/bookmark) which is the correct API.
+        await req.miniflux.toggleBookmark(id);
         res.json({ success: true });
     } catch (error) {
         console.error('Unfavorite error:', error);
