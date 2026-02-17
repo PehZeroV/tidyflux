@@ -106,6 +106,23 @@ export const AICache = {
     },
 
     /**
+     * 删除缓存的摘要
+     * @param {number|string} entryId
+     */
+    async deleteSummary(entryId) {
+        return this._delete(_makeKey(entryId, 'summary'));
+    },
+
+    /**
+     * 删除缓存的翻译
+     * @param {number|string} entryId
+     * @param {string} lang - 目标语言
+     */
+    async deleteTranslation(entryId, lang) {
+        return this._delete(_makeKey(entryId, 'translation', lang));
+    },
+
+    /**
      * 批量加载标题翻译缓存（启动时一次性读取）
      * @returns {Promise<Map|null>} 标题翻译 Map，或 null
      */

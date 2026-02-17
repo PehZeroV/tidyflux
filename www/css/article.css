@@ -569,6 +569,34 @@
     margin: 1em auto;
 }
 
+.article-preview-content {
+    overflow-x: hidden;
+    word-break: break-word;
+}
+
+.article-preview-content * {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.article-preview-content pre {
+    overflow-x: auto;
+}
+
+.article-preview-content iframe,
+.article-preview-content video,
+.article-preview-content embed,
+.article-preview-content object {
+    max-width: 100%;
+    height: auto;
+}
+
+.article-preview-content table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
 .article-preview-content a {
     color: var(--accent-color);
     text-decoration: underline;

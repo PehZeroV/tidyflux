@@ -194,7 +194,7 @@ export const SettingsDialogMixin = {
                             <label class="miniflux-input-label">${i18n.t('ai.target_lang')}</label>
                             <select id="ai-target-lang" class="dialog-select">
                                 ${AI_LANGUAGES.map(lang =>
-            `<option value="${lang.id}">${i18n.locale === 'zh' ? lang.name : lang.nameEn}</option>`
+            `<option value="${lang.id}">${lang.name}</option>`
         ).join('')}
                             </select>
                         </div>

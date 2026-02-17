@@ -253,6 +253,8 @@ export default {
         fetch_articles_failed: 'Failed to fetch articles',
         fetch_content: 'Fetch Full Content',
         fetch_content_failed: 'Failed to fetch full content',
+        restore_original: 'Restore Original',
+        empty_content: 'Content is empty',
         mark_all_read_failed: 'Failed to mark all as read',
         mark_unread_failed: 'Failed to mark as unread',
         favorite_failed: 'Failed to favorite',
@@ -328,7 +330,8 @@ export default {
         rate_limit_warning: 'Rapidly scrolling through the article list or quickly switching articles may easily trigger API rate limits. Enable only as needed.',
         not_configured: 'AI service not configured, please configure in settings',
         translate_failed: 'Translation failed',
-        auto_translate_failed: 'Auto translation failed'
+        auto_translate_failed: 'Auto translation failed',
+        translate_cancelled: 'Translation cancelled'
     },
     theme: {
         default: 'Default',

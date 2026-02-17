@@ -465,7 +465,7 @@ export const ArticleAIMixin = {
                         translateBtn.classList.remove('active');
                         translateBtn.title = i18n.t('ai.translate_btn');
 
-                        showToast('翻译已取消');
+                        showToast(i18n.t('ai.translate_cancelled'));
                     }
                     return;
                 }
@@ -648,24 +648,33 @@ export const ArticleAIMixin = {
 
         if (!bodyEl) return;
 
-        // 如果已经有翻译块（说明已翻译过），跳过
+        // 如果正文已有翻译块，说明正文已翻译，跳过
         const existingBlocks = bodyEl.querySelectorAll('.ai-trans-block');
+        if (existingBlocks.length > 0) return;
+
+        // 检查标题翻译块是否存在（标题可能在获取全文/恢复后保留）
         const existingTitleBlock = document.querySelector('.ai-title-trans-block');
-        if (existingBlocks.length > 0 || existingTitleBlock) return;
 
-        // 如果翻译按钮正在加载或已完成，不重复触发
-        if (translateBtn && (translateBtn.classList.contains('loading') || translateBtn.classList.contains('active'))) {
-            return;
-        }
+        // 如果翻译按钮正在加载，不重复触发
+        if (translateBtn && translateBtn.classList.contains('loading')) return;
 
-        // 先检查 IndexedDB 翻译缓存
-        const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
-        if (cacheRestored) {
-            if (translateBtn) {
-                translateBtn.classList.add('active');
-                translateBtn.title = i18n.t('ai.original_content');
+        // 如果按钮已 active 且无标题翻译块，说明翻译已完整完成，跳过
+        // 如果按钮已 active 且有标题翻译块但无正文翻译块，说明需要补充正文翻译
+        if (translateBtn && translateBtn.classList.contains('active') && !existingTitleBlock) return;
+
+        // 如果标题已翻译，只翻译正文（跳过标题避免重复创建翻译块）
+        const effectiveTitleEl = existingTitleBlock ? null : titleEl;
+
+        // 先检查 IndexedDB 翻译缓存（仅在标题未翻译时尝试，否则缓存中的正文部分已过期）
+        if (!existingTitleBlock) {
+            const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
+            if (cacheRestored) {
+                if (translateBtn) {
+                    translateBtn.classList.add('active');
+                    translateBtn.title = i18n.t('ai.original_content');
+                }
+                return;
             }
-            return;
         }
 
         // 开始自动翻译
@@ -673,7 +682,7 @@ export const ArticleAIMixin = {
 
         try {
             article._translateController = new AbortController();
-            await this.translateBilingual(bodyEl, titleEl, article._translateController.signal, article.id);
+            await this.translateBilingual(bodyEl, effectiveTitleEl, article._translateController.signal, article.id);
             if (translateBtn) {
                 translateBtn.classList.remove('loading');
                 translateBtn.classList.add('active');

@@ -597,7 +597,7 @@ export const ArticleContentView = {
         const date = article.published_at
             ? new Date(article.published_at).toLocaleString(locale)
             : '';
-        const content = article.content || article.summary || '<p>内容为空</p>';
+        const content = article.content || article.summary || `<p>${i18n.t('feed.empty_content')}</p>`;
 
         // Detect audio enclosure
         let audioEnclosure = null;

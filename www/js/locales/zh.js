@@ -253,6 +253,8 @@ export default {
         fetch_articles_failed: '获取文章失败',
         fetch_content: '获取全文',
         fetch_content_failed: '获取全文失败',
+        restore_original: '恢复原文',
+        empty_content: '内容为空',
         mark_all_read_failed: '标记全部已读失败',
         mark_unread_failed: '标记未读失败',
         favorite_failed: '收藏失败',
@@ -328,7 +330,8 @@ export default {
         rate_limit_warning: '快速滚动文章列表或者快速切换文章极易触发 API 速率限制，建议按需开启',
         not_configured: 'AI 服务未配置，请先在设置中配置',
         translate_failed: '翻译失败',
-        auto_translate_failed: '自动翻译失败'
+        auto_translate_failed: '自动翻译失败',
+        translate_cancelled: '翻译已取消'
     },
     theme: {
         default: '默认',

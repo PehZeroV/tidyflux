@@ -14,6 +14,8 @@ import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
 import { showToast } from './utils.js';
 import { Modal } from './components.js';
+import { AICache } from '../ai-cache.js';
+import { AIService } from '../ai-service.js';
 
 export const ArticleToolbarMixin = {
     /**
@@ -125,7 +127,7 @@ export const ArticleToolbarMixin = {
             // 如果已有原始内容缓存，更新按钮状态
             if (article._originalContent) {
                 fetchBtn.innerHTML = Icons.restore_original;
-                fetchBtn.title = '恢复原文';
+                fetchBtn.title = i18n.t('feed.restore_original');
                 fetchBtn.classList.add('active');
             }
 
@@ -147,16 +149,69 @@ export const ArticleToolbarMixin = {
 
                 // 切换回原始内容
                 if (article._originalContent) {
+                    // 取消进行中的 AI 请求
+                    if (article._translateController) {
+                        article._translateController.abort();
+                        article._translateController = null;
+                    }
+                    if (article._summarizeController) {
+                        article._summarizeController.abort();
+                        article._summarizeController = null;
+                    }
+                    if (article._autoSummarizeController) {
+                        article._autoSummarizeController.abort();
+                        article._autoSummarizeController = null;
+                    }
+
+                    // 清除内存中的 AI 缓存
+                    delete article._aiSummary;
+                    delete article._translatedContent;
+
+                    // 清除 IndexedDB 中的 AI 缓存
+                    AICache.deleteSummary(article.id).catch(() => { });
+                    const aiConfig = AIService.getConfig();
+                    const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                    AICache.deleteTranslation(article.id, lang).catch(() => { });
+
+                    // 标题未变化，保留标题翻译块
+                    // 翻译按钮状态：如果标题翻译块存在则保持 active（标题仍然是翻译的）
+                    const titleTransBlock = document.querySelector('.ai-title-trans-block');
+                    const translateBtn = document.getElementById('article-translate-btn');
+                    if (translateBtn) {
+                        translateBtn.classList.remove('loading');
+                        if (!titleTransBlock) {
+                            translateBtn.classList.remove('active');
+                            translateBtn.title = i18n.t('ai.translate_btn');
+                        }
+                    }
+
+                    // 重置摘要按钮和摘要框状态
+                    const summarizeBtn = document.getElementById('article-summarize-btn');
+                    const summaryBox = document.getElementById('article-ai-summary');
+                    if (summarizeBtn) {
+                        summarizeBtn.classList.remove('active', 'loading');
+                    }
+                    if (summaryBox) {
+                        summaryBox.style.display = 'none';
+                        const summaryContent = summaryBox.querySelector('.ai-content');
+                        if (summaryContent) summaryContent.innerHTML = '';
+                    }
+
                     const bodyEl = document.querySelector('.article-body');
                     if (bodyEl) bodyEl.innerHTML = article._originalContent;
 
+                    article.content = article._originalContent;
                     const stateArticle = AppState.articles?.find(a => a.id == article.id);
                     if (stateArticle) stateArticle.content = article._originalContent;
 
                     delete article._originalContent;
                     fetchBtn.innerHTML = Icons.fetch_original;
                     btn.classList.remove('active');
-                    btn.title = '获取全文';
+                    btn.title = i18n.t('feed.fetch_content');
+
+                    // 恢复原文后重新触发自动 AI（如果已启用）
+                    this.autoSummarize(article);
+                    this.autoTranslate(article);
                     return;
                 }
 
@@ -179,22 +234,77 @@ export const ArticleToolbarMixin = {
 
                     article._originalContent = originalContent;
 
-                    const bodyEl = document.querySelector('.article-body');
-                    if (bodyEl) {
-                        bodyEl.innerHTML = result.content || result.summary || '<p>内容为空</p>';
+                    // --- 清除所有 AI 相关状态（全文内容已变更，旧缓存失效）---
+                    // 取消进行中的 AI 请求
+                    if (article._translateController) {
+                        article._translateController.abort();
+                        article._translateController = null;
+                    }
+                    if (article._summarizeController) {
+                        article._summarizeController.abort();
+                        article._summarizeController = null;
+                    }
+                    if (article._autoSummarizeController) {
+                        article._autoSummarizeController.abort();
+                        article._autoSummarizeController = null;
                     }
 
+                    // 清除内存中的 AI 摘要缓存
+                    delete article._aiSummary;
+                    delete article._translatedContent;
+
+                    // 清除 IndexedDB 中该文章的 AI 缓存
+                    AICache.deleteSummary(article.id).catch(() => { });
+                    const aiConfig = AIService.getConfig();
+                    const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                    AICache.deleteTranslation(article.id, lang).catch(() => { });
+
+                    // 标题未变化，保留标题翻译块
+                    const titleTransBlock = document.querySelector('.ai-title-trans-block');
+                    const translateBtn = document.getElementById('article-translate-btn');
+                    if (translateBtn) {
+                        translateBtn.classList.remove('loading');
+                        if (!titleTransBlock) {
+                            translateBtn.classList.remove('active');
+                            translateBtn.title = i18n.t('ai.translate_btn');
+                        }
+                    }
+
+                    // 重置摘要按钮和摘要框状态
+                    const summarizeBtn = document.getElementById('article-summarize-btn');
+                    const summaryBox = document.getElementById('article-ai-summary');
+                    if (summarizeBtn) {
+                        summarizeBtn.classList.remove('active', 'loading');
+                    }
+                    if (summaryBox) {
+                        summaryBox.style.display = 'none';
+                        const summaryContent = summaryBox.querySelector('.ai-content');
+                        if (summaryContent) summaryContent.innerHTML = '';
+                    }
+                    // --- 清除 AI 状态结束 ---
+
+                    const bodyEl = document.querySelector('.article-body');
+                    if (bodyEl) {
+                        bodyEl.innerHTML = result.content || result.summary || `<p>${i18n.t('feed.empty_content')}</p>`;
+                    }
+
+                    // 更新文章内容引用（供后续 AI 使用新全文）
+                    article.content = result.content || result.summary || '';
                     const stateArticle = AppState.articles?.find(a => a.id == article.id);
-                    if (stateArticle) stateArticle.content = result.content;
+                    if (stateArticle) stateArticle.content = article.content;
 
                     // 显示成功状态
                     btn.innerHTML = Icons.success;
 
                     setTimeout(() => {
                         btn.innerHTML = Icons.restore_original;
-                        btn.title = '恢复原文';
+                        btn.title = i18n.t('feed.restore_original');
                         btn.classList.add('active');
                         btn.classList.remove('loading');
+
+                        // 全文获取完成后，重新触发自动 AI 功能（如果已启用）
+                        this.autoSummarize(article);
+                        this.autoTranslate(article);
                     }, 1000);
                 } catch (err) {
                     console.error('Fetch content failed', err);

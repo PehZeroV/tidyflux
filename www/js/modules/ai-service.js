@@ -15,16 +15,16 @@ const DEFAULT_PROMPTS = {
 
 // 语言选项
 export const AI_LANGUAGES = [
-    { id: 'zh-CN', name: '简体中文', nameEn: 'Simplified Chinese' },
-    { id: 'zh-TW', name: '繁體中文', nameEn: 'Traditional Chinese' },
-    { id: 'en', name: 'English', nameEn: 'English' },
-    { id: 'ja', name: '日本語', nameEn: 'Japanese' },
-    { id: 'ko', name: '한국어', nameEn: 'Korean' },
-    { id: 'fr', name: 'Français', nameEn: 'French' },
-    { id: 'de', name: 'Deutsch', nameEn: 'German' },
-    { id: 'es', name: 'Español', nameEn: 'Spanish' },
-    { id: 'pt', name: 'Português', nameEn: 'Portuguese' },
-    { id: 'ru', name: 'Русский', nameEn: 'Russian' }
+    { id: 'zh-CN', name: '简体中文' },
+    { id: 'zh-TW', name: '繁體中文' },
+    { id: 'en', name: 'English' },
+    { id: 'ja', name: '日本語' },
+    { id: 'ko', name: '한국어' },
+    { id: 'fr', name: 'Français' },
+    { id: 'de', name: 'Deutsch' },
+    { id: 'es', name: 'Español' },
+    { id: 'pt', name: 'Português' },
+    { id: 'ru', name: 'Русский' }
 ];
 
 /**
@@ -517,7 +517,7 @@ export const AIService = {
     getLanguageName(langId) {
         const lang = AI_LANGUAGES.find(l => l.id === langId);
         if (!lang) return langId;
-        return i18n.locale === 'zh' ? lang.name : lang.nameEn;
+        return lang.name;
     },
 
     /**
