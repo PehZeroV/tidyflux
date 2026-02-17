@@ -63,19 +63,7 @@ export const DigestScheduler = {
                 const prefs = await PreferenceStore.get(userId);
                 const userTimezone = prefs.digest_timezone || '';
                 const currentTime = getCurrentTimeStr(userTimezone);
-                let schedules = [];
-
-                // 配置迁移与初始化
-                if (Array.isArray(prefs.digest_schedules)) {
-                    schedules = prefs.digest_schedules;
-                } else if (prefs.digest_schedule && typeof prefs.digest_schedule === 'object') {
-                    schedules = [{ id: 'default', ...prefs.digest_schedule }];
-                    // 使用 update() 确保原子性，避免覆盖并发的用户修改
-                    await PreferenceStore.update(userId, {
-                        digest_schedules: schedules,
-                        digest_schedule: undefined
-                    });
-                }
+                const schedules = Array.isArray(prefs.digest_schedules) ? prefs.digest_schedules : [];
 
                 if (schedules.length === 0) continue;
 

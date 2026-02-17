@@ -135,7 +135,9 @@ export function extractFirstImage(htmlContent) {
  */
 export function getThumbnailUrl(originalUrl) {
     if (!originalUrl || originalUrl.startsWith('data:')) return null;
-    // 直接返回原始 URL，由前端负责加载（减轻服务器压力）
+    // 过滤 SVG 图片（渲染性能差，且通常是图标/Logo 而非内容图片）
+    const lowerUrl = originalUrl.toLowerCase();
+    if (lowerUrl.endsWith('.svg') || lowerUrl.includes('.svg?')) return null;
     return originalUrl;
 }
 

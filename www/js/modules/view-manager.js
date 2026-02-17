@@ -23,7 +23,6 @@ import {
     formatDate,
     isIOSSafari,
     isMobileDevice,
-    extractFirstImage,
     getThumbnailUrl,
     showToast
 } from './view/utils.js';
@@ -598,7 +597,6 @@ export const ViewManager = {
     formatDate,
     isIOSSafari,
     isMobileDevice,
-    extractFirstImage,
     getThumbnailUrl,
     showToast,
 

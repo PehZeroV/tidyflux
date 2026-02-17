@@ -616,13 +616,13 @@ export class VirtualList {
     }
 
     hasImage(item) {
-        return item.thumbnail_url || (item.content && /<img/i.test(item.content));
+        return !!item.thumbnail_url;
     }
 
     _precalculateHasImage(items) {
         for (const item of items) {
             if (item._has_image === undefined) {
-                item._has_image = !!(item.thumbnail_url || (item.content && /<img/i.test(item.content)));
+                item._has_image = !!item.thumbnail_url;
             }
         }
     }

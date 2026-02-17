@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateToken, authenticateToken, clearMinifluxClientCache, getMinifluxClient } from '../middleware/auth.js';
+import { generateToken, authenticateToken, clearMinifluxClientCache } from '../middleware/auth.js';
 import { UserStore } from '../utils/user-store.js';
 import { MinifluxConfigStore } from '../utils/miniflux-config-store.js';
 import { MinifluxClient } from '../miniflux.js';
@@ -8,7 +8,6 @@ import dns from 'dns';
 import { promisify } from 'util';
 
 const AUTH_TYPE_API_KEY = 'api_key';
-const AUTH_TYPE_BASIC = 'basic';
 const ERR_CODE_ENOTFOUND = 'ENOTFOUND';
 
 const dnsLookup = promisify(dns.lookup);

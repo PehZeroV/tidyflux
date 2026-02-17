@@ -2,7 +2,7 @@ import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
 import { FeedManager } from '../feed-manager.js';
 import { VirtualList } from '../virtual-list.js';
-import { formatDate, isMobileDevice, extractFirstImage, getThumbnailUrl, showToast, escapeHtml } from './utils.js';
+import { formatDate, isMobileDevice, showToast, escapeHtml } from './utils.js';
 import { i18n } from '../i18n.js';
 import { AIService } from '../ai-service.js';
 
@@ -236,21 +236,11 @@ export const ArticlesView = {
             this.useVirtualScroll = true;
             this.initVirtualList();
 
-            // 预处理缩略图
+            // 预处理缩略图（直接使用服务端返回的 thumbnail_url）
             const showThumbnails = AppState.preferences?.show_thumbnails !== false;
-            articles.forEach(a => {
-                if (showThumbnails) {
-                    let img = a.thumbnail_url;
-                    if (!img) {
-                        img = extractFirstImage(a.content || a.summary || '');
-                    }
-                    if (img) {
-                        a.thumbnail_url = getThumbnailUrl(img);
-                    }
-                } else {
-                    a.thumbnail_url = null;
-                }
-            });
+            if (!showThumbnails) {
+                articles.forEach(a => { a.thumbnail_url = null; });
+            }
 
             this.virtualList.setItems(articles);
         } else {
@@ -342,18 +332,7 @@ export const ArticlesView = {
         const date = formatDate(article.published_at);
         const isFavorited = article.is_favorited;
         const showThumbnails = AppState.preferences?.show_thumbnails !== false;
-        let thumbnail = null;
-        if (showThumbnails) {
-            thumbnail = article.thumbnail_url || extractFirstImage(article.content || article.summary || '');
-            if (thumbnail) {
-                // 双重检查：确保不使用 SVG (即使是 API 返回的 thumbnail_url)
-                if (thumbnail.toLowerCase().includes('.svg')) {
-                    thumbnail = null;
-                } else {
-                    thumbnail = getThumbnailUrl(thumbnail);
-                }
-            }
-        }
+        const thumbnail = (showThumbnails && article.thumbnail_url) ? article.thumbnail_url : null;
 
         const hasImage = !!thumbnail;
         let thumbnailHtml = '';
@@ -429,18 +408,7 @@ export const ArticlesView = {
 
             const date = formatDate(article.published_at);
             const unreadClass = article.is_read ? '' : 'unread';
-            let thumbnail = null;
-            if (showThumbnails) {
-                thumbnail = article.thumbnail_url || extractFirstImage(article.content || article.summary || '');
-                if (thumbnail) {
-                    // 双重检查：确保不使用 SVG
-                    if (thumbnail.toLowerCase().includes('.svg')) {
-                        thumbnail = null;
-                    } else {
-                        thumbnail = getThumbnailUrl(thumbnail);
-                    }
-                }
-            }
+            const thumbnail = (showThumbnails && article.thumbnail_url) ? article.thumbnail_url : null;
 
             const hasImage = !!thumbnail;
             const isFavorited = article.is_favorited;
@@ -849,21 +817,11 @@ export const ArticlesView = {
             if (newArticles.length > 0) {
                 console.debug(`Found ${newArticles.length} new articles, prepending...`);
 
-                // 预处理缩略图
+                // 预处理缩略图（直接使用服务端返回的 thumbnail_url）
                 const showThumbnails = AppState.preferences?.show_thumbnails !== false;
-                newArticles.forEach(a => {
-                    if (showThumbnails) {
-                        let img = a.thumbnail_url;
-                        if (!img) {
-                            img = extractFirstImage(a.content || a.summary || '');
-                        }
-                        if (img) {
-                            a.thumbnail_url = getThumbnailUrl(img);
-                        }
-                    } else {
-                        a.thumbnail_url = null;
-                    }
-                });
+                if (!showThumbnails) {
+                    newArticles.forEach(a => { a.thumbnail_url = null; });
+                }
 
                 AppState.articles = [...newArticles, ...AppState.articles];
 
