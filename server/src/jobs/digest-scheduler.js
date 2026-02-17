@@ -70,9 +70,11 @@ export const DigestScheduler = {
                     schedules = prefs.digest_schedules;
                 } else if (prefs.digest_schedule && typeof prefs.digest_schedule === 'object') {
                     schedules = [{ id: 'default', ...prefs.digest_schedule }];
-                    prefs.digest_schedules = schedules;
-                    delete prefs.digest_schedule;
-                    await PreferenceStore.save(userId, prefs);
+                    // 使用 update() 确保原子性，避免覆盖并发的用户修改
+                    await PreferenceStore.update(userId, {
+                        digest_schedules: schedules,
+                        digest_schedule: undefined
+                    });
                 }
 
                 if (schedules.length === 0) continue;
@@ -87,16 +89,19 @@ export const DigestScheduler = {
 
                         if (!result.success) {
                             console.error(`Digest generation logic failed for user ${userId} [Task: ${task.scope}]:`, result.error);
-                            
+
                             // Check if we should disable the task (resource not found)
                             if (result.error === 'Feed not found' || result.error === 'Group not found') {
                                 console.warn(`Disabling invalid task for user ${userId}`);
                                 task.enabled = false;
-                                await PreferenceStore.save(userId, prefs);
+                                // 使用 update() 确保原子性，避免覆盖并发的用户修改
+                                await PreferenceStore.update(userId, {
+                                    digest_schedules: prefs.digest_schedules
+                                });
                             }
                             continue;
                         }
-                        
+
                         console.log(`Digest task completed for user ${userId} [Task ID: ${result.digest.id}]`);
 
                     } catch (err) {

@@ -86,3 +86,16 @@
     background: var(--border-color);
     margin: 6px 0;
 }
+
+/* Submenu styles */
+.context-menu-submenu-trigger {
+    position: relative;
+}
+
+.context-menu-submenu-trigger:hover {
+    background: var(--hover-bg);
+}
+
+.context-submenu {
+    min-width: 160px;
+}

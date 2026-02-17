@@ -203,6 +203,38 @@ export const TranslationDialogMixin = {
 
         let html = '';
 
+        // Compute "select all" state
+        const allFeedIds = feeds.map(f => f.id);
+        const allGroupIds = groups.filter(g => {
+            return feeds.some(f => f.group_id == g.id);
+        }).map(g => g.id);
+
+        let totalOn = 0;
+        let totalOff = 0;
+        // Check groups
+        for (const gid of allGroupIds) {
+            const go = getGroupOverride(gid);
+            if (go === 'on') totalOn++;
+            else totalOff++;
+        }
+        // Check ungrouped feeds
+        ungrouped.forEach(f => {
+            const fo = getFeedOverride(f.id);
+            if (fo === 'on') totalOn++;
+            else totalOff++;
+        });
+        const selectAllChecked = totalOn > 0 && totalOff === 0;
+        const selectAllIndeterminate = totalOn > 0 && totalOff > 0;
+
+        html += `
+        <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-color);">
+            <input type="checkbox" class="${prefix}-select-all-checkbox"
+                ${selectAllChecked ? 'checked' : ''}
+                data-indeterminate="${selectAllIndeterminate}"
+                style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+            <span style="font-size: 0.9em; font-weight: 600; color: var(--text-primary);">${i18n.t('common.select_all')}</span>
+        </div>`;
+
         for (const [groupId, group] of groupMap) {
             if (group.feeds.length === 0) continue;
 
@@ -295,6 +327,57 @@ export const TranslationDialogMixin = {
         container.querySelectorAll(`.${prefix}-group-checkbox[data-indeterminate="true"]`).forEach(cb => {
             cb.indeterminate = true;
         });
+        container.querySelectorAll(`.${prefix}-select-all-checkbox[data-indeterminate="true"]`).forEach(cb => {
+            cb.indeterminate = true;
+        });
+
+        // Helper: update select-all checkbox state based on all group/feed checkboxes
+        const updateSelectAllState = () => {
+            const selectAllCb = container.querySelector(`.${prefix}-select-all-checkbox`);
+            if (!selectAllCb) return;
+            const groupCbs = container.querySelectorAll(`.${prefix}-group-checkbox`);
+            const ungroupedFeedCbs = container.querySelectorAll(`.${prefix}-feed-checkbox:not([data-group-id])`);
+            let on = 0, off = 0;
+            groupCbs.forEach(cb => { if (cb.checked && !cb.indeterminate) on++; else off++; });
+            ungroupedFeedCbs.forEach(cb => { if (cb.checked) on++; else off++; });
+            // If any group is indeterminate, treat as mixed
+            const hasIndeterminate = Array.from(groupCbs).some(cb => cb.indeterminate);
+            selectAllCb.checked = on > 0 && off === 0 && !hasIndeterminate;
+            selectAllCb.indeterminate = (on > 0 && off > 0) || hasIndeterminate;
+        };
+
+        // Select all checkbox → toggle all groups and ungrouped feeds
+        const selectAllCb = container.querySelector(`.${prefix}-select-all-checkbox`);
+        if (selectAllCb) {
+            selectAllCb.addEventListener('change', async () => {
+                const value = selectAllCb.checked ? 'on' : 'off';
+                selectAllCb.indeterminate = false;
+
+                // Toggle all groups
+                const groupCbs = container.querySelectorAll(`.${prefix}-group-checkbox`);
+                for (const gcb of groupCbs) {
+                    const groupId = gcb.dataset.groupId;
+                    gcb.checked = selectAllCb.checked;
+                    gcb.indeterminate = false;
+                    await setGroupOverride(groupId, value);
+
+                    // Reset child feeds to inherit
+                    const group = gcb.closest(`.${prefix}-group`);
+                    const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
+                    for (const fcb of feedCbs) {
+                        await setFeedOverride(fcb.dataset.feedId, 'inherit');
+                        fcb.checked = selectAllCb.checked;
+                    }
+                }
+
+                // Toggle ungrouped feeds
+                const ungroupedFeedCbs = container.querySelectorAll(`.${prefix}-feed-checkbox:not([data-group-id])`);
+                for (const fcb of ungroupedFeedCbs) {
+                    fcb.checked = selectAllCb.checked;
+                    await setFeedOverride(fcb.dataset.feedId, value);
+                }
+            });
+        }
 
         // Expand / collapse groups
         container.querySelectorAll(`.${prefix}-group-header`).forEach(header => {
@@ -325,6 +408,8 @@ export const TranslationDialogMixin = {
                     await setFeedOverride(feedId, 'inherit');
                     feedCb.checked = cb.checked;
                 }
+
+                updateSelectAllState();
             });
         });
 
@@ -346,6 +431,8 @@ export const TranslationDialogMixin = {
                     groupCb.checked = allChecked;
                     groupCb.indeterminate = !allChecked && !noneChecked;
                 }
+
+                updateSelectAllState();
             });
         });
     },

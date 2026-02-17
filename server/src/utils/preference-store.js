@@ -99,7 +99,10 @@ export const PreferenceStore = {
                 }
             }
 
-            await fs.writeFile(filePath, JSON.stringify(prefsToSave, null, 2), 'utf8');
+            // 原子写入：先写临时文件，再 rename，防止并发读到截断的 JSON
+            const tmpPath = filePath + '.tmp';
+            await fs.writeFile(tmpPath, JSON.stringify(prefsToSave, null, 2), 'utf8');
+            await fs.rename(tmpPath, filePath);
             return true;
         } catch (error) {
             console.error(`Error saving preferences for ${userId}:`, error);

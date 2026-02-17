@@ -27,7 +27,8 @@ export default {
         view: 'View',
         go_to_settings: 'Go to Settings',
         retry: 'Retry',
-        dont_show_again: "Don't show again"
+        dont_show_again: "Don't show again",
+        select_all: 'Select All'
     },
     nav: {
         all: 'All Articles',

@@ -75,28 +75,67 @@ router.get('/', authenticateToken, async (req, res) => {
             params.after_entry_id = after_id;
         }
 
-        // Cursor for fetching older items (before) - used for "load more"
-        if (before_published_at) {
-            params.before = Math.floor(new Date(before_published_at).getTime() / 1000);
+        // Composite cursor pagination: Miniflux's before + before_entry_id are independent AND conditions,
+        // which skips same-second articles. We use before = time+1s and post-filter server-side.
+        const useCompositeCursor = !!(before_published_at && before_id);
+        let cursorTime, cursorId;
+
+        if (useCompositeCursor) {
+            cursorTime = new Date(before_published_at).getTime();
+            cursorId = parseInt(before_id);
+            params.before = Math.floor(cursorTime / 1000) + 1; // +1s: strict < becomes <=
+        } else {
+            if (before_published_at) {
+                params.before = Math.floor(new Date(before_published_at).getTime() / 1000);
+            }
+            if (before_id) {
+                params.before_entry_id = before_id;
+            }
         }
-        if (before_id) {
-            params.before_entry_id = before_id;
+
+        const parsedLimit = parseInt(limit);
+        let entries = [];
+        let totalFromMiniflux = 0;
+        let filteredOutCount = 0;
+
+        if (useCompositeCursor) {
+            // Fetch in rounds with increasing offsets to handle many same-second articles
+            let currentOffset = 0;
+            const MAX_ROUNDS = 5;
+            for (let round = 0; round < MAX_ROUNDS && entries.length < parsedLimit; round++) {
+                const batchParams = { ...params, offset: currentOffset, limit: parsedLimit };
+                const data = await req.miniflux.getEntries(batchParams);
+                totalFromMiniflux = data.total;
+                const batch = data.entries || [];
+
+                for (const entry of batch) {
+                    const entryTime = new Date(entry.published_at).getTime();
+                    if (entryTime < cursorTime || (entryTime === cursorTime && entry.id < cursorId)) {
+                        entries.push(entry);
+                    } else {
+                        filteredOutCount++;
+                    }
+                }
+
+                if (batch.length < parsedLimit) break;
+                currentOffset += parsedLimit;
+            }
+            entries = entries.slice(0, parsedLimit);
+        } else {
+            const entriesData = await req.miniflux.getEntries(params);
+            entries = entriesData.entries || [];
+            totalFromMiniflux = entriesData.total;
         }
 
-        const entriesData = await req.miniflux.getEntries(params);
-
-        // entriesData is { total: 123, entries: [...] }
-        const entries = entriesData.entries || [];
-
-        // Stabilize sort order: Miniflux might return indeterminate order for same-second timestamps.
-        // We enforce sorting by published_at DESC, then id DESC.
+        // Sort by published_at DESC, id DESC (stabilize same-second order)
         entries.sort((a, b) => {
             const timeA = new Date(a.published_at).getTime();
             const timeB = new Date(b.published_at).getTime();
             if (timeA !== timeB) return timeB - timeA;
             return b.id - a.id;
         });
-        const total = entriesData.total;
+
+        const total = totalFromMiniflux - filteredOutCount;
 
         const entryUrls = new Map();
         const articles = entries.map(entry => {

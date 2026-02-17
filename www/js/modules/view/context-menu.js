@@ -10,6 +10,7 @@ import { i18n } from '../i18n.js';
 import { Modal } from './components.js';
 import { Icons } from '../icons.js';
 import { Dialogs } from './dialogs.js';
+import { AIService } from '../ai-service.js';
 
 
 /**
@@ -172,6 +173,11 @@ export const ContextMenu = {
                 ${Icons.schedule}
                 ${i18n.t('ai.scheduled_digest')}
             </div>
+            <div class="context-menu-item context-menu-submenu-trigger" data-action="ai-automation">
+                ${Icons.summarize}
+                ${i18n.t('ai.ai_automation')}
+                <span style="margin-left: auto; font-size: 10px; opacity: 0.5;">▶</span>
+            </div>
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="mark-all-read">
                  ${Icons.check}
@@ -247,11 +253,141 @@ export const ContextMenu = {
         articlesMenuCloseHandler = closeHandler;
         setTimeout(() => document.addEventListener('click', closeHandler, true), 0);
 
+        // ===== AI Automation submenu =====
+        const aiTrigger = menu.querySelector('.context-menu-submenu-trigger[data-action="ai-automation"]');
+        if (aiTrigger) {
+            const buildSubmenuHtml = () => {
+                const feedId = AppState.currentFeedId;
+                const groupId = AppState.currentGroupId;
+
+                let titleOn = false;
+                let translateOn = false;
+                let summaryOn = false;
+
+                if (feedId) {
+                    titleOn = AIService.shouldTranslateFeed(feedId);
+                    translateOn = AIService.shouldAutoTranslate(feedId);
+                    summaryOn = AIService.shouldAutoSummarize(feedId);
+                } else if (groupId) {
+                    titleOn = AIService.getGroupTranslationOverride(groupId) === 'on';
+                    translateOn = AIService.getGroupAutoTranslateOverride(groupId) === 'on';
+                    summaryOn = AIService.getGroupSummaryOverride(groupId) === 'on';
+                } else {
+                    const groups = AppState.groups || [];
+                    const feeds = AppState.feeds || [];
+                    const ungrouped = feeds.filter(f => !f.group_id);
+                    const allGroupsOn = (arr, getter) => arr.length > 0 && arr.every(g => getter(g.id) === 'on');
+                    const allUngroupedOn = (arr, getter) => arr.every(f => getter(f.id) === 'on');
+                    const hasAny = groups.length > 0 || ungrouped.length > 0;
+                    titleOn = hasAny && allGroupsOn(groups, id => AIService.getGroupTranslationOverride(id)) && allUngroupedOn(ungrouped, id => AIService.getFeedTranslationOverride(id));
+                    translateOn = hasAny && allGroupsOn(groups, id => AIService.getGroupAutoTranslateOverride(id)) && allUngroupedOn(ungrouped, id => AIService.getFeedAutoTranslateOverride(id));
+                    summaryOn = hasAny && allGroupsOn(groups, id => AIService.getGroupSummaryOverride(id)) && allUngroupedOn(ungrouped, id => AIService.getFeedSummaryOverride(id));
+                }
+
+                return `
+                    <div class="context-menu-label" style="display: flex; align-items: center; gap: 6px;">
+                        ${Icons.summarize}
+                        ${i18n.t('ai.ai_automation')}
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item" data-ai-action="toggle-title-translate">
+                        ${titleOn ? Icons.checkbox_checked : Icons.checkbox_unchecked}
+                        ${i18n.t('ai.title_translation')}
+                    </div>
+                    <div class="context-menu-item" data-ai-action="toggle-auto-translate">
+                        ${translateOn ? Icons.checkbox_checked : Icons.checkbox_unchecked}
+                        ${i18n.t('ai.auto_translate_article')}
+                    </div>
+                    <div class="context-menu-item" data-ai-action="toggle-auto-summary">
+                        ${summaryOn ? Icons.checkbox_checked : Icons.checkbox_unchecked}
+                        ${i18n.t('ai.auto_summary')}
+                    </div>
+                `;
+            };
+
+            const openAISubmenu = (e) => {
+                e.stopPropagation();
+
+                // Capture main menu right edge and top position
+                const menuRect = menu.getBoundingClientRect();
+                const menuRight = menuRect.right;
+                const menuY = menuRect.top;
+
+                // Close main menu
+                menu.remove();
+                document.removeEventListener('click', closeHandler, true);
+                articlesMenuCloseHandler = null;
+
+                // Create submenu at the same position (right-aligned)
+                const submenu = document.createElement('div');
+                submenu.className = 'context-menu context-submenu';
+                submenu.innerHTML = buildSubmenuHtml();
+                document.body.appendChild(submenu);
+
+                // Right-align with the main menu's right edge
+                const subW = submenu.offsetWidth;
+                const subH = submenu.offsetHeight;
+                let x = menuRight - subW;
+                let y = menuY;
+
+                if (x < 10) x = 10;
+                if (y + subH > window.innerHeight - 10) {
+                    y = window.innerHeight - subH - 10;
+                }
+                if (y < 10) y = 10;
+
+                submenu.style.left = `${x}px`;
+                submenu.style.top = `${y}px`;
+
+                // Handle submenu item clicks
+                submenu.addEventListener('click', async (e) => {
+                    const subItem = e.target.closest('.context-menu-item');
+                    if (!subItem) return;
+                    e.stopPropagation();
+
+                    const aiAction = subItem.dataset.aiAction;
+                    if (!aiAction) return;
+
+                    const feedId = AppState.currentFeedId;
+                    const groupId = AppState.currentGroupId;
+
+                    if (aiAction === 'toggle-title-translate') {
+                        await this._toggleAIOverride('translation', feedId, groupId);
+                    } else if (aiAction === 'toggle-auto-translate') {
+                        await this._toggleAIOverride('translate', feedId, groupId);
+                    } else if (aiAction === 'toggle-auto-summary') {
+                        await this._toggleAIOverride('summary', feedId, groupId);
+                    }
+
+                    // Re-render to reflect new state
+                    submenu.innerHTML = buildSubmenuHtml();
+                });
+
+                // Click outside to close submenu
+                const subCloseHandler = (e) => {
+                    if (!submenu.contains(e.target)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        submenu.remove();
+                        document.removeEventListener('click', subCloseHandler, true);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', subCloseHandler, true), 0);
+            };
+
+            aiTrigger.addEventListener('click', openAISubmenu);
+        }
+
         menu.addEventListener('click', async (e) => {
             const item = e.target.closest('.context-menu-item');
             if (!item || item.classList.contains('disabled')) return;
 
             const action = item.dataset.action;
+
+            // Don't close menu for submenu trigger
+            if (action === 'ai-automation') return;
+
             menu.remove();
             document.removeEventListener('click', closeHandler, true);
             articlesMenuCloseHandler = null;
@@ -405,5 +541,80 @@ export const ContextMenu = {
                 }
             }
         });
+    },
+
+    /**
+     * Toggle AI automation override for a specific feed, group, or all feeds
+     * @param {'translation'|'translate'|'summary'} mode - AI feature mode
+     * @param {string|number|null} feedId - Current feed ID (if viewing a specific feed)
+     * @param {string|number|null} groupId - Current group ID (if viewing a group)
+     */
+    async _toggleAIOverride(mode, feedId, groupId) {
+        const overrideMap = {
+            translation: {
+                getFeed: (id) => AIService.getFeedTranslationOverride(id),
+                getGroup: (id) => AIService.getGroupTranslationOverride(id),
+                setFeed: (id, v) => AIService.setFeedTranslationOverride(id, v),
+                setGroup: (id, v) => AIService.setGroupTranslationOverride(id, v),
+                shouldFeed: (id) => AIService.shouldTranslateFeed(id),
+            },
+            translate: {
+                getFeed: (id) => AIService.getFeedAutoTranslateOverride(id),
+                getGroup: (id) => AIService.getGroupAutoTranslateOverride(id),
+                setFeed: (id, v) => AIService.setFeedAutoTranslateOverride(id, v),
+                setGroup: (id, v) => AIService.setGroupAutoTranslateOverride(id, v),
+                shouldFeed: (id) => AIService.shouldAutoTranslate(id),
+            },
+            summary: {
+                getFeed: (id) => AIService.getFeedSummaryOverride(id),
+                getGroup: (id) => AIService.getGroupSummaryOverride(id),
+                setFeed: (id, v) => AIService.setFeedSummaryOverride(id, v),
+                setGroup: (id, v) => AIService.setGroupSummaryOverride(id, v),
+                shouldFeed: (id) => AIService.shouldAutoSummarize(id),
+            },
+        };
+
+        const { getFeed, getGroup, setFeed, setGroup, shouldFeed } = overrideMap[mode];
+
+        if (feedId) {
+            // Toggle for specific feed
+            const currentlyOn = shouldFeed(feedId);
+            const newValue = currentlyOn ? 'off' : 'on';
+            await setFeed(feedId, newValue);
+        } else if (groupId) {
+            // Toggle for group
+            const currentlyOn = getGroup(groupId) === 'on';
+            const newValue = currentlyOn ? 'off' : 'on';
+            await setGroup(groupId, newValue);
+            // Reset all child feeds in this group to inherit
+            const feeds = (AppState.feeds || []).filter(f => f.group_id == groupId);
+            for (const f of feeds) {
+                await setFeed(f.id, 'inherit');
+            }
+        } else {
+            // Toggle for all: set all groups and ungrouped feeds
+            const groups = AppState.groups || [];
+            const feeds = AppState.feeds || [];
+            const ungrouped = feeds.filter(f => !f.group_id);
+
+            // Determine if currently "all on"
+            const allGroupsOn = groups.length > 0 && groups.every(g => getGroup(g.id) === 'on');
+            const allUngroupedOn = ungrouped.every(f => getFeed(f.id) === 'on');
+            const currentlyAllOn = (groups.length > 0 || ungrouped.length > 0) && allGroupsOn && allUngroupedOn;
+
+            const newValue = currentlyAllOn ? 'off' : 'on';
+
+            for (const g of groups) {
+                await setGroup(g.id, newValue);
+                // Reset all feeds in group to inherit
+                const groupFeeds = feeds.filter(f => f.group_id == g.id);
+                for (const f of groupFeeds) {
+                    await setFeed(f.id, 'inherit');
+                }
+            }
+            for (const f of ungrouped) {
+                await setFeed(f.id, newValue);
+            }
+        }
     }
 };

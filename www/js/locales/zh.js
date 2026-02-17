@@ -27,7 +27,8 @@ export default {
         view: '查看',
         go_to_settings: '前往设置',
         retry: '重试',
-        dont_show_again: '不再提示'
+        dont_show_again: '不再提示',
+        select_all: '全选'
     },
     nav: {
         all: '全部文章',

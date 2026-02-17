@@ -663,7 +663,7 @@ export const AIService = {
      * @param {string} targetLangId - 目标语言 ID
      * @returns {Promise<Map<string|number, string>>} id -> 翻译结果 Map
      */
-    async translateTitlesBatch(items, targetLangId) {
+    async translateTitlesBatch(items, targetLangId, signal = null) {
         const resultMap = new Map();
         if (!items || items.length === 0) return resultMap;
 
@@ -685,7 +685,7 @@ export const AIService = {
         const prompt = `Translate each of the following titles into ${targetLang}. Output ONLY the translated titles, one per line, in the same numbered format (e.g. "1. translated title"). Do not add any extra text:\n\n${titlesBlock}`;
 
         try {
-            const result = await this.callAPI(prompt);
+            const result = await this.callAPI(prompt, null, signal);
             const lines = result.trim().split('\n').filter(l => l.trim());
 
             for (let i = 0; i < needTranslate.length; i++) {

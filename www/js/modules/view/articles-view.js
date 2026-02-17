@@ -541,10 +541,7 @@ export const ArticlesView = {
 
             const batch = needTranslate.slice(i, i + BATCH_SIZE);
             try {
-                // 传入 signal 给 translateTitlesBatch (需要 ai-service 支持，或者仅仅在这里中断 loop)
-                // 目前 AI Service 的 callAPI 支持 signal，但 translateTitlesBatch 还没传。
-                // 即使 callAPI 不传 signal，我们在这里 break loop 也能停止后续的 batch。
-                const resultMap = await AIService.translateTitlesBatch(batch, targetLangId);
+                const resultMap = await AIService.translateTitlesBatch(batch, targetLangId, signal);
 
                 if (signal.aborted) break;
 
@@ -688,8 +685,11 @@ export const ArticlesView = {
             AppState.pagination.page = nextPage;
 
             this.appendArticlesList(newArticles);
-        } else if (result.articles.length > 0) {
-            console.warn('Received only duplicate articles in loadMore');
+        } else {
+            // Still update pagination to avoid infinite retries on the same page
+            if (result.articles.length > 0) {
+                console.warn('Received only duplicate articles in loadMore');
+            }
             AppState.pagination = result.pagination;
             AppState.pagination.page = nextPage;
         }
