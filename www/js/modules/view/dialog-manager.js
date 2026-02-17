@@ -511,7 +511,23 @@ export const ManagerDialogMixin = {
 
             listContainer.innerHTML = '';
 
-            Object.keys(grouped).forEach(key => {
+            // Sort: enabled tasks first (pinned), then by earliest time ascending
+            const sortedKeys = Object.keys(grouped).sort((a, b) => {
+                const tasksA = grouped[a];
+                const tasksB = grouped[b];
+                const enabledA = tasksA.some(t => t.enabled);
+                const enabledB = tasksB.some(t => t.enabled);
+
+                // Enabled tasks come first
+                if (enabledA !== enabledB) return enabledA ? -1 : 1;
+
+                // Within same enabled state, sort by earliest time
+                const minTimeA = tasksA.map(t => t.time).sort()[0] || '';
+                const minTimeB = tasksB.map(t => t.time).sort()[0] || '';
+                return minTimeA.localeCompare(minTimeB);
+            });
+
+            sortedKeys.forEach(key => {
                 const tasks = grouped[key];
                 const first = tasks[0];
                 const scopeName = getScopeName(first);

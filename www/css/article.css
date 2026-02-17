@@ -496,7 +496,7 @@
 }
 
 .article-preview-card {
-    background: var(--bg-color);
+    background: color-mix(in srgb, var(--bg-color), #fff 8%);
     border-radius: var(--radius);
     padding: 0;
     box-shadow: var(--card-shadow);
