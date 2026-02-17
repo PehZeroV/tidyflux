@@ -631,6 +631,13 @@ export const ManagerDialogMixin = {
 
                         const result = await response.json();
                         if (response.ok && result.success) {
+                            // Check if no articles were found
+                            if (result.digest && (result.digest.articleCount === 0 || !result.digest.id)) {
+                                const hours = first.hours || 24;
+                                const noArticlesMsg = result.digest.content || i18n.t('digest.no_articles', { hours });
+                                showToast(noArticlesMsg, 5000, false);
+                                return;
+                            }
                             let msg = i18n.t('digest.manager_success');
                             if (result.push) {
                                 if (result.push.attempted) {
