@@ -31,23 +31,22 @@
 
 - 🎨 Modern three-column layout, supporting dark mode
 - 📱 Support for mobile, tablet, and desktop
-- 🌐 Bilingual interface (Chinese/English)
 - 📥 Installable to desktop (PWA)
 - ⌨️ Keyboard Shortcuts: Rich built-in shortcuts with customizable key bindings
 - 💾 Save to Third-party Services: Save articles to Pocket, Instapaper, Wallabag, and other third-party services
 - 🎧 Built-in podcast player, supporting background playback and progress control
 - 🔄 Personalized settings and AI configuration cloud storage, automatic synchronization across multiple devices
 - 🤖 **AI Enhanced Features**:
-    - 🏷️ **Auto Title Translation**: Automatically translate feed titles to your target language, configurable per feed/category
-    - 📝 **Auto Summarization**: Automatically generate AI summaries when opening articles, configurable per feed/category
-    - 🌍 **Auto Full-Text Translation**: Automatically translate articles with bilingual side-by-side view, configurable per feed/category
-    - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
-    - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in IndexedDB — zero token cost on repeat visits
-    - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
+  - 🏷️ **Auto Title Translation in Article List**: Automatically translate feed list titles to your target language
+  - 🌍 **Auto Full-Text Translation**: Automatically translate articles with bilingual side-by-side view when opening articles
+  - 📝 **Auto Article Summarization**: Automatically generate AI summaries when opening articles
+  - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in IndexedDB — zero cost on repeat visits
+  - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
+  - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
 
 ### Supported Operations
 
-**feeds**: Add, Edit, Delete, Refresh, OPML Import/Export
+**Feeds**: Add, Edit, Delete, Refresh, OPML Import/Export
 
 **Articles**: Read, Search, Mark as Read/Unread, Star, Fetch Full Text, Save to Third-party Services
 
@@ -82,11 +81,11 @@ curl -O https://raw.githubusercontent.com/PehZeroV/tidyflux/main/docker-compose.
 ```yaml
 environment:
   - TZ=Asia/Shanghai
-  - MINIFLUX_URL=https://Your Miniflux URL
-  - MINIFLUX_API_KEY=Your Miniflux API Key  # Recommended
+  - MINIFLUX_URL=https://your-miniflux-url
+  - MINIFLUX_API_KEY=your_miniflux_api_key # Recommended
   # Or use username/password:
-  # - MINIFLUX_USERNAME=Miniflux Username
-  # - MINIFLUX_PASSWORD=Miniflux Password
+  # - MINIFLUX_USERNAME=Miniflux_Username
+  # - MINIFLUX_PASSWORD=Miniflux_Password
 ```
 
 3. Start service:
@@ -101,7 +100,7 @@ docker compose up -d
 - Address: `http://localhost:8812`
 - Username: `admin`
 - Password: `admin`
-- *Recommended to change password after login*
+- _Recommended to change password after login_
 
 ### II. Fresh Deployment (Includes Miniflux + Tidyflux)
 

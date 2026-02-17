@@ -444,6 +444,214 @@
     color: var(--accent-color) !important;
 }
 
+/* Digest Article Reference Links */
+.digest-article-ref {
+    display: inline;
+    color: var(--accent-color) !important;
+    text-decoration: none !important;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+    font-size: 0.85em;
+    vertical-align: baseline;
+    margin-left: 1px;
+}
+
+.digest-article-ref:hover {
+    opacity: 1;
+    text-decoration: none !important;
+    color: var(--accent-color) !important;
+}
+
+.digest-article-ref sup {
+    font-size: inherit;
+    vertical-align: baseline;
+    position: static;
+    line-height: inherit;
+}
+
+/* ========================================
+   Digest Article Preview Popup (Desktop)
+   Uses same overlay pattern as settings-dialog
+   ======================================== */
+.article-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+}
+
+.article-preview-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.article-preview-card {
+    background: var(--bg-color);
+    border-radius: var(--radius);
+    padding: 0;
+    box-shadow: var(--card-shadow);
+    width: 680px;
+    max-width: 90vw;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.article-preview-header {
+    padding: 0 0 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.article-preview-title {
+    font-size: 1.35em;
+    font-weight: 700;
+    color: var(--title-color);
+    line-height: 1.4;
+    margin: 0 0 10px;
+    font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif;
+}
+
+.article-preview-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.article-preview-title a:hover {
+    color: var(--accent-color);
+}
+
+.article-preview-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78em;
+    color: var(--meta-color);
+    flex-wrap: wrap;
+}
+
+.article-preview-meta img.favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+.article-preview-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+    font-size: 1.05em;
+    line-height: 1.8;
+    color: var(--text-color);
+    -webkit-overflow-scrolling: touch;
+}
+
+.article-preview-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    margin: 1em auto;
+}
+
+.article-preview-content a {
+    color: var(--accent-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.article-preview-footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.article-preview-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.88em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.article-preview-btn-secondary {
+    background: var(--card-bg);
+    color: var(--text-color);
+    box-shadow: var(--card-shadow);
+}
+
+.article-preview-btn-secondary:hover {
+    background: var(--hover-bg);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.article-preview-btn-primary {
+    background: var(--accent-color);
+    color: white;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-color), transparent 60%);
+}
+
+.article-preview-btn-primary:hover {
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color), transparent 40%);
+}
+
+.article-preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    color: var(--meta-color);
+    gap: 12px;
+}
+
+.article-preview-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.article-preview-error {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--meta-color);
+    font-size: 0.92em;
+}
+
 /* 响应式 - 手机端左右边距优化 */
 @media (max-width: 800px) {
     .article-content {

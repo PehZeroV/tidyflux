@@ -187,7 +187,8 @@ export const DigestStore = {
             articleCount: digestData.articleCount || 0,
             hours: digestData.hours || 12,
             generatedAt: digestData.generatedAt || now.toISOString(),
-            isRead: false
+            isRead: false,
+            articleRefs: digestData.articleRefs || null
         };
 
         dayDigests.unshift(digest);
@@ -269,7 +270,8 @@ export const DigestStore = {
                 url: null,
                 digest_scope: d.scope,
                 digest_scope_id: d.scopeId,
-                article_count: d.articleCount
+                article_count: d.articleCount,
+                articleRefs: d.articleRefs || null
             };
 
             if (shouldPin) {

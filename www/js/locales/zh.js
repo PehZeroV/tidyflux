@@ -381,6 +381,7 @@ export default {
         push_success: '已推送（{status} ✅）',
         push_failed: '推送失败 {status} ❌',
         push_not_configured: '未配置推送 ⚠️',
-        push_disabled: '未开启推送'
+        push_disabled: '未开启推送',
+        read_full: '阅读原文'
     }
 };

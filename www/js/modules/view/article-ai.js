@@ -83,7 +83,7 @@ export const ArticleAIMixin = {
                         return;
                     }
 
-                    if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar')) return;
+                    if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar') || node.classList.contains('preview-summary-box')) return;
 
                     if (blockTags.has(tag)) {
                         flushInlineBlock();
@@ -146,7 +146,7 @@ export const ArticleAIMixin = {
                 transEl.style.marginTop = '6px';
                 transEl.style.marginBottom = '20px';
                 transEl.style.padding = '8px 12px';
-                transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 96%)';
+                transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 94%)';
                 transEl.style.borderRadius = 'var(--radius)';
                 transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
 
@@ -272,7 +272,7 @@ export const ArticleAIMixin = {
                         const tag = node.tagName.toUpperCase();
                         if (['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'].includes(tag)) return;
                         if (['MATH', 'PRE', 'TABLE'].includes(tag)) { flushInlineBlock(); return; }
-                        if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar')) return;
+                        if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar') || node.classList.contains('preview-summary-box')) return;
                         if (blockTags.has(tag)) {
                             flushInlineBlock();
                             if (node.querySelector('math, pre, table')) return;
@@ -318,7 +318,7 @@ export const ArticleAIMixin = {
                     transEl.style.marginTop = '6px';
                     transEl.style.marginBottom = '20px';
                     transEl.style.padding = '8px 12px';
-                    transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 96%)';
+                    transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 94%)';
                     transEl.style.borderRadius = 'var(--radius)';
                     if (block.el.nodeType === Node.ELEMENT_NODE) {
                         block.el.insertAdjacentElement('afterend', transEl);

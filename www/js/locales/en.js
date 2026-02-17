@@ -381,6 +381,7 @@ export default {
         push_success: 'Pushed ({status} ✅)',
         push_failed: 'Push Failed {status} ❌',
         push_not_configured: 'Push Not Configured ⚠️',
-        push_disabled: 'Push Disabled'
+        push_disabled: 'Push Disabled',
+        read_full: 'Read Full Article'
     }
 };

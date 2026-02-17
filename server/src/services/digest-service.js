@@ -89,6 +89,7 @@ async function prepareArticlesForDigest(articles) {
             content = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
             return {
+                id: article.id,
                 index: i + batchIndex + 1,
                 title: article.title,
                 feedTitle: article.feed ? article.feed.title : '',
@@ -132,6 +133,7 @@ function buildDigestPrompt(articles, options = {}) {
 
     const articlesList = articles.map(a =>
         `### ${a.index}. ${a.title}\n` +
+        `- ID: ${a.id}\n` +
         `- Source: ${a.feedTitle}\n` +
         (a.categoryName ? `- Category: ${a.categoryName}\n` : '') +
         `- Date: ${a.publishedAt}\n` +
@@ -147,6 +149,10 @@ function buildDigestPrompt(articles, options = {}) {
         finalPrompt = customPrompt
             .replace(/\{\{targetLang\}\}/g, targetLang)
             .replace(/\{\{content\}\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`);
+        // 追加文章引用指令（如果用户 prompt 中没有提到 [ref:]）
+        if (!finalPrompt.includes('[ref:')) {
+            finalPrompt += `\n\nIMPORTANT: Each article has an ID field. When mentioning a specific article, add [ref:ARTICLE_ID] after the relevant text so readers can click to read the original. For example: "Some news happened [ref:12345]".`;
+        }
     } else {
         // 默认提示词
         finalPrompt = `You are a professional news editor. Please generate a concise digest based on the following list of recent ${scope} articles.
@@ -158,6 +164,7 @@ function buildDigestPrompt(articles, options = {}) {
 4. If multiple articles relate to the same topic, combine them
 5. Keep the format concise and compact, using Markdown
 6. Output the content directly, no opening remarks like "Here is the digest"
+7. When mentioning or referencing a specific article, use the format [ref:ARTICLE_ID] right after the relevant text (where ARTICLE_ID is the ID from the article list). This allows readers to click and jump to the original article. For example: "OpenAI released GPT-5 [ref:12345]". Each reference should use the exact article ID provided.
 
 ## Article List (Total ${articles.length} articles):
 
@@ -320,6 +327,12 @@ export const DigestService = {
         const digestWord = t('digest_word', lang);
         const title = `${scopeName} · ${digestWord} ${timeStr}`;
 
+        // 构建文章引用映射 (ID -> {title, feedTitle})
+        const articleRefs = {};
+        for (const a of preparedArticles) {
+            articleRefs[a.id] = { title: a.title, feedTitle: a.feedTitle };
+        }
+
         // 存储简报
         const saved = await DigestStore.add(userId, {
             scope,
@@ -328,7 +341,8 @@ export const DigestService = {
             title,
             content: digestContent,
             articleCount: preparedArticles.length,
-            hours
+            hours,
+            articleRefs
         });
 
         return {

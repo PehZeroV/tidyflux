@@ -13,6 +13,8 @@ import { FeedManager } from '../feed-manager.js';
 import { showToast } from './utils.js';
 import { i18n } from '../i18n.js';
 import { Icons } from '../icons.js';
+import { AIService } from '../ai-service.js';
+import { AICache } from '../ai-cache.js';
 
 import { ArticlesView } from './articles-view.js';
 import { GlobalPodcastPlayer } from '../components/podcast-player.js';
@@ -282,6 +284,223 @@ export const ArticleContentView = {
     },
 
     /**
+     * 处理简报中的文章引用标记 [ref:ID]
+     * 先替换为占位符，避免 parseMarkdown 转义 HTML
+     * @param {string} content - 简报内容
+     * @param {Object} articleRefs - 文章引用映射 {id: {title, feedTitle}}
+     * @returns {{content: string, placeholders: Object}} 处理后的内容和占位符映射
+     */
+    _processArticleRefs(content, articleRefs) {
+        if (!content) return { content, placeholders: {} };
+        const placeholders = {};
+        let idx = 0;
+        // 匹配 [ref:ID] 格式，ID 可以是数字
+        const processed = content.replace(/\[ref:(\d+)\]/g, (match, articleId) => {
+            const ref = articleRefs && articleRefs[articleId];
+            const title = ref ? ref.title : `#${articleId}`;
+            const tooltip = title.replace(/"/g, '&quot;');
+            const placeholder = `\x00ARTREF_${idx}\x00`;
+            placeholders[placeholder] = `<a href="#/article/${articleId}" class="digest-article-ref" data-article-id="${articleId}" title="${tooltip}"><sup>[↗]</sup></a>`;
+            idx++;
+            return placeholder;
+        });
+        return { content: processed, placeholders };
+    },
+
+    /**
+     * 在桌面端显示文章预览悬浮框
+     * @param {string} articleId - 文章 ID
+     * @param {Object} articleRefs - 文章引用映射
+     */
+    async _showArticlePreview(articleId, articleRefs) {
+        // 移除已存在的预览
+        const existing = document.querySelector('.article-preview-overlay');
+        if (existing) existing.remove();
+
+        const ref = articleRefs && articleRefs[articleId];
+        const previewTitle = ref ? ref.title : `Article #${articleId}`;
+
+        // 创建预览弹窗 — 初始只有 loading 状态
+        const overlay = document.createElement('div');
+        overlay.className = 'article-preview-overlay';
+        overlay.innerHTML = `
+            <div class="article-preview-card">
+                <div class="article-preview-scroll">
+                    <div class="article-preview-loading">
+                        <div class="article-preview-spinner"></div>
+                        <span>${i18n.t('common.loading') || 'Loading...'}</span>
+                    </div>
+                </div>
+                <div class="article-preview-footer">
+                    <button class="article-preview-btn article-preview-btn-secondary preview-close-btn">${i18n.t('common.close') || 'Close'}</button>
+                    <button class="article-preview-btn article-preview-btn-primary preview-goto-btn">${i18n.t('digest.read_full') || 'Read Full Article'} →</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // 动画展开 + 背景模糊
+        document.body.classList.add('dialog-open');
+        requestAnimationFrame(() => overlay.classList.add('active'));
+
+        // 用于取消 AI 请求
+        const previewAbortController = new AbortController();
+
+        // 关闭逻辑
+        const closePreview = () => {
+            previewAbortController.abort();
+            overlay.classList.remove('active');
+            document.body.classList.remove('dialog-open');
+            setTimeout(() => overlay.remove(), 300);
+        };
+
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreview(); });
+        overlay.querySelector('.preview-close-btn').addEventListener('click', closePreview);
+        overlay.querySelector('.preview-goto-btn').addEventListener('click', () => {
+            closePreview();
+            window.location.hash = `#/article/${articleId}`;
+        });
+        const escHandler = (e) => {
+            if (e.key === 'Escape') { closePreview(); document.removeEventListener('keydown', escHandler); }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        // 加载文章内容
+        try {
+            const article = await FeedManager.getArticle(articleId);
+            const scrollArea = overlay.querySelector('.article-preview-scroll');
+            if (!scrollArea || !document.body.contains(overlay)) return;
+
+            const locale = AppState.user.language || 'zh-CN';
+            const date = article.published_at
+                ? new Date(article.published_at).toLocaleString(locale)
+                : '';
+            const content = article.content || article.summary || '';
+            const feedName = article.feed?.title || ref?.feedTitle || '';
+            const titleText = article.title || previewTitle;
+            const titleHTML = article.url
+                ? `<a href="${article.url}" target="_blank" rel="noopener noreferrer">${titleText}</a>`
+                : titleText;
+
+            // 构建 meta HTML
+            let metaHTML = '';
+            const metaParts = [];
+            if (article.feed_id && feedName) {
+                metaParts.push(`<img src="/api/favicon?feedId=${article.feed_id}" class="favicon" alt=""><span>${feedName}</span>`);
+            } else if (feedName) {
+                metaParts.push(`<span>${feedName}</span>`);
+            }
+            if (date) {
+                metaParts.push(`<span>${date}</span>`);
+            }
+            metaHTML = metaParts.join('<span style="opacity:0.4;">·</span>');
+
+            // 一次性替换整个滚动区域内容
+            scrollArea.innerHTML = `
+                <div class="article-preview-header">
+                    <div class="article-preview-title">${titleHTML}</div>
+                    <div class="article-preview-meta">${metaHTML}</div>
+                </div>
+                <div class="article-preview-content">${content || `<div class="article-preview-error">${i18n.t('article.empty_content') || 'No content'}</div>`}</div>
+            `;
+
+            // === 自动摘要 ===
+            if (AIService.isConfigured() && article.feed_id && AIService.shouldAutoSummarize(article.feed_id)) {
+                this._previewAutoSummarize(overlay, article, previewAbortController.signal);
+            }
+
+            // === 自动翻译 ===
+            if (AIService.isConfigured() && article.feed_id && AIService.shouldAutoTranslate(article.feed_id)) {
+                this._previewAutoTranslate(overlay, article, previewAbortController.signal);
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('[ArticlePreview] Failed to load article:', err);
+            const scrollArea = overlay.querySelector('.article-preview-scroll');
+            if (scrollArea) {
+                scrollArea.innerHTML = `<div class="article-preview-error">${i18n.t('feed.fetch_articles_failed') || 'Failed to load article'}</div>`;
+            }
+        }
+    },
+
+    /**
+     * 预览弹窗内的自动摘要
+     */
+    async _previewAutoSummarize(overlay, article, signal) {
+        const contentEl = overlay.querySelector('.article-preview-content');
+        if (!contentEl) return;
+
+        const rawContent = AIService.extractText(article.content || '');
+        if (!rawContent || rawContent.trim().length < 50) return;
+
+        // 先检查缓存
+        try {
+            const cached = await AICache.getSummary(article.id);
+            if (cached) {
+                this._insertPreviewSummary(contentEl, this.parseMarkdown(cached));
+                return;
+            }
+        } catch { /* ignore */ }
+
+        // 插入加载中的摘要容器
+        const summaryEl = this._insertPreviewSummary(contentEl, `<span style="opacity:0.6;">${i18n.t('ai.summarizing')}</span>`);
+
+        try {
+            const aiConfig = AIService.getConfig();
+            const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+            let streamedText = '';
+
+            await AIService.summarize(rawContent, targetLang, (chunk) => {
+                streamedText += chunk;
+                const contentEl = summaryEl.querySelector('.preview-summary-content');
+                if (contentEl) contentEl.innerHTML = this.parseMarkdown(streamedText);
+            }, signal);
+
+            AICache.setSummary(article.id, streamedText).catch(() => { });
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('[PreviewSummary] Failed:', err);
+            const contentEl = summaryEl.querySelector('.preview-summary-content');
+            if (contentEl) contentEl.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${i18n.t('ai.api_error')}</span>`;
+        }
+    },
+
+    /**
+     * 在预览弹窗正文顶部插入摘要区块
+     */
+    _insertPreviewSummary(bodyEl, initialHTML) {
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'preview-summary-box';
+        summaryEl.style.cssText = 'margin-bottom: 16px; padding: 14px 16px; background: color-mix(in srgb, var(--accent-color), transparent 94%); border-radius: var(--radius); font-size: 0.92em; line-height: 1.7;';
+        summaryEl.innerHTML = `
+            <div style="font-weight: 600; font-size: 0.85em; color: var(--accent-color); margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">✦ ${i18n.t('ai.summary_title')}</div>
+            <div class="preview-summary-content">${initialHTML}</div>
+        `;
+        bodyEl.insertBefore(summaryEl, bodyEl.firstChild);
+        return summaryEl;
+    },
+
+    /**
+     * 预览弹窗内的自动翻译
+     */
+    async _previewAutoTranslate(overlay, article, signal) {
+        const contentEl = overlay.querySelector('.article-preview-content');
+        const titleEl = overlay.querySelector('.article-preview-title a') || overlay.querySelector('.article-preview-title');
+        if (!contentEl) return;
+
+        // 先检查缓存
+        const cacheRestored = await this._restoreTranslationFromCache(contentEl, titleEl, article.id);
+        if (cacheRestored) return;
+
+        try {
+            await this.translateBilingual(contentEl, titleEl, signal, article.id);
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('[PreviewTranslate] Failed:', err);
+        }
+    },
+
+    /**
      * 渲染简报内容
      * @param {Object} digest - 简报对象
      */
@@ -307,8 +526,16 @@ export const ArticleContentView = {
         // 渲染工具栏到 content-panel（与 panel-header 同级）
         this._renderToolbar(toolbarHTML);
 
+        // 处理文章引用标记 [ref:ID] -> 占位符（避免被 parseMarkdown 转义）
+        const { content: refProcessed, placeholders } = this._processArticleRefs(digest.content || '', digest.articleRefs);
+
         // 使用 Markdown 解析内容
-        const renderedContent = this.parseMarkdown(digest.content || '');
+        let renderedContent = this.parseMarkdown(refProcessed);
+
+        // 还原占位符为实际的 HTML 链接
+        for (const [placeholder, html] of Object.entries(placeholders)) {
+            renderedContent = renderedContent.replace(placeholder, html);
+        }
 
         DOMElements.articleContent.innerHTML = `
             <header class="article-header digest-header">
@@ -335,6 +562,19 @@ export const ArticleContentView = {
             </div>
 
         `;
+
+        // 绑定文章引用链接的点击事件
+        const refLinks = DOMElements.articleContent.querySelectorAll('.digest-article-ref');
+        refLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const articleId = link.dataset.articleId;
+                if (!articleId) return;
+
+                // 弹出悬浮预览框
+                this._showArticlePreview(articleId, digest.articleRefs);
+            });
+        });
 
         this.bindDigestToolbarEvents(digest);
         this.updateNavButtons(digest.id);
@@ -447,14 +687,12 @@ export const ArticleContentView = {
                     ${metaHTML}
                 </div>
             </header>
-            <div id="article-ai-summary" class="article-ai-summary" style="display: none; margin: 16px 0; padding: 16px; background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--card-shadow); border: none;">
-                <div class="ai-summary-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
-                    <strong class="ai-title" style="display: flex; align-items: center; gap: 8px;">
-                        <span class="ai-title-text">${i18n.t('ai.summary_title')}</span>
-                    </strong>
-                    <button class="ai-close-btn" style="background: none; border: none; cursor: pointer; color: var(--meta-color); font-size: 1.2em; padding: 4px;">✕</button>
+            <div id="article-ai-summary" class="article-ai-summary preview-summary-box" style="display: none; margin: 16px 0; padding: 14px 16px; background: color-mix(in srgb, var(--accent-color), transparent 94%); border-radius: var(--radius); border: none; box-shadow: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: 600; font-size: 0.85em; color: var(--accent-color); display: flex; align-items: center; gap: 4px;">✦ ${i18n.t('ai.summary_title')}</div>
+                    <button class="ai-close-btn" style="background: none; border: none; cursor: pointer; color: var(--meta-color); font-size: 1em; padding: 2px; opacity: 0.5;">✕</button>
                 </div>
-                <div class="ai-content markdown-body" style="line-height: 1.5; font-size: 0.9em;"></div>
+                <div class="ai-content preview-summary-content markdown-body" style="line-height: 1.7; font-size: 0.92em;"></div>
             </div>
             <div class="article-body" style="margin-top: 24px; line-height: 1.8;">
                 ${content}
