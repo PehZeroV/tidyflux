@@ -34,7 +34,7 @@ export const ScheduleDialogMixin = {
      * @param {Object} context - { feedId, groupId } 如果都为空则针对 'all'
      */
     showDigestScheduleDialog(context = {}) {
-        const { feedId, groupId } = context;
+        const { feedId, groupId, noPreselect } = context;
         let scope = 'all';
         let scopeId = null;
 
@@ -210,9 +210,11 @@ export const ScheduleDialogMixin = {
         const manageOthersBtn = dialog.querySelector('#manage-others-btn');
         const pushEnabledInput = dialog.querySelector('#schedule-push-enabled');
 
-        // Pre-check the initial scope checkbox
-        const initialCheckbox = scopeList.querySelector(`input[value="${initialScopeValue}"]`);
-        if (initialCheckbox) initialCheckbox.checked = true;
+        // Pre-check the initial scope checkbox (skip when adding from manager)
+        if (!noPreselect) {
+            const initialCheckbox = scopeList.querySelector(`input[value="${initialScopeValue}"]`);
+            if (initialCheckbox) initialCheckbox.checked = true;
+        }
 
         // Scope parser helper
         const parseScope = (val) => {
@@ -352,7 +354,7 @@ export const ScheduleDialogMixin = {
                 isTwiceDaily = existingTasks.length > 1;
                 const firstTask = existingTasks[0];
                 initialTime = firstTask ? firstTask.time : '08:00';
-                const isEnabled = existingTasks.length > 0 && existingTasks.some(t => t.enabled);
+                const isEnabled = existingTasks.length === 0 || existingTasks.some(t => t.enabled);
                 const isUnreadOnly = firstTask ? (firstTask.unreadOnly !== false) : true;
 
                 enabledInput.checked = isEnabled;

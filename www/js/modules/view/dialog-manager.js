@@ -733,7 +733,7 @@ export const ManagerDialogMixin = {
         // Add button → go to schedule dialog
         addBtn.addEventListener('click', () => {
             close();
-            this.showDigestScheduleDialog({});
+            this.showDigestScheduleDialog({ noPreselect: true });
         });
 
         loadTasks();

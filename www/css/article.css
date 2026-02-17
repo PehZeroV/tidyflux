@@ -35,7 +35,7 @@
     text-align: left;
     font-size: 1.6em;
     line-height: 1.4;
-    margin: 0 0 16px 0;
+    margin: 0 0 4px 0;
     font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', 'FangSong', Georgia, serif;
     font-weight: 700;
     color: var(--title-color);
@@ -442,6 +442,27 @@
 
 .article-title-link:hover {
     color: var(--accent-color) !important;
+}
+
+/* Article Feed Source (above title) */
+.article-feed-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75em;
+    color: var(--meta-color) !important;
+    text-decoration: none !important;
+    margin-bottom: 10px;
+    transition: color 0.2s ease;
+    line-height: 1;
+}
+
+.article-feed-source:hover {
+    color: var(--accent-color) !important;
+}
+
+.article-feed-source span {
+    font-weight: 500;
 }
 
 /* Digest Article Reference Links */

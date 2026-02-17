@@ -643,10 +643,22 @@ export const ArticleContentView = {
 
         // document.title = article.title || 'Tidyflux';
 
-        const locale = AppState.user.language || 'zh-CN';
-        const date = article.published_at
-            ? new Date(article.published_at).toLocaleString(locale)
-            : '';
+        // 格式化日期（根据语言）
+        let dateStr = '';
+        if (article.published_at) {
+            const d = new Date(article.published_at);
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            if (i18n.locale === 'zh') {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                dateStr = `${y}年${m}月${day}日 ${h}:${min}`;
+            } else {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                dateStr = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${h}:${min}`;
+            }
+        }
         const content = article.content || article.summary || `<p>${i18n.t('feed.empty_content')}</p>`;
 
         // Detect audio enclosure
@@ -655,20 +667,27 @@ export const ArticleContentView = {
             audioEnclosure = article.enclosures.find(e => e.mime_type && e.mime_type.startsWith('audio/'));
         }
 
-        // 构建 feed icon 或 feed 名称
-        let feedInfo = '';
+        // 构建标题上方的订阅源信息（icon + 名称，可点击进入订阅源）
+        let feedSourceHTML = '';
         if (article.feed_id) {
-            feedInfo = `<img src="/api/favicon?feedId=${article.feed_id}" class="favicon" loading="lazy" decoding="async" alt="${article.feed_title || ''}" title="${article.feed_title || ''}" style="width: 14px; height: 14px; border-radius: 4px; margin: 0; display: block;">`;
-        }
-        if (!feedInfo && article.feed_title) {
-            feedInfo = `<span style="font-weight: 500;">${article.feed_title}</span>`;
+            const feedTitle = article.feed_title || '';
+            feedSourceHTML = `
+                <a href="#/feed/${article.feed_id}" class="article-feed-source" title="${feedTitle}">
+                    <img src="/api/favicon?feedId=${article.feed_id}" class="favicon" loading="lazy" decoding="async" alt="${feedTitle}" style="width: 14px; height: 14px; border-radius: 3px; margin: 0; display: block;">
+                    <span>${feedTitle}</span>
+                </a>
+            `;
+        } else if (article.feed_title) {
+            feedSourceHTML = `
+                <span class="article-feed-source" style="cursor: default;">
+                    <span>${article.feed_title}</span>
+                </span>
+            `;
         }
 
-        // 构建 meta 信息行
+        // 构建标题下方的日期 + 播客按钮
         const metaParts = [];
-        if (feedInfo) metaParts.push(feedInfo);
-        if (date) metaParts.push(`<span>${date}</span>`);
-        // 添加播客播放按钮到 meta 行
+        if (dateStr) metaParts.push(`<span>${dateStr}</span>`);
         if (audioEnclosure) {
             metaParts.push(`<button class="podcast-play-wrapper" id="podcast-play-btn" data-url="${audioEnclosure.url}" data-title="${article.title || ''}" data-cover="${article.thumbnail_url || ''}">
                 <span class="podcast-play-icon">${Icons.play_circle}</span>
@@ -723,11 +742,12 @@ export const ArticleContentView = {
 
         DOMElements.articleContent.innerHTML = `
             <header class="article-header">
+                ${feedSourceHTML}
                 ${titleHTML}
                 <div class="article-header-info" style="
-                    color: var(--text-secondary); 
-                    font-size: 14px; 
-                    margin-top: 16px; 
+                    color: var(--meta-color); 
+                    font-size: 12px; 
+                    margin-top: 0; 
                     display: flex; 
                     align-items: center; 
                     justify-content: flex-start;

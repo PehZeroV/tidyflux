@@ -133,7 +133,7 @@ export const ArticleAIMixin = {
                 transEl.style.textTransform = computedStyle.textTransform;
 
                 transEl.style.marginTop = '8px';
-                transEl.style.marginBottom = '24px';
+                transEl.style.marginBottom = '4px';
 
                 transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.6em; font-weight: normal;">... ${i18n.t('ai.translating')} ...</span>`;
 
@@ -308,7 +308,7 @@ export const ArticleAIMixin = {
                     transEl.style.letterSpacing = computedStyle.letterSpacing;
                     transEl.style.textTransform = computedStyle.textTransform;
                     transEl.style.marginTop = '8px';
-                    transEl.style.marginBottom = '24px';
+                    transEl.style.marginBottom = '4px';
                     const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
                     parent.insertAdjacentElement('afterend', transEl);
                 } else {
