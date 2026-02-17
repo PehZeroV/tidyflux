@@ -45,6 +45,16 @@ export const ArticleContentView = {
                     e.target.onerror = null;
                 }
             }, true); // Capture phase
+
+            // 点击图片弹出大图 lightbox（委托监听）
+            DOMElements.articleContent.addEventListener('click', (e) => {
+                const img = e.target.closest('img');
+                if (img && !img.classList.contains('favicon')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this._openImageLightbox(img.src);
+                }
+            });
         }
     },
 
@@ -67,6 +77,46 @@ export const ArticleContentView = {
             const existing = DOMElements.contentPanel.querySelector('.article-toolbar');
             if (existing) existing.remove();
         }
+    },
+
+    /**
+     * 打开图片大图 lightbox
+     * @param {string} src - 图片 URL
+     */
+    _openImageLightbox(src) {
+        // 移除已有的 lightbox
+        const existing = document.querySelector('.image-lightbox-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'image-lightbox-overlay';
+        overlay.innerHTML = `
+            <button class="image-lightbox-close" aria-label="Close">✕</button>
+            <img src="${src}" alt="" />
+        `;
+        document.body.appendChild(overlay);
+
+        // 动画展开
+        requestAnimationFrame(() => overlay.classList.add('active'));
+
+        const closeLightbox = () => {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 250);
+            document.removeEventListener('keydown', escHandler);
+        };
+
+        // 点击遮罩或关闭按钮关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay || e.target.closest('.image-lightbox-close')) {
+                closeLightbox();
+            }
+        });
+
+        // ESC 关闭
+        const escHandler = (e) => {
+            if (e.key === 'Escape') closeLightbox();
+        };
+        document.addEventListener('keydown', escHandler);
     },
 
     /**

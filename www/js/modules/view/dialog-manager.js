@@ -623,6 +623,16 @@ export const ManagerDialogMixin = {
                     const btn = e.currentTarget;
                     if (btn.disabled) return;
 
+                    // Check AI configuration before running
+                    if (!AIService.isConfigured()) {
+                        await Modal.alertWithSettings(
+                            i18n.t('digest.ai_not_configured'),
+                            i18n.t('common.go_to_settings'),
+                            () => this.showSettingsDialog(false)
+                        );
+                        return;
+                    }
+
                     // Find index of the first task in this group within allSchedules
                     // We trigger the first one as representative (layout/hours usually same)
                     const taskIndex = allSchedules.indexOf(tasks[0]);

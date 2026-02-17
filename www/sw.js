@@ -16,7 +16,6 @@ const URLS_TO_CACHE = [
   '/js/main.js',
   '/js/state.js',
   '/js/dom.js',
-  '/js/modules/utils.js',
   '/js/modules/view-manager.js',
   '/js/modules/router.js',
   '/js/modules/events.js',

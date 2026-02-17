@@ -1,7 +1,6 @@
 import { getMinifluxClient } from '../middleware/auth.js';
 import { DigestService } from './digest-service.js';
 import { sendPushNotification } from './push-service.js';
-import { PreferenceStore } from '../utils/preference-store.js';
 
 export const DigestRunner = {
     /**

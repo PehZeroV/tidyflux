@@ -385,6 +385,7 @@ export default {
         push_failed: 'Push Failed {status} ❌',
         push_not_configured: 'Push Not Configured ⚠️',
         push_disabled: 'Push Disabled',
-        read_full: 'Read Full Article'
+        read_full: 'Read Full Article',
+        ai_not_configured: 'AI service not configured, please configure in settings'
     }
 };

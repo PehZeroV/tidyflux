@@ -210,11 +210,9 @@ export const ScheduleDialogMixin = {
         const manageOthersBtn = dialog.querySelector('#manage-others-btn');
         const pushEnabledInput = dialog.querySelector('#schedule-push-enabled');
 
-        // Pre-check the initial scope only if opened from a specific context
-        if (feedId || groupId) {
-            const initialCheckbox = scopeList.querySelector(`input[value="${initialScopeValue}"]`);
-            if (initialCheckbox) initialCheckbox.checked = true;
-        }
+        // Pre-check the initial scope checkbox
+        const initialCheckbox = scopeList.querySelector(`input[value="${initialScopeValue}"]`);
+        if (initialCheckbox) initialCheckbox.checked = true;
 
         // Scope parser helper
         const parseScope = (val) => {

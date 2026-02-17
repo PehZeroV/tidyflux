@@ -10,7 +10,6 @@
 import { AIService } from '../ai-service.js';
 import { AICache } from '../ai-cache.js';
 import { Modal } from './components.js';
-import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
 import { showToast } from './utils.js';
 import { Dialogs } from './dialogs.js';

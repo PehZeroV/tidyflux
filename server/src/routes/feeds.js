@@ -1,6 +1,5 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
-import { sanitizeHtml } from '../utils.js';
 import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();

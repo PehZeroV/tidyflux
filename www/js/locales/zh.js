@@ -385,6 +385,7 @@ export default {
         push_failed: '推送失败 {status} ❌',
         push_not_configured: '未配置推送 ⚠️',
         push_disabled: '未开启推送',
-        read_full: '阅读原文'
+        read_full: '阅读原文',
+        ai_not_configured: 'AI 服务未配置，请先在设置中配置'
     }
 };
