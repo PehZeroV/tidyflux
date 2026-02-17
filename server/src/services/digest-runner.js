@@ -86,10 +86,11 @@ export const DigestRunner = {
                 if (pushConfig?.url) {
                     pushResult.attempted = true;
                     try {
+                        const pushContent = (result.digest.content || '').replace(/\[ref:\d+\]/g, '');
                         const pushResp = await sendPushNotification(
                             pushConfig,
                             result.digest.title || '',
-                            result.digest.content || '',
+                            pushContent,
                             userId
                         );
                         pushResult.success = true;
