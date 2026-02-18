@@ -178,6 +178,13 @@ export default {
         thumbnails_off: 'Thumbnails disabled',
         refresh_feed: 'Refresh',
         refresh_miniflux: 'Refresh Miniflux Feeds',
+        page_width: 'Page Width',
+        page_width_narrow: 'Narrow',
+        page_width_standard: 'Standard',
+        page_width_wide: 'Wide',
+        font_size: 'Font Size',
+        font_size_small: 'Small',
+        font_size_large: 'Large',
     },
     auth: {
         title: 'Tidyflux',

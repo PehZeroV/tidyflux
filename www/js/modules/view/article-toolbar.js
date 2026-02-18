@@ -365,10 +365,36 @@ export const ArticleToolbarMixin = {
                 menu.className = 'context-menu';
                 menu.style.maxWidth = 'calc(100vw - 20px)';
                 menu.style.minWidth = '200px';
+
+                const currentWidth = AppState.preferences?.article_width || 360;
+                const currentFontSize = AppState.preferences?.article_font_size || 1.1;
+
                 menu.innerHTML = `
-                    <div class="context-menu-label">${i18n.t('article.save_to_third_party')}</div>
-                    <div class="article-more-menu-content">
-                        <div class="context-menu-item" style="opacity: 0.5; cursor: default; font-size: 0.85em;">${i18n.t('common.loading')}</div>
+                    <div class="context-menu-item" data-action="save-third-party">
+                        ${Icons.save_alt}
+                        <span>${i18n.t('article.save_to_third_party')}</span>
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-label" style="padding-bottom: 0;">${i18n.t('context.font_size')}</div>
+                    <div style="padding: 0 16px 10px;">
+                        <input type="range" class="context-menu-slider font-size-slider" min="0.9" max="1.5" step="0.05" value="${currentFontSize}">
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); margin-top: 2px; user-select: none;">
+                            <span>${i18n.t('context.font_size_small')}</span>
+                            <span class="font-size-value" style="cursor: pointer;">${currentFontSize}em</span>
+                            <span>${i18n.t('context.font_size_large')}</span>
+                        </div>
+                    </div>
+                    <div class="page-width-section">
+                        <div class="context-menu-divider"></div>
+                        <div class="context-menu-label" style="padding-bottom: 0;">${i18n.t('context.page_width')}</div>
+                        <div style="padding: 0 16px 10px;">
+                            <input type="range" class="context-menu-slider width-slider" min="300" max="600" step="10" value="${currentWidth}">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); margin-top: 2px; user-select: none;">
+                                <span>${i18n.t('context.page_width_narrow')}</span>
+                                <span class="page-width-value" style="cursor: pointer;">${currentWidth * 2}</span>
+                                <span>${i18n.t('context.page_width_wide')}</span>
+                            </div>
+                        </div>
                     </div>
                 `;
                 document.body.appendChild(menu);
@@ -386,6 +412,143 @@ export const ArticleToolbarMixin = {
                 };
                 positionMenu();
 
+                // Page width slider events
+                const widthSlider = menu.querySelector('.width-slider');
+                if (widthSlider) {
+                    const articleContent = document.getElementById('article-content');
+
+                    const widthValueLabel = menu.querySelector('.page-width-value');
+
+                    // Live update as user drags
+                    widthSlider.addEventListener('input', (e) => {
+                        e.stopPropagation();
+                        const val = e.target.value;
+                        if (articleContent) {
+                            articleContent.style.setProperty('--article-half-width', val + 'px');
+                        }
+                        if (widthValueLabel) {
+                            widthValueLabel.textContent = val * 2;
+                        }
+                    });
+
+                    // Save on release
+                    widthSlider.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        const val = parseInt(e.target.value, 10);
+                        AppState.preferences = AppState.preferences || {};
+                        AppState.preferences.article_width = val;
+                        FeedManager.setPreference('article_width', val).catch(err => {
+                            console.error('Save pref error:', err);
+                        });
+                    });
+
+                    // Prevent slider interaction from closing the menu
+                    widthSlider.addEventListener('mousedown', (e) => e.stopPropagation());
+                    widthSlider.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+                    // Double-click to reset to default (360px = 720px content width)
+                    widthSlider.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        const defaultVal = 360;
+                        widthSlider.value = defaultVal;
+                        if (articleContent) {
+                            articleContent.style.setProperty('--article-half-width', defaultVal + 'px');
+                        }
+                        if (widthValueLabel) {
+                            widthValueLabel.textContent = defaultVal * 2;
+                        }
+                        AppState.preferences = AppState.preferences || {};
+                        AppState.preferences.article_width = defaultVal;
+                        FeedManager.setPreference('article_width', defaultVal).catch(err => {
+                            console.error('Save pref error:', err);
+                        });
+                    });
+
+                    // Click value label to reset
+                    if (widthValueLabel) {
+                        widthValueLabel.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const defaultVal = 360;
+                            widthSlider.value = defaultVal;
+                            if (articleContent) {
+                                articleContent.style.setProperty('--article-half-width', defaultVal + 'px');
+                            }
+                            widthValueLabel.textContent = defaultVal * 2;
+                            AppState.preferences = AppState.preferences || {};
+                            AppState.preferences.article_width = defaultVal;
+                            FeedManager.setPreference('article_width', defaultVal).catch(err => {
+                                console.error('Save pref error:', err);
+                            });
+                        });
+                    }
+                }
+
+                // Font size slider events
+                const fontSlider = menu.querySelector('.font-size-slider');
+                if (fontSlider) {
+                    const articleContent = document.getElementById('article-content');
+                    const fontValueLabel = menu.querySelector('.font-size-value');
+
+                    fontSlider.addEventListener('input', (e) => {
+                        e.stopPropagation();
+                        const val = e.target.value;
+                        if (articleContent) {
+                            articleContent.style.setProperty('--article-font-size', val + 'em');
+                        }
+                        if (fontValueLabel) {
+                            fontValueLabel.textContent = val + 'em';
+                        }
+                    });
+
+                    fontSlider.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        const val = parseFloat(e.target.value);
+                        AppState.preferences = AppState.preferences || {};
+                        AppState.preferences.article_font_size = val;
+                        FeedManager.setPreference('article_font_size', val).catch(err => {
+                            console.error('Save pref error:', err);
+                        });
+                    });
+
+                    fontSlider.addEventListener('mousedown', (e) => e.stopPropagation());
+                    fontSlider.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+                    fontSlider.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        const defaultVal = 1.1;
+                        fontSlider.value = defaultVal;
+                        if (articleContent) {
+                            articleContent.style.setProperty('--article-font-size', defaultVal + 'em');
+                        }
+                        if (fontValueLabel) {
+                            fontValueLabel.textContent = defaultVal + 'em';
+                        }
+                        AppState.preferences = AppState.preferences || {};
+                        AppState.preferences.article_font_size = defaultVal;
+                        FeedManager.setPreference('article_font_size', defaultVal).catch(err => {
+                            console.error('Save pref error:', err);
+                        });
+                    });
+
+                    // Click value label to reset
+                    if (fontValueLabel) {
+                        fontValueLabel.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const defaultVal = 1.1;
+                            fontSlider.value = defaultVal;
+                            if (articleContent) {
+                                articleContent.style.setProperty('--article-font-size', defaultVal + 'em');
+                            }
+                            fontValueLabel.textContent = defaultVal + 'em';
+                            AppState.preferences = AppState.preferences || {};
+                            AppState.preferences.article_font_size = defaultVal;
+                            FeedManager.setPreference('article_font_size', defaultVal).catch(err => {
+                                console.error('Save pref error:', err);
+                            });
+                        });
+                    }
+                }
+
                 // Click-outside to close (capture phase, same as other context menus)
                 const closeHandler = (ce) => {
                     if (!menu.contains(ce.target) && ce.target !== moreBtn && !moreBtn.contains(ce.target)) {
@@ -398,36 +561,7 @@ export const ArticleToolbarMixin = {
                 activeCloseHandler = closeHandler;
                 setTimeout(() => document.addEventListener('click', closeHandler, true), 0);
 
-                // Always fetch integration status (FeedManager has 5-min cache)
-                const moreMenuContent = menu.querySelector('.article-more-menu-content');
-                try {
-                    const status = await FeedManager.getIntegrationsStatus();
-                    if (status.has_integrations) {
-                        moreMenuContent.innerHTML = `
-                            <div class="context-menu-item" data-action="save-third-party">
-                                ${Icons.save_alt}
-                                <span>${i18n.t('article.save_to_third_party')}</span>
-                            </div>
-                        `;
-                    } else {
-                        moreMenuContent.innerHTML = `
-                            <div class="context-menu-item" style="cursor: default; opacity: 0.7; font-size: 0.85em; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-weight: 500;">${i18n.t('article.no_integrations')}</div>
-                                <div style="opacity: 0.7; font-size: 0.9em; white-space: normal; line-height: 1.4;">${i18n.t('article.no_integrations_hint')}</div>
-                            </div>
-                        `;
-                    }
-                } catch (err) {
-                    moreMenuContent.innerHTML = `
-                        <div class="context-menu-item" style="color: #ff4444; cursor: default;">
-                            ${i18n.t('article.integrations_check_failed')}
-                        </div>
-                    `;
-                }
-                // Reposition after content loaded
-                positionMenu();
-
-                // Bind save action
+                // Bind save action — check integrations on click
                 menu.addEventListener('click', async (ce) => {
                     const item = ce.target.closest('[data-action="save-third-party"]');
                     if (!item) return;
@@ -435,9 +569,33 @@ export const ArticleToolbarMixin = {
 
                     const label = item.querySelector('span');
                     const originalText = label.textContent;
-                    label.textContent = i18n.t('article.saving');
+
+                    // Check integration status first
+                    label.textContent = i18n.t('common.loading');
                     item.style.opacity = '0.6';
                     item.style.pointerEvents = 'none';
+
+                    try {
+                        const status = await FeedManager.getIntegrationsStatus();
+                        if (!status.has_integrations) {
+                            label.textContent = originalText;
+                            item.style.opacity = '';
+                            item.style.pointerEvents = '';
+                            closeMenu();
+                            await Modal.alert(i18n.t('article.no_integrations_hint'), i18n.t('article.no_integrations'));
+                            return;
+                        }
+                    } catch (err) {
+                        label.textContent = originalText;
+                        item.style.opacity = '';
+                        item.style.pointerEvents = '';
+                        closeMenu();
+                        await Modal.alert(i18n.t('article.integrations_check_failed'));
+                        return;
+                    }
+
+                    // Has integrations, proceed to save
+                    label.textContent = i18n.t('article.saving');
 
                     try {
                         await FeedManager.saveToThirdParty(article.id);

@@ -97,6 +97,22 @@ export const FeedsView = {
             AIService._loadSummaryOverrides();
             AIService._loadAutoTranslateOverrides();
 
+            // 应用文章页面宽度设置
+            if (AppState.preferences.article_width) {
+                const articleContent = document.getElementById('article-content');
+                if (articleContent) {
+                    articleContent.style.setProperty('--article-half-width', AppState.preferences.article_width + 'px');
+                }
+            }
+
+            // 应用文章字体大小设置
+            if (AppState.preferences.article_font_size) {
+                const articleContent = document.getElementById('article-content');
+                if (articleContent) {
+                    articleContent.style.setProperty('--article-font-size', AppState.preferences.article_font_size + 'em');
+                }
+            }
+
             return { feeds, groups, digestsData, todayUnread };
         } catch (err) {
             console.error('Load feeds error:', err);

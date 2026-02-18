@@ -68,18 +68,10 @@
 }
 
 .all-unread-count {
-    background: var(--bg-color);
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-weight: 600;
     margin-left: auto;
 }
 
 .digests-unread-count {
-    background: var(--bg-color);
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-weight: 600;
     margin-left: auto;
 }
 

@@ -5,8 +5,8 @@
     /* Layout properties migrated from layout.css */
     flex: 1;
     overflow-y: auto;
-    /* Dynamic padding: centers content at 720px wide, scrollbar stays at rightmost edge */
-    padding: 54px max(40px, calc(50% - 360px)) 80px;
+    /* Dynamic padding: centers content, width controlled by --article-half-width (default 360px = 720px content) */
+    padding: 54px max(40px, calc(50% - var(--article-half-width, 360px))) 80px;
     width: 100%;
     box-sizing: border-box;
     touch-action: pan-y;
@@ -14,7 +14,7 @@
     -webkit-overflow-scrolling: touch;
 
     /* Typography & Visuals */
-    font-size: 1.1em;
+    font-size: var(--article-font-size, 1.1em);
     line-height: 1.8;
     color: var(--text-color);
     text-align: left;
@@ -1343,4 +1343,77 @@ body.player-active .article-content {
 .image-lightbox-close:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: scale(1.1);
+}
+
+/* Lightbox Navigation Arrows */
+.image-lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+}
+
+.image-lightbox-nav svg {
+    width: 36px;
+    height: 36px;
+    stroke-width: 2.2;
+}
+
+.image-lightbox-prev {
+    left: 12px;
+}
+
+.image-lightbox-next {
+    right: 12px;
+}
+
+.image-lightbox-nav:hover {
+    color: #fff;
+    transform: translateY(-50%) scale(1.12);
+}
+
+.image-lightbox-nav.disabled {
+    opacity: 0.15;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* Lightbox Counter */
+.image-lightbox-counter {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px 14px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 移动端隐藏导航按钮和计数器，使用滑动手势代替 */
+@media (max-width: 800px) {
+
+    .image-lightbox-nav,
+    .image-lightbox-counter {
+        display: none;
+    }
 }

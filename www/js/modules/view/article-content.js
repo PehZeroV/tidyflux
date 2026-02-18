@@ -88,21 +88,65 @@ export const ArticleContentView = {
         const existing = document.querySelector('.image-lightbox-overlay');
         if (existing) existing.remove();
 
+        // 收集当前文章内所有非 favicon 图片
+        const allImages = Array.from(
+            (DOMElements.articleContent || document).querySelectorAll('img:not(.favicon)')
+        ).map(img => img.src).filter(Boolean);
+
+        let currentIndex = allImages.indexOf(src);
+        if (currentIndex === -1) {
+            // fallback：如果没找到完全匹配，尝试部分匹配
+            currentIndex = allImages.findIndex(s => s.includes(src) || src.includes(s));
+            if (currentIndex === -1) {
+                allImages.push(src);
+                currentIndex = allImages.length - 1;
+            }
+        }
+
+        const hasMultiple = allImages.length > 1;
+
         const overlay = document.createElement('div');
         overlay.className = 'image-lightbox-overlay';
         overlay.innerHTML = `
             <button class="image-lightbox-close" aria-label="Close">✕</button>
+            ${hasMultiple ? `<button class="image-lightbox-nav image-lightbox-prev" aria-label="Previous">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>` : ''}
             <img src="${src}" alt="" />
+            ${hasMultiple ? `<button class="image-lightbox-nav image-lightbox-next" aria-label="Next">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+            </button>` : ''}
+            ${hasMultiple ? `<div class="image-lightbox-counter">${currentIndex + 1} / ${allImages.length}</div>` : ''}
         `;
         document.body.appendChild(overlay);
 
         // 动画展开
         requestAnimationFrame(() => overlay.classList.add('active'));
 
+        const imgEl = overlay.querySelector('img');
+        const counterEl = overlay.querySelector('.image-lightbox-counter');
+        const prevBtn = overlay.querySelector('.image-lightbox-prev');
+        const nextBtn = overlay.querySelector('.image-lightbox-next');
+
+        const updateNav = () => {
+            if (!hasMultiple) return;
+            prevBtn.classList.toggle('disabled', currentIndex === 0);
+            nextBtn.classList.toggle('disabled', currentIndex === allImages.length - 1);
+        };
+        updateNav();
+
+        const showImage = (index) => {
+            if (index < 0 || index >= allImages.length) return;
+            currentIndex = index;
+            imgEl.src = allImages[currentIndex];
+            if (counterEl) counterEl.textContent = `${currentIndex + 1} / ${allImages.length}`;
+            updateNav();
+        };
+
         const closeLightbox = () => {
             overlay.classList.remove('active');
             setTimeout(() => overlay.remove(), 250);
-            document.removeEventListener('keydown', escHandler);
+            document.removeEventListener('keydown', keyHandler);
         };
 
         // 点击遮罩或关闭按钮关闭
@@ -112,11 +156,41 @@ export const ArticleContentView = {
             }
         });
 
-        // ESC 关闭
-        const escHandler = (e) => {
+        // 上一张 / 下一张点击
+        if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); showImage(currentIndex - 1); });
+        if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); showImage(currentIndex + 1); });
+
+        // 键盘：ESC 关闭，← → 切换
+        const keyHandler = (e) => {
             if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') showImage(currentIndex - 1);
+            if (e.key === 'ArrowRight') showImage(currentIndex + 1);
         };
-        document.addEventListener('keydown', escHandler);
+        document.addEventListener('keydown', keyHandler);
+
+        // 阻止所有触摸事件穿透到文章页面
+        let touchStartX = 0;
+        let touchStartY = 0;
+        overlay.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            touchStartX = e.changedTouches[0].clientX;
+            touchStartY = e.changedTouches[0].clientY;
+        }, { passive: false });
+        overlay.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+        overlay.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            if (!hasMultiple) return;
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            const dy = e.changedTouches[0].clientY - touchStartY;
+            // 水平滑动 > 50px 且水平位移大于垂直位移
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+                if (dx < 0) showImage(currentIndex + 1);
+                else showImage(currentIndex - 1);
+            }
+        }, { passive: false });
     },
 
     /**

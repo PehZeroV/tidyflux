@@ -178,6 +178,13 @@ export default {
         thumbnails_off: '已关闭缩略图显示',
         refresh_feed: '刷新',
         refresh_miniflux: '刷新 Miniflux 订阅',
+        page_width: '页面宽度',
+        page_width_narrow: '窄',
+        page_width_standard: '标准',
+        page_width_wide: '宽',
+        font_size: '字体大小',
+        font_size_small: '小',
+        font_size_large: '大',
     },
     auth: {
         title: 'Tidyflux',
