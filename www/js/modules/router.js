@@ -80,6 +80,18 @@ export const Router = {
             return;
         }
 
+        // 4.5. 今天 #/today
+        if (hash === '#/today') {
+            ViewManager._renderToday();
+            return;
+        }
+
+        // 4.6. 历史记录 #/history
+        if (hash === '#/history') {
+            ViewManager._renderHistory();
+            return;
+        }
+
         // 5. 搜索 #/search?q=xxx
         const searchMatch = hash.match(/^#\/search\?q=(.+)$/);
         if (searchMatch) {

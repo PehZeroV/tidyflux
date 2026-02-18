@@ -137,13 +137,27 @@ export const ArticlesView = {
      * 加载普通文章列表
      */
     async _loadNormalArticles(requestId, feedId, groupId) {
-        const articlesResult = await FeedManager.getArticles({
+        const params = {
             page: 1,
             feedId,
             groupId,
             unreadOnly: AppState.showUnreadOnly,
             favorites: AppState.viewingFavorites
-        });
+        };
+
+        // 今天模式：只加载今天的文章
+        if (AppState.viewingToday) {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            params.afterPublishedAt = todayStart.toISOString();
+        }
+
+        // 历史记录模式：只加载已读文章
+        if (AppState.viewingHistory) {
+            params.readOnly = true;
+        }
+
+        const articlesResult = await FeedManager.getArticles(params);
 
         if (this.currentRequestId !== requestId) return;
 
@@ -155,6 +169,17 @@ export const ArticlesView = {
         this.startNewArticlesPoller();
         // this.checkUnreadDigestsAndShowToast(); // Handled by ViewManager
         this.preloadNextPage();
+    },
+
+    /**
+     * 获取今天模式的过滤参数
+     * @returns {string|null} afterPublishedAt ISO 字符串
+     */
+    _getTodayFilter() {
+        if (!AppState.viewingToday) return null;
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return todayStart.toISOString();
     },
 
     /**
@@ -603,10 +628,12 @@ export const ArticlesView = {
             if (AppState.isSearchMode && AppState.searchQuery) {
                 result = await FeedManager.searchArticles(AppState.searchQuery, nextPage);
             } else {
-                // 构建游标：在 unreadOnly 模式下，使用最后一篇文章的信息作为游标
+                // 构建游标：在 unreadOnly 或 今天 模式下，使用最后一篇文章的信息作为游标
                 // 这样即使前面的文章被标记为已读，也不会影响下一页的加载
+                // 今天模式必须使用游标，因为 after_published_at 会导致服务器重置 offset
+                // 注意：历史记录模式不能用游标，因为排序字段是 changed_at 而非 published_at
                 let cursor = null;
-                if (AppState.showUnreadOnly && AppState.articles.length > 0) {
+                if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
                     const lastArticle = AppState.articles[AppState.articles.length - 1];
                     if (lastArticle && lastArticle.published_at && lastArticle.id) {
                         cursor = {
@@ -622,8 +649,10 @@ export const ArticlesView = {
                     feedId: AppState.currentFeedId,
                     groupId: AppState.currentGroupId,
                     unreadOnly: AppState.showUnreadOnly,
+                    readOnly: AppState.viewingHistory,
                     favorites: AppState.viewingFavorites,
-                    cursor
+                    cursor,
+                    afterPublishedAt: this._getTodayFilter()
                 });
             }
 
@@ -684,9 +713,10 @@ export const ArticlesView = {
             if (AppState.isSearchMode && AppState.searchQuery) {
                 result = await FeedManager.searchArticles(AppState.searchQuery, nextPage);
             } else {
-                // 构建游标：在 unreadOnly 模式下，使用最后一篇文章的信息作为游标
+                // 构建游标：在 unreadOnly 或 今天 模式下，使用最后一篇文章的信息作为游标
+                // 注意：历史记录模式不能用游标，因为排序字段是 changed_at 而非 published_at
                 let cursor = null;
-                if (AppState.showUnreadOnly && AppState.articles.length > 0) {
+                if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
                     const lastArticle = AppState.articles[AppState.articles.length - 1];
                     if (lastArticle && lastArticle.published_at && lastArticle.id) {
                         cursor = {
@@ -702,8 +732,10 @@ export const ArticlesView = {
                     feedId: AppState.currentFeedId,
                     groupId: AppState.currentGroupId,
                     unreadOnly: AppState.showUnreadOnly,
+                    readOnly: AppState.viewingHistory,
                     favorites: AppState.viewingFavorites,
-                    cursor
+                    cursor,
+                    afterPublishedAt: this._getTodayFilter()
                 });
             }
 
@@ -770,7 +802,7 @@ export const ArticlesView = {
     async checkForNewArticles() {
         const requestId = this.currentRequestId;
         if (!AppState.articles || AppState.articles.length === 0) return;
-        if (AppState.viewingFavorites || AppState.viewingDigests) return;
+        if (AppState.viewingFavorites || AppState.viewingDigests || AppState.viewingHistory) return;
         // 搜索模式下不检查新文章，避免将新文章插入搜索结果
         if (AppState.isSearchMode) return;
 
@@ -800,7 +832,8 @@ export const ArticlesView = {
                 feedId: AppState.currentFeedId,
                 groupId: AppState.currentGroupId,
                 unreadOnly: true,
-                favorites: false
+                favorites: false,
+                afterPublishedAt: this._getTodayFilter()
             });
 
             if (this.currentRequestId !== requestId) return;

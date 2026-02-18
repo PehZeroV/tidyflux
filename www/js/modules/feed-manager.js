@@ -128,17 +128,26 @@ export const FeedManager = {
         return data;
     },
 
-    async getArticles({ page = 1, feedId = null, groupId = null, unreadOnly = true, favorites = false, cursor = null } = {}) {
+    async getArticles({ page = 1, feedId = null, groupId = null, unreadOnly = true, readOnly = false, favorites = false, cursor = null, afterPublishedAt = null } = {}) {
         const params = new URLSearchParams({
             page: String(page),
             limit: '50',
-            unread_only: String(unreadOnly)
+            unread_only: String(readOnly ? false : unreadOnly)
         });
+
+        if (readOnly) {
+            params.append('read_only', 'true');
+        }
 
         // 使用游标分页
         if (cursor?.publishedAt && cursor?.id) {
             params.append(cursor.isAfter ? 'after_published_at' : 'before_published_at', cursor.publishedAt);
             params.append(cursor.isAfter ? 'after_id' : 'before_id', cursor.id);
+        }
+
+        // 今天模式：过滤发布时间
+        if (afterPublishedAt) {
+            params.append('after_published_at', afterPublishedAt);
         }
 
         if (favorites) {
@@ -444,6 +453,26 @@ export const FeedManager = {
         }
 
         return response.ok;
+    },
+
+    /**
+     * 获取今日未读文章数量（轻量级请求）
+     */
+    async getTodayUnreadCount() {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const params = new URLSearchParams({
+            page: '1',
+            limit: '1',
+            unread_only: 'true',
+            after_published_at: todayStart.toISOString()
+        });
+
+        const response = await AuthManager.fetchWithAuth(`/api/articles?${params.toString()}`);
+        if (!response.ok) return 0;
+
+        const data = await response.json();
+        return data.pagination?.total || 0;
     },
 
     // Search articles

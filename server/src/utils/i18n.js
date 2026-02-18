@@ -87,9 +87,11 @@ const messages = {
         ai_not_configured: 'AI 未配置，请先在设置中配置 AI API',
         ai_api_error: 'AI API 错误',
         all_subscriptions: '全部订阅',
+        today: '今天',
         feed: '订阅源',
         group: '分组',
         no_articles_in_hours: '在过去 {hours} 小时内没有{unread}文章。',
+        no_articles_today: '今天没有{unread}文章。',
         unread: '未读',
         digest_word: '简报',
 
@@ -178,9 +180,11 @@ const messages = {
         ai_not_configured: 'AI not configured, please configure AI API in settings',
         ai_api_error: 'AI API Error',
         all_subscriptions: 'All Subscriptions',
+        today: 'Today',
         feed: 'Feed',
         group: 'Group',
         no_articles_in_hours: 'No {unread}articles in the past {hours} hours.',
+        no_articles_today: 'No {unread}articles today.',
         unread: 'unread ',
         digest_word: 'Digest',
 

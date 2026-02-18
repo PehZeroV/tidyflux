@@ -626,6 +626,7 @@ export const ArticleContentView = {
             });
         });
 
+        this.enhanceTables();
         this.bindDigestToolbarEvents(digest);
         this.updateNavButtons(digest.id);
     },
@@ -783,6 +784,7 @@ export const ArticleContentView = {
         }
 
         this.enhanceCodeBlocks();
+        this.enhanceTables();
         this.bindArticleToolbarEvents(article);
         this.updateNavButtons(article.id);
     },
@@ -888,6 +890,26 @@ export const ArticleContentView = {
         }
 
         this._currentArticle = null;
+    },
+
+    /**
+     * 增强表格显示
+     * 将宽表格包裹在可横向滚动的容器中
+     */
+    enhanceTables() {
+        const articleBody = DOMElements.articleContent?.querySelector('.article-body, .digest-body');
+        if (!articleBody) return;
+
+        const tables = articleBody.querySelectorAll('table');
+        tables.forEach((table) => {
+            // 避免重复处理
+            if (table.parentElement?.classList.contains('table-scroll-wrapper')) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-scroll-wrapper';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        });
     },
 
     /**
@@ -1056,6 +1078,34 @@ export const ArticleContentView = {
                 allCountEl.remove();
             }
         }
+
+        // 更新今天未读计数
+        const todayBtn = document.getElementById('today-btn');
+        if (todayBtn) {
+            // 检查当前文章是否是今天发布的
+            const article = AppState.articles?.find(a => a.id == AppState.currentArticleId);
+            if (article && article.published_at) {
+                const pubDate = new Date(article.published_at);
+                const now = new Date();
+                const isToday = pubDate.getFullYear() === now.getFullYear() &&
+                    pubDate.getMonth() === now.getMonth() &&
+                    pubDate.getDate() === now.getDate();
+                if (isToday) {
+                    let todayCountEl = todayBtn.querySelector('.today-unread-count');
+                    const currentCount = todayCountEl ? parseInt(todayCountEl.textContent) || 0 : 0;
+                    const newCount = Math.max(0, currentCount + delta);
+                    if (newCount > 0) {
+                        if (todayCountEl) {
+                            todayCountEl.textContent = newCount;
+                        } else {
+                            todayBtn.insertAdjacentHTML('beforeend', `<span class="feed-unread-count today-unread-count">${newCount}</span>`);
+                        }
+                    } else if (todayCountEl) {
+                        todayCountEl.remove();
+                    }
+                }
+            }
+        }
     },
 
     /**
@@ -1090,28 +1140,28 @@ export const ArticleContentView = {
         const nextId = currentIndex < AppState.articles.length - 1 ? AppState.articles[currentIndex + 1].id : null;
         const canLoadMore = !nextId && AppState.pagination && AppState.pagination.hasMore;
 
-        if (!prevId && !nextId && !canLoadMore) return;
-
         const container = document.createElement('div');
         container.className = 'article-nav-btns';
 
         let html = '';
-        if (prevId) {
-            html += `<button class="article-nav-btn" data-nav-id="${prevId}" title="${i18n.t('keyboard.prev_article')}">${Icons.arrow_back}</button>`;
-        }
+        // 始终显示上一篇按钮，第一篇时禁用
+        html += `<button class="article-nav-btn${prevId ? '' : ' disabled'}" ${prevId ? `data-nav-id="${prevId}"` : ''} title="${i18n.t('keyboard.prev_article')}">${Icons.arrow_back}</button>`;
+        // 始终显示下一篇按钮，最后一篇时禁用（除非可以加载更多）
         if (nextId) {
             html += `<button class="article-nav-btn" data-nav-id="${nextId}" title="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
         } else if (canLoadMore) {
             html += `<button class="article-nav-btn load-more-nav-btn" title="${i18n.t('common.loading')}">${Icons.arrow_forward}</button>`;
+        } else {
+            html += `<button class="article-nav-btn disabled" title="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
         }
 
         container.innerHTML = html;
         if (DOMElements.contentPanel) {
-            DOMElements.contentPanel.appendChild(container); // Move to contentPanel to avoid scrolling
+            DOMElements.contentPanel.appendChild(container);
         }
 
-        // 绑定事件
-        const btns = container.querySelectorAll('.article-nav-btn');
+        // 绑定事件（跳过禁用按钮）
+        const btns = container.querySelectorAll('.article-nav-btn:not(.disabled)');
         btns.forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();

@@ -16,6 +16,8 @@
  *     a        - Add feed
  *
  *   Reading view:
+ *     Space        - Scroll down / Next article
+ *     Shift+Space  - Scroll up / Previous article
  *     n        - Next article
  *     p        - Previous article
  *     f        - Toggle star / favorite
@@ -23,6 +25,8 @@
  *     v        - Open original in new tab
  *     d        - Fetch original content
  *     s        - Save to third-party service
+ *     t        - Translate article
+ *     g        - Summarize article
  *     Escape   - Go back to list
  *
  *   Global:
@@ -58,6 +62,8 @@ const DEFAULT_SHORTCUTS = {
     addFeed: ['a'],
 
     // Reading view
+    scrollDown: [' '],
+    scrollUp: ['Shift+ '],
     nextArticle: ['n'],
     prevArticle: ['p'],
     toggleStar: ['f'],
@@ -65,6 +71,8 @@ const DEFAULT_SHORTCUTS = {
     openOriginal: ['v'],
     fetchContent: ['d'],
     saveThirdParty: ['s'],
+    translateArticle: ['t'],
+    summarizeArticle: ['g'],
     goBack: ['Escape'],
 
     // Global
@@ -83,6 +91,8 @@ const ACTION_META = {
     refresh: { group: 'list', i18nKey: 'keyboard.refresh' },
     addFeed: { group: 'list', i18nKey: 'keyboard.add_feed' },
 
+    scrollDown: { group: 'reading', i18nKey: 'keyboard.scroll_down' },
+    scrollUp: { group: 'reading', i18nKey: 'keyboard.scroll_up' },
     nextArticle: { group: 'reading', i18nKey: 'keyboard.next_article' },
     prevArticle: { group: 'reading', i18nKey: 'keyboard.prev_article' },
     toggleStar: { group: 'reading', i18nKey: 'keyboard.toggle_star' },
@@ -90,6 +100,8 @@ const ACTION_META = {
     openOriginal: { group: 'reading', i18nKey: 'keyboard.open_original' },
     fetchContent: { group: 'reading', i18nKey: 'keyboard.fetch_content' },
     saveThirdParty: { group: 'reading', i18nKey: 'keyboard.save_third_party' },
+    translateArticle: { group: 'reading', i18nKey: 'keyboard.translate_article' },
+    summarizeArticle: { group: 'reading', i18nKey: 'keyboard.summarize_article' },
     goBack: { group: 'reading', i18nKey: 'keyboard.go_back' },
 
     showHelp: { group: 'global', i18nKey: 'keyboard.show_help' },
@@ -192,7 +204,13 @@ export const KeyboardShortcuts = {
             const meta = ACTION_META[action];
             if (!meta) continue;
             for (const key of keys) {
-                this._keyToAction[key] = { action, group: meta.group };
+                // Shift+ prefix keys: store with shift flag
+                if (key.startsWith('Shift+')) {
+                    const realKey = key.slice(6);
+                    this._keyToAction['Shift+' + realKey] = { action, group: meta.group };
+                } else {
+                    this._keyToAction[key] = { action, group: meta.group };
+                }
             }
         }
     },
@@ -398,6 +416,16 @@ export const KeyboardShortcuts = {
         }
     },
 
+    _translateArticle() {
+        const btn = document.getElementById('article-translate-btn');
+        if (btn) btn.click();
+    },
+
+    _summarizeArticle() {
+        const btn = document.getElementById('article-summarize-btn');
+        if (btn) btn.click();
+    },
+
     _refresh() {
         const btn = document.getElementById('articles-refresh-btn');
         if (btn) btn.click();
@@ -427,6 +455,49 @@ export const KeyboardShortcuts = {
         if (idx > 0) {
             const prevId = AppState.articles[idx - 1].id;
             if (this.viewManager) this.viewManager.selectArticle(prevId);
+        }
+    },
+
+    /**
+     * Get the article scroll container (.article-content)
+     * @returns {Element|null}
+     */
+    _getArticleScrollContainer() {
+        return DOMElements.articleContent || DOMElements.contentPanel?.querySelector('.article-content');
+    },
+
+    /**
+     * Scroll article content down by ~85% viewport.
+     * If already at the bottom, jump to the next article.
+     */
+    _scrollDown() {
+        const container = this._getArticleScrollContainer();
+        if (!container) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
+
+        if (isAtBottom) {
+            this._nextArticle();
+        } else {
+            container.scrollBy({ top: clientHeight * 0.8, behavior: 'smooth' });
+        }
+    },
+
+    /**
+     * Scroll article content up by ~85% viewport.
+     * If already at the top, jump to the previous article.
+     */
+    _scrollUp() {
+        const container = this._getArticleScrollContainer();
+        if (!container) return;
+
+        const isAtTop = container.scrollTop <= 10;
+
+        if (isAtTop) {
+            this._prevArticle();
+        } else {
+            container.scrollBy({ top: -(container.clientHeight * 0.8), behavior: 'smooth' });
         }
     },
 
@@ -461,6 +532,12 @@ export const KeyboardShortcuts = {
                 this._addFeed(); return true;
 
             // Article actions: require an article to be loaded
+            case 'scrollDown':
+                if (isArticleView) { this._scrollDown(); return true; }
+                return false;
+            case 'scrollUp':
+                if (isArticleView) { this._scrollUp(); return true; }
+                return false;
             case 'nextArticle':
                 if (isArticleView) { this._nextArticle(); return true; }
                 return false;
@@ -481,6 +558,12 @@ export const KeyboardShortcuts = {
                 return false;
             case 'saveThirdParty':
                 if (isArticleView) { this._saveThirdParty(); return true; }
+                return false;
+            case 'translateArticle':
+                if (isArticleView) { this._translateArticle(); return true; }
+                return false;
+            case 'summarizeArticle':
+                if (isArticleView) { this._summarizeArticle(); return true; }
                 return false;
             case 'goBack':
                 this._goBack();
@@ -518,11 +601,15 @@ export const KeyboardShortcuts = {
             if (this._isDialogOpen()) return;
 
             // Don't intercept with modifier keys (Ctrl, Cmd, Alt)
-            // Exception: Shift is allowed (needed for ? = Shift+/)
+            // Exception: Shift is allowed (needed for ? = Shift+/ and Shift+Space)
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+            // Build lookup key: prefix with Shift+ when shift is held (except for keys that produce shifted chars like ?)
             const key = e.key;
-            const mapping = this._keyToAction[key];
+            const lookupKey = e.shiftKey ? 'Shift+' + key : key;
+
+            // Try Shift+ prefixed key first, then plain key
+            const mapping = this._keyToAction[lookupKey] || this._keyToAction[key];
             if (!mapping) return;
 
             const isArticleView = this._isArticleViewActive();
@@ -551,6 +638,11 @@ export const KeyboardShortcuts = {
      * @returns {string}
      */
     _formatKey(key) {
+        // Handle Shift+ combo keys generically
+        if (key.startsWith('Shift+')) {
+            const inner = key.slice(6);
+            return '⇧ ' + this._formatKey(inner);
+        }
         const map = {
             'Escape': 'Esc',
             'Enter': '↵',
@@ -560,6 +652,10 @@ export const KeyboardShortcuts = {
             'ArrowRight': '→',
             ' ': 'Space',
         };
+        // Uppercase single letter keys for display
+        if (key.length === 1 && key >= 'a' && key <= 'z') {
+            return key.toUpperCase();
+        }
         return map[key] || key;
     },
 
@@ -607,7 +703,7 @@ export const KeyboardShortcuts = {
                                     <div class="keyboard-customize-row" data-action="${item.action}">
                                         <span class="keyboard-customize-label">${item.label}</span>
                                         <div class="keyboard-customize-key-input" tabindex="0" data-action="${item.action}">
-                                            ${item.keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')}
+                                            ${item.keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' / ')}
                                         </div>
                                     </div>
                                 `).join('')}
@@ -675,8 +771,17 @@ export const KeyboardShortcuts = {
             e.preventDefault();
             e.stopPropagation();
 
-            const key = e.key;
-            if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return;
+            const rawKey = e.key;
+            if (['Shift', 'Control', 'Alt', 'Meta'].includes(rawKey)) return;
+
+            // Shift 组合键：Shift+/ 已产生 '?' 等独立字符的不加前缀，其余加 Shift+ 前缀
+            let key = rawKey;
+            if (e.shiftKey) {
+                const isAlphaOrSpecialKey = rawKey === ' ' || rawKey.length > 1 || rawKey === rawKey.toLowerCase();
+                if (isAlphaOrSpecialKey) {
+                    key = 'Shift+' + rawKey;
+                }
+            }
 
             const action = activeInput.dataset.action;
 

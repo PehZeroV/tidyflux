@@ -166,6 +166,14 @@ export const ViewManager = {
         FeedsView.selectDigests();
     },
 
+    selectToday() {
+        FeedsView.selectToday();
+    },
+
+    selectHistory() {
+        FeedsView.selectHistory();
+    },
+
     updateSidebarActiveState(options) {
         FeedsView.updateSidebarActiveState(options);
     },
@@ -236,7 +244,7 @@ export const ViewManager = {
         // 检查是否需要跳过重复加载（滑动返回时不刷新，点击时刷新）
         const isSame = !AppState.isSearchMode &&
             (AppState.currentFeedId == (feedId || '') || (feedId === null && !AppState.currentFeedId)) &&
-            !AppState.currentGroupId && !AppState.viewingFavorites && !AppState.viewingDigests && AppState.articles.length > 0;
+            !AppState.currentGroupId && !AppState.viewingFavorites && !AppState.viewingDigests && !AppState.viewingToday && !AppState.viewingHistory && AppState.articles.length > 0;
 
         if (isSame && !this.forceRefreshList) {
             if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
@@ -255,6 +263,8 @@ export const ViewManager = {
         AppState.currentGroupId = null;
         AppState.viewingFavorites = false;
         AppState.viewingDigests = false;
+        AppState.viewingToday = false;
+        AppState.viewingHistory = false;
 
         const filterKey = feedId ? `feed_${feedId}` : 'all';
         const saved = this.loadFilterSetting(filterKey);
@@ -295,6 +305,8 @@ export const ViewManager = {
         AppState.currentGroupId = groupId;
         AppState.viewingFavorites = false;
         AppState.viewingDigests = false;
+        AppState.viewingToday = false;
+        AppState.viewingHistory = false;
 
         const saved = this.loadFilterSetting(`group_${groupId}`);
         AppState.showUnreadOnly = saved !== null ? saved : true;
@@ -330,6 +342,8 @@ export const ViewManager = {
         AppState.currentGroupId = null;
         AppState.viewingFavorites = true;
         AppState.viewingDigests = false;
+        AppState.viewingToday = false;
+        AppState.viewingHistory = false;
         AppState.showUnreadOnly = false;
 
         this.updateSidebarActiveState({ favorites: true });
@@ -357,12 +371,74 @@ export const ViewManager = {
         AppState.currentGroupId = null;
         AppState.viewingFavorites = false;
         AppState.viewingDigests = true;
+        AppState.viewingToday = false;
+        AppState.viewingHistory = false;
         // Briefings default to unread only or all? User implies "only unread at top", suggesting we might show all but prioritize.
         // Let's default to whatever filter logic or just show all for now.
         AppState.showUnreadOnly = false;
 
         this.updateSidebarActiveState({ digests: true });
         DOMElements.currentFeedTitle.textContent = i18n.t('nav.briefings');
+
+        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
+        await this.loadArticles(null, null);
+    },
+
+    async _renderToday() {
+        await this.waitForFeedsLoaded();
+
+        // 检查是否需要跳过重复加载
+        if (!AppState.isSearchMode && AppState.viewingToday === true && AppState.articles.length > 0 && !this.forceRefreshList) {
+            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
+            this._restoreScrollPosition();
+            return;
+        }
+
+        this.forceRefreshList = false;
+        AppState.isSearchMode = false;
+        AppState.searchQuery = '';
+
+        AppState.currentFeedId = null;
+        AppState.currentGroupId = null;
+        AppState.viewingFavorites = false;
+        AppState.viewingDigests = false;
+        AppState.viewingToday = true;
+        AppState.viewingHistory = false;
+
+        const savedToday = this.loadFilterSetting('today');
+        AppState.showUnreadOnly = savedToday !== null ? savedToday : true;
+
+        this.updateSidebarActiveState({ today: true });
+        DOMElements.currentFeedTitle.textContent = i18n.t('nav.today');
+
+        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
+        await this.loadArticles(null, null);
+    },
+
+    async _renderHistory() {
+        await this.waitForFeedsLoaded();
+
+        // 检查是否需要跳过重复加载
+        if (!AppState.isSearchMode && AppState.viewingHistory === true && AppState.articles.length > 0 && !this.forceRefreshList) {
+            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
+            this._restoreScrollPosition();
+            return;
+        }
+
+        this.forceRefreshList = false;
+        AppState.isSearchMode = false;
+        AppState.searchQuery = '';
+
+        AppState.currentFeedId = null;
+        AppState.currentGroupId = null;
+        AppState.viewingFavorites = false;
+        AppState.viewingDigests = false;
+        AppState.viewingToday = false;
+        AppState.viewingHistory = true;
+        AppState.showUnreadOnly = false;
+
+        this.updateSidebarActiveState({ history: true });
+        DOMElements.currentFeedTitle.textContent = i18n.t('nav.history');
 
         if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
         await this.loadArticles(null, null);
@@ -431,16 +507,17 @@ export const ViewManager = {
 
     async refreshFeedCounts() {
         try {
-            // Fetch Feeds, Groups and Digest Counts
-            const [feeds, groups, digests] = await Promise.all([
+            // Fetch Feeds, Groups, Digest Counts and Today Unread Count
+            const [feeds, groups, digests, todayUnread] = await Promise.all([
                 FeedManager.getFeeds(),
                 FeedManager.getGroups(),
-                FeedManager.getDigests({ unreadOnly: true })
+                FeedManager.getDigests({ unreadOnly: true }),
+                FeedManager.getTodayUnreadCount()
             ]);
             AppState.feeds = feeds;
             AppState.groups = groups;
             // Store digests count/metadata if needed? No, pass it to view
-            this.updateFeedUnreadCounts(digests && digests.digests ? digests.digests : null);
+            this.updateFeedUnreadCounts(digests && digests.digests ? digests.digests : null, todayUnread);
 
             await ArticlesView.checkUnreadDigestsAndShowToast(digests);
         } catch (err) {
@@ -462,13 +539,13 @@ export const ViewManager = {
         }, this._refreshCountsDelay);
     },
 
-    updateFeedUnreadCounts(digestsData = null) {
+    updateFeedUnreadCounts(digestsData = null, todayUnread = 0) {
         if (DOMElements.feedsList.innerHTML.trim() === '') {
             // 如果列表为空，则全量渲染
-            FeedsView.renderFeedsList(AppState.feeds, AppState.groups, digestsData);
+            FeedsView.renderFeedsList(AppState.feeds, AppState.groups, digestsData, todayUnread);
         } else {
             // 否则只更新计数，避免重绘闪烁
-            FeedsView.updateUnreadCounts(AppState.feeds, AppState.groups, digestsData);
+            FeedsView.updateUnreadCounts(AppState.feeds, AppState.groups, digestsData, todayUnread);
         }
     },
 
@@ -502,8 +579,8 @@ export const ViewManager = {
 
     // ==================== Digest 相关 ====================
 
-    generateDigest(scope = 'all', feedId = null, groupId = null) {
-        DigestView.generate(scope, feedId, groupId);
+    generateDigest(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null) {
+        DigestView.generate(scope, feedId, groupId, hours, afterTimestamp);
     },
 
     generateDigestForFeed(feedId) {
@@ -737,7 +814,9 @@ export const ViewManager = {
             // 显示加载状态（可选，也可以依赖 loadArticles 的处理）
             // DOMElements.articlesList.innerHTML = `<div class="loading">${i18n.t('common.loading')}</div>`;
 
-            if (AppState.viewingDigests) {
+            if (AppState.viewingToday) {
+                await this._renderToday();
+            } else if (AppState.viewingDigests) {
                 await this._renderDigests();
             } else if (AppState.viewingFavorites) {
                 await this._renderFavorites();

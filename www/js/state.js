@@ -21,6 +21,8 @@ const state = {
         currentGroupId: null,
         viewingFavorites: false,
         viewingDigests: false,
+        viewingToday: false,
+        viewingHistory: false,
     },
     // 内容与分页状态
     content: {
@@ -65,6 +67,8 @@ const legacyMap = {
     currentGroupId: ['navigation', 'currentGroupId'],
     viewingFavorites: ['navigation', 'viewingFavorites'],
     viewingDigests: ['navigation', 'viewingDigests'],
+    viewingToday: ['navigation', 'viewingToday'],
+    viewingHistory: ['navigation', 'viewingHistory'],
     articles: ['content', 'articles'],
     pagination: ['content', 'pagination'],
     currentArticleId: ['content', 'currentArticleId'],

@@ -125,6 +125,9 @@ export const ContextMenu = {
         const isFavorites = AppState.viewingFavorites;
         const isDigests = AppState.viewingDigests;
 
+        const isToday = AppState.viewingToday;
+        const isHistory = AppState.viewingHistory;
+
         let itemsHtml = '';
 
         if (isDigests) {
@@ -134,7 +137,19 @@ export const ContextMenu = {
                 ${i18n.t('digest.manage_scheduled')}
             </div>
 `;
-        } else if (!isFavorites) {
+        } else if (isToday) {
+            itemsHtml += `
+            <div class="context-menu-item" data-action="generate-digest">
+                ${Icons.newspaper}
+                ${i18n.t('digest.generate_today')}
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="toggle-view">
+                    ${isUnreadOnly ? Icons.checkbox_checked : Icons.checkbox_unchecked}
+                ${i18n.t('context.show_unread')}
+            </div>
+`;
+        } else if (!isFavorites && !isHistory) {
             itemsHtml += `
             <div class="context-menu-item" data-action="manual-refresh">
                 ${Icons.miniflux}
@@ -437,8 +452,11 @@ export const ContextMenu = {
             } else if (action === 'generate-digest') {
                 const skipKey = 'tidyflux_skip_digest_confirm';
                 if (!localStorage.getItem(skipKey)) {
+                    const confirmMsg = AppState.viewingToday
+                        ? i18n.t('digest.confirm_generate_today')
+                        : i18n.t('digest.confirm_generate');
                     const confirmed = await Modal._renderDialog({
-                        body: `<p>${i18n.t('digest.confirm_generate')}</p>
+                        body: `<p>${confirmMsg}</p>
                             <label style="display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 0.85em; color: var(--meta-color); cursor: pointer;">
                                 <input type="checkbox" id="digest-dont-show-again" style="cursor: pointer;">
                                 ${i18n.t('common.dont_show_again')}
@@ -460,7 +478,13 @@ export const ContextMenu = {
                     });
                     if (!confirmed) return;
                 }
-                if (AppState.currentFeedId) {
+                if (AppState.viewingToday) {
+                    // 今天模式：传精确的午夜时间戳，和前端"今天"视图一致
+                    const now = new Date();
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const afterTimestamp = Math.floor(todayStart.getTime() / 1000);
+                    this.viewManager.generateDigest('today', null, null, null, afterTimestamp);
+                } else if (AppState.currentFeedId) {
                     this.viewManager.generateDigestForFeed(AppState.currentFeedId);
                 } else if (AppState.currentGroupId) {
                     this.viewManager.generateDigestForGroup(AppState.currentGroupId);
@@ -486,6 +510,8 @@ export const ContextMenu = {
                     await this.viewManager.saveFilterSetting(`feed_${AppState.currentFeedId}`, AppState.showUnreadOnly);
                 } else if (AppState.currentGroupId) {
                     await this.viewManager.saveFilterSetting(`group_${AppState.currentGroupId}`, AppState.showUnreadOnly);
+                } else if (AppState.viewingToday) {
+                    await this.viewManager.saveFilterSetting('today', AppState.showUnreadOnly);
                 } else if (!AppState.viewingFavorites) {
                     await this.viewManager.saveFilterSetting('all', AppState.showUnreadOnly);
                 }

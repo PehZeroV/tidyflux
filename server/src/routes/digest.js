@@ -105,6 +105,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
             feedId,
             groupId,
             hours = 12,
+            afterTimestamp,
             targetLang = '简体中文',
             prompt: customPrompt,
             aiConfig
@@ -132,6 +133,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
             timezone: prefs.digest_timezone || ''
         };
 
+        if (afterTimestamp) options.afterTimestamp = parseInt(afterTimestamp);
         if (isNaN(options.hours)) options.hours = 12;
 
         if (feedId) {

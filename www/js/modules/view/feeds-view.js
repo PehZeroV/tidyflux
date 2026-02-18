@@ -56,11 +56,12 @@ export const FeedsView = {
                 }
             };
 
-            const [feeds, groups, prefs, digestsData] = await Promise.all([
+            const [feeds, groups, prefs, digestsData, todayUnread] = await Promise.all([
                 FeedManager.getFeeds(),
                 FeedManager.getGroups(),
                 FeedManager.getPreferences(),
-                safeGetDigests()
+                safeGetDigests(),
+                FeedManager.getTodayUnreadCount()
             ]);
 
             AppState.feeds = feeds;
@@ -96,7 +97,7 @@ export const FeedsView = {
             AIService._loadSummaryOverrides();
             AIService._loadAutoTranslateOverrides();
 
-            return { feeds, groups, digestsData };
+            return { feeds, groups, digestsData, todayUnread };
         } catch (err) {
             console.error('Load feeds error:', err);
             DOMElements.feedsList.innerHTML = `<div class="error-msg">${i18n.t('common.load_error')}</div>`;
@@ -109,8 +110,8 @@ export const FeedsView = {
      * @param {Object} data - fetchFeedsData 返回的数据
      */
     render(data) {
-        const { feeds, groups, digestsData } = data;
-        this.renderFeedsList(feeds, groups, digestsData);
+        const { feeds, groups, digestsData, todayUnread } = data;
+        this.renderFeedsList(feeds, groups, digestsData, todayUnread || 0);
 
         // 更新当前标题
         if (AppState.currentFeedId) {
@@ -135,15 +136,24 @@ export const FeedsView = {
      * @param {Array} feeds - 订阅源数组
      * @param {Array} groups - 分组数组
      */
-    renderFeedsList(feeds, groups = [], digestsData = null) {
+    renderFeedsList(feeds, groups = [], digestsData = null, todayUnread = 0) {
         const totalUnread = feeds.reduce((sum, f) => sum + (f.unread_count || 0), 0);
 
-        // 固定项：全部文章和收藏
+        // 固定项：全部文章、今天、收藏
         let html = `
-            <button class="feed-item-btn ${!AppState.currentFeedId && !AppState.viewingFavorites && !AppState.currentGroupId ? 'active' : ''}" data-feed-id="">
+            <button class="feed-item-btn ${!AppState.currentFeedId && !AppState.viewingFavorites && !AppState.viewingToday && !AppState.viewingHistory && !AppState.currentGroupId && !AppState.viewingDigests ? 'active' : ''}" data-feed-id="">
                 ${Icons.list}
                 <span class="feed-name">${i18n.t('nav.all')}</span>
                 ${totalUnread > 0 ? `<span class="feed-unread-count all-unread-count">${totalUnread}</span>` : ''}
+            </button>
+            <button class="feed-item-btn ${AppState.viewingToday ? 'active' : ''}" id="today-btn">
+                ${Icons.today}
+                <span class="feed-name">${i18n.t('nav.today')}</span>
+                ${todayUnread > 0 ? `<span class="feed-unread-count today-unread-count">${todayUnread}</span>` : ''}
+            </button>
+            <button class="feed-item-btn ${AppState.viewingHistory ? 'active' : ''}" id="history-btn">
+                ${Icons.history}
+                <span class="feed-name">${i18n.t('nav.history')}</span>
             </button>
             <button class="feed-item-btn ${AppState.viewingFavorites ? 'active' : ''}" id="favorites-btn">
                 ${Icons.star}
@@ -245,11 +255,15 @@ export const FeedsView = {
      * @param {Array} feeds - 订阅源数组
      * @param {Array} groups - 分组数组
      */
-    updateUnreadCounts(feeds, groups, digestsData = null) {
+    updateUnreadCounts(feeds, groups, digestsData = null, todayUnread = 0) {
         // 更新全部文章计数
         const totalUnread = feeds.reduce((sum, f) => sum + (f.unread_count || 0), 0);
         const allBtn = DOMElements.feedsList.querySelector('.feed-item-btn[data-feed-id=""]');
         this._updateBadge(allBtn, totalUnread, 'feed-unread-count all-unread-count');
+
+        // 更新今天未读计数
+        const todayBtn = document.getElementById('today-btn');
+        this._updateBadge(todayBtn, todayUnread, 'feed-unread-count today-unread-count');
 
         // 优化：一次性建立映射，避免在循环中重复查询 DOM
         const feedUnreadMap = new Map(feeds.map(f => [String(f.id), f.unread_count || 0]));
@@ -323,6 +337,18 @@ export const FeedsView = {
             }
         }, true);
 
+        // 今天按钮
+        const todayBtn = document.getElementById('today-btn');
+        if (todayBtn) {
+            todayBtn.addEventListener('click', () => this.selectToday());
+        }
+
+        // 历史记录按钮
+        const historyBtn = document.getElementById('history-btn');
+        if (historyBtn) {
+            historyBtn.addEventListener('click', () => this.selectHistory());
+        }
+
         // 收藏按钮
         const favBtn = document.getElementById('favorites-btn');
         if (favBtn) {
@@ -387,7 +413,7 @@ export const FeedsView = {
 
         // 订阅源点击和右键菜单
         DOMElements.feedsList.querySelectorAll('.feed-item-btn').forEach(btn => {
-            if (btn.id !== 'favorites-btn' && btn.id !== 'digests-btn') {
+            if (btn.id !== 'favorites-btn' && btn.id !== 'digests-btn' && btn.id !== 'today-btn' && btn.id !== 'history-btn') {
                 const feedId = btn.dataset.feedId || null;
 
                 // 点击事件
@@ -519,6 +545,38 @@ export const FeedsView = {
     },
 
     /**
+     * 选择今天
+     */
+    selectToday() {
+        const vm = this.viewManager;
+        vm.isProgrammaticNav = true;
+        vm.forceRefreshList = true;
+
+        const hash = '#/today';
+        if (window.location.hash === hash) {
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+        } else {
+            window.location.hash = hash;
+        }
+    },
+
+    /**
+     * 选择历史记录
+     */
+    selectHistory() {
+        const vm = this.viewManager;
+        vm.isProgrammaticNav = true;
+        vm.forceRefreshList = true;
+
+        const hash = '#/history';
+        if (window.location.hash === hash) {
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+        } else {
+            window.location.hash = hash;
+        }
+    },
+
+    /**
      * 更新侧边栏激活状态
      * @param {Object} options - 选项
      */
@@ -527,7 +585,13 @@ export const FeedsView = {
         const currentActive = DOMElements.feedsList.querySelector('.active');
         if (currentActive) currentActive.classList.remove('active');
 
-        if (options?.favorites) {
+        if (options?.today) {
+            const btn = document.getElementById('today-btn');
+            if (btn) btn.classList.add('active');
+        } else if (options?.history) {
+            const btn = document.getElementById('history-btn');
+            if (btn) btn.classList.add('active');
+        } else if (options?.favorites) {
             const favBtn = document.getElementById('favorites-btn');
             if (favBtn) favBtn.classList.add('active');
         } else if (options?.digests) {

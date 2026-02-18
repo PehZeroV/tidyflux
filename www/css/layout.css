@@ -555,7 +555,7 @@ body.panel-resizing .panel-resize-handle {
     }
 
     .article-content {
-        padding: 54px 32px 24px;
+        padding: 54px max(32px, calc(50% - 360px)) 80px;
     }
 }
 
@@ -682,7 +682,7 @@ body.panel-resizing .panel-resize-handle {
     }
 
     .article-content {
-        padding: 54px 24px 20px 24px;
+        padding: 54px 24px calc(80px + env(safe-area-inset-bottom)) 24px;
     }
 
     .panel-footer {
@@ -1160,6 +1160,14 @@ body.dialog-open #app-container {
 
 .article-nav-btn:active {
     background: var(--border-color);
+}
+
+.article-nav-btn.disabled {
+    color: color-mix(in srgb, var(--meta-color) 25%, transparent);
+    cursor: default;
+    pointer-events: none;
+    box-shadow: none;
+    background: color-mix(in srgb, var(--card-bg) 60%, transparent);
 }
 
 @media (max-width: 800px) {

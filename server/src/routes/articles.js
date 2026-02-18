@@ -36,6 +36,7 @@ router.get('/', authenticateToken, async (req, res) => {
             feed_id,
             group_id,
             unread_only,
+            read_only,
             favorites,
 
             after_published_at,
@@ -63,6 +64,10 @@ router.get('/', authenticateToken, async (req, res) => {
         if (feed_id) params.feed_id = feed_id;
         if (group_id) params.category_id = group_id;
         if (unread_only === '1' || unread_only === 'true') params.status = 'unread';
+        if (read_only === '1' || read_only === 'true') {
+            params.status = 'read';
+            params.order = 'changed_at'; // 按阅读时间排序
+        }
         if (favorites === '1' || favorites === 'true') params.starred = 'true';
         if (search) params.search = search;
 
@@ -128,12 +133,15 @@ router.get('/', authenticateToken, async (req, res) => {
         }
 
         // Sort by published_at DESC, id DESC (stabilize same-second order)
-        entries.sort((a, b) => {
-            const timeA = new Date(a.published_at).getTime();
-            const timeB = new Date(b.published_at).getTime();
-            if (timeA !== timeB) return timeB - timeA;
-            return b.id - a.id;
-        });
+        // 历史记录模式保留 Miniflux 返回的 changed_at 排序
+        if (!(read_only === '1' || read_only === 'true')) {
+            entries.sort((a, b) => {
+                const timeA = new Date(a.published_at).getTime();
+                const timeB = new Date(b.published_at).getTime();
+                if (timeA !== timeB) return timeB - timeA;
+                return b.id - a.id;
+            });
+        }
 
         const total = totalFromMiniflux - filteredOutCount;
 

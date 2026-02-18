@@ -32,24 +32,30 @@ function truncateByToken(text, maxTokens) {
 
 // 辅助函数：获取最近文章（可选仅未读）
 export async function getRecentUnreadArticles(miniflux, options) {
-    const { hours = 12, limit, feedId, groupId, unreadOnly = true } = options;
+    const { hours = 12, limit, feedId, groupId, unreadOnly = true, afterTimestamp: explicitAfter } = options;
 
-    const afterDate = new Date();
-    afterDate.setHours(afterDate.getHours() - hours);
-    const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+    let afterTs;
+    if (explicitAfter) {
+        // 使用前端传来的精确时间戳（如午夜 0 点）
+        afterTs = explicitAfter;
+    } else {
+        const afterDate = new Date();
+        afterDate.setHours(afterDate.getHours() - hours);
+        afterTs = Math.floor(afterDate.getTime() / 1000);
+    }
 
     const entriesOptions = {
         order: 'published_at',
         direction: 'desc',
         limit: limit || 500,
-        after: afterTimestamp
+        after: afterTs
     };
 
     if (unreadOnly) {
         entriesOptions.status = 'unread';
     }
 
-    console.log(`[Digest Debug] Fetching articles with options: limit=${entriesOptions.limit}, after=${entriesOptions.after} (${hours} hours ago), unreadOnly=${unreadOnly}`);
+    console.log(`[Digest Debug] Fetching articles with options: limit=${entriesOptions.limit}, after=${entriesOptions.after}${explicitAfter ? ' (exact timestamp)' : ` (${hours} hours ago)`}, unreadOnly=${unreadOnly}`);
 
     if (feedId) entriesOptions.feed_id = parseInt(feedId);
     if (groupId) entriesOptions.category_id = parseInt(groupId);
@@ -151,7 +157,7 @@ function buildDigestPrompt(articles, options = {}) {
             .replace(/\{\{content\}\}/g, `## Article List (Total ${articles.length} articles):\n\n${articlesList}`);
         // 追加文章引用指令（如果用户 prompt 中没有提到 [ref:]）
         if (!finalPrompt.includes('[ref:')) {
-            finalPrompt += `\n\nIMPORTANT: Each article has an ID field. When mentioning a specific article, add [ref:ARTICLE_ID] after the relevant text so readers can click to read the original. For example: "Some news happened [ref:12345]".`;
+            finalPrompt += `\n\nIMPORTANT: Each article has an ID field. When mentioning a specific article, add [ref:ARTICLE_ID] immediately after the relevant text so readers can click to read the original. Each [ref:] tag must contain exactly ONE article ID. If referencing multiple articles, use separate tags: [ref:111][ref:222]. Example: "OpenAI released GPT-5 [ref:12345]".`;
         }
     } else {
         // 默认提示词
@@ -164,7 +170,7 @@ function buildDigestPrompt(articles, options = {}) {
 4. If multiple articles relate to the same topic, combine them
 5. Keep the format concise and compact, using Markdown
 6. Output the content directly, no opening remarks like "Here is the digest"
-7. When mentioning or referencing a specific article, use the format [ref:ARTICLE_ID] right after the relevant text (where ARTICLE_ID is the ID from the article list). This allows readers to click and jump to the original article. For example: "OpenAI released GPT-5 [ref:12345]". Each reference should use the exact article ID provided.
+7. When mentioning or referencing a specific article, use the format [ref:ARTICLE_ID] right after the relevant text (where ARTICLE_ID is the ID from the article list). This allows readers to click and jump to the original article. Each [ref:] tag must contain exactly ONE article ID. If referencing multiple articles, use separate tags like [ref:111][ref:222]. Example: "OpenAI released GPT-5 [ref:12345]". Each reference should use the exact article ID provided.
 
 ## Article List (Total ${articles.length} articles):
 
@@ -233,6 +239,7 @@ export const DigestService = {
             feedId,
             groupId,
             hours = 12,
+            afterTimestamp,
             targetLang = 'Simplified Chinese',
             prompt: customPrompt,
             aiConfig,
@@ -257,16 +264,18 @@ export const DigestService = {
             const categories = await minifluxClient.getCategories();
             const category = categories.find(c => c.id === parseInt(groupId));
             scopeName = category ? category.title : t('group', lang);
+        } else if (scope === 'today') {
+            scopeName = t('today', lang);
         }
 
         const fetchOptions = { hours, feedId, groupId, unreadOnly };
+        if (afterTimestamp) fetchOptions.afterTimestamp = afterTimestamp;
         const articles = await getRecentUnreadArticles(minifluxClient, fetchOptions);
 
         if (articles.length === 0) {
-            const noArticlesMsg = t('no_articles_in_hours', lang, {
-                hours,
-                unread: unreadOnly ? t('unread', lang) : ''
-            });
+            const noArticlesMsg = scope === 'today'
+                ? t('no_articles_today', lang, { unread: unreadOnly ? t('unread', lang) : '' })
+                : t('no_articles_in_hours', lang, { hours, unread: unreadOnly ? t('unread', lang) : '' });
             return {
                 success: true,
                 digest: {
