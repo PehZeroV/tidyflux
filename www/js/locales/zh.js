@@ -185,6 +185,10 @@ export default {
         font_size: '字体大小',
         font_size_small: '小',
         font_size_large: '大',
+        font_family: '字体',
+        font_family_system: '系统默认',
+        font_family_sans_serif: '无衬线',
+        font_family_serif: '衬线',
     },
     auth: {
         title: 'Tidyflux',

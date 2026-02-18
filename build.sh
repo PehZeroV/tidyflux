@@ -121,6 +121,18 @@ echo "📁 复制静态资源..."
 cp -r "$ROOT_DIR/www/icons/"* "$DIST_DIR/www/icons/"
 cp "$ROOT_DIR/www/manifest.json" "$DIST_DIR/www/"
 
+# 复制字体文件和字体 CSS
+if [ -d "$ROOT_DIR/www/fonts" ]; then
+    echo "🔤 复制字体文件..."
+    cp -r "$ROOT_DIR/www/fonts" "$DIST_DIR/www/fonts"
+    # 删除不需要的 version.json
+    rm -f "$DIST_DIR/www/fonts/version.json"
+fi
+if [ -f "$ROOT_DIR/www/css/fonts.css" ]; then
+    mkdir -p "$DIST_DIR/www/css"
+    cp "$ROOT_DIR/www/css/fonts.css" "$DIST_DIR/www/css/fonts.css"
+fi
+
 # ========================================
 # 后端构建
 # ========================================

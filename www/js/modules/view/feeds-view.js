@@ -113,6 +113,18 @@ export const FeedsView = {
                 }
             }
 
+            // 应用文章字体设置
+            if (AppState.preferences.article_font_family) {
+                const articleContent = document.getElementById('article-content');
+                if (articleContent) {
+                    articleContent.style.setProperty('--article-font-family', AppState.preferences.article_font_family);
+                    // 非默认字体时，标题也跟着变
+                    if (AppState.preferences.article_font_family !== 'system-ui') {
+                        articleContent.style.setProperty('--article-heading-font-family', AppState.preferences.article_font_family);
+                    }
+                }
+            }
+
             return { feeds, groups, digestsData, todayUnread };
         } catch (err) {
             console.error('Load feeds error:', err);

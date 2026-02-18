@@ -369,10 +369,29 @@ export const ArticleToolbarMixin = {
                 const currentWidth = AppState.preferences?.article_width || 360;
                 const currentFontSize = AppState.preferences?.article_font_size || 1.1;
 
+                // Font family options (all locally hosted or system fonts)
+                const fontFamilyOptions = [
+                    { label: i18n.t('context.font_family_system'), value: 'system-ui' },
+                    { label: i18n.t('context.font_family_sans_serif'), value: 'sans-serif' },
+                    { label: i18n.t('context.font_family_serif'), value: 'serif' },
+                    { label: 'Fira Sans', value: "'Fira Sans', sans-serif" },
+                    { label: 'Open Sans', value: "'Open Sans', sans-serif" },
+                    { label: 'Noto Sans', value: "'Noto Sans', sans-serif" },
+                    { label: 'Noto Serif', value: "'Noto Serif', serif" },
+                    { label: 'Source Sans Pro', value: "'Source Sans Pro', sans-serif" },
+                    { label: 'Source Serif Pro', value: "'Source Serif Pro', serif" },
+                ];
+
                 menu.innerHTML = `
                     <div class="context-menu-item" data-action="save-third-party">
                         ${Icons.save_alt}
                         <span>${i18n.t('article.save_to_third_party')}</span>
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item context-menu-submenu-trigger" data-action="font-family">
+                        ${Icons.text_format}
+                        <span>${i18n.t('context.font_family')}</span>
+                        <span style="margin-left: auto; font-size: 10px; opacity: 0.5;">▶</span>
                     </div>
                     <div class="context-menu-divider"></div>
                     <div class="context-menu-label" style="padding-bottom: 0;">${i18n.t('context.font_size')}</div>
@@ -412,6 +431,96 @@ export const ArticleToolbarMixin = {
                 };
                 positionMenu();
 
+                // ===== Font Family Submenu =====
+                const fontTrigger = menu.querySelector('.context-menu-submenu-trigger[data-action="font-family"]');
+                if (fontTrigger) {
+                    fontTrigger.addEventListener('click', (e) => {
+                        e.stopPropagation();
+
+                        // Capture menu position before closing
+                        const menuRect = menu.getBoundingClientRect();
+                        const menuRight = menuRect.right;
+                        const menuY = menuRect.top;
+
+                        // Close main menu
+                        closeMenu();
+
+                        // Build font submenu
+                        const currentFF = AppState.preferences?.article_font_family || 'system-ui';
+                        const submenu = document.createElement('div');
+                        submenu.className = 'context-menu context-submenu';
+
+                        const buildFontHtml = (activeValue) => {
+                            return `
+                                <div class="context-menu-label" style="padding: 6px 12px 4px; display: flex; align-items: center; gap: 6px;">
+                                    ${Icons.text_format}
+                                    ${i18n.t('context.font_family')}
+                                </div>
+                                <div class="context-menu-divider" style="margin: 2px 0;"></div>
+                                ${fontFamilyOptions.map(opt => {
+                                const isActive = opt.value === activeValue;
+                                return `<div class="context-menu-item font-family-option${isActive ? ' active' : ''}" data-font-value="${opt.value}" style="font-family: ${opt.value}; padding: 7px 12px; font-size: 0.85em;">
+                                        <span>${opt.label}</span>
+                                    </div>`;
+                            }).join('')}
+                            `;
+                        };
+
+                        submenu.innerHTML = buildFontHtml(currentFF);
+                        document.body.appendChild(submenu);
+
+                        // Position: right-aligned with main menu
+                        const subW = submenu.offsetWidth;
+                        const subH = submenu.offsetHeight;
+                        let x = menuRight - subW;
+                        let y = menuY;
+                        if (x < 10) x = 10;
+                        if (y + subH > window.innerHeight - 10) y = window.innerHeight - subH - 10;
+                        if (y < 10) y = 10;
+                        submenu.style.left = `${x}px`;
+                        submenu.style.top = `${y}px`;
+
+                        // Handle font option clicks
+                        submenu.addEventListener('click', (ce) => {
+                            const opt = ce.target.closest('.font-family-option');
+                            if (!opt) return;
+                            ce.stopPropagation();
+
+                            const val = opt.dataset.fontValue;
+                            const articleContent = document.getElementById('article-content');
+                            if (articleContent) {
+                                articleContent.style.setProperty('--article-font-family', val);
+                                if (val === 'system-ui') {
+                                    articleContent.style.removeProperty('--article-heading-font-family');
+                                } else {
+                                    articleContent.style.setProperty('--article-heading-font-family', val);
+                                }
+                            }
+
+                            // Save preference
+                            AppState.preferences = AppState.preferences || {};
+                            AppState.preferences.article_font_family = val;
+                            FeedManager.setPreference('article_font_family', val).catch(err => {
+                                console.error('Save pref error:', err);
+                            });
+
+                            // Re-render to update checkmark
+                            submenu.innerHTML = buildFontHtml(val);
+                        });
+
+                        // Click outside to close
+                        const subCloseHandler = (ce) => {
+                            if (!submenu.contains(ce.target)) {
+                                ce.preventDefault();
+                                ce.stopPropagation();
+                                ce.stopImmediatePropagation();
+                                submenu.remove();
+                                document.removeEventListener('click', subCloseHandler, true);
+                            }
+                        };
+                        setTimeout(() => document.addEventListener('click', subCloseHandler, true), 0);
+                    });
+                }
                 // Page width slider events
                 const widthSlider = menu.querySelector('.width-slider');
                 if (widthSlider) {

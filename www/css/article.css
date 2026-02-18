@@ -14,6 +14,7 @@
     -webkit-overflow-scrolling: touch;
 
     /* Typography & Visuals */
+    font-family: var(--article-font-family, inherit);
     font-size: var(--article-font-size, 1.1em);
     line-height: 1.8;
     color: var(--text-color);
@@ -34,7 +35,7 @@
     font-size: 1.6em;
     line-height: 1.4;
     margin: 0 0 4px 0;
-    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', 'FangSong', Georgia, serif;
+    font-family: var(--article-heading-font-family, 'Noto Serif SC', 'Songti SC', 'SimSun', 'FangSong', Georgia, serif);
     font-weight: 700;
     color: var(--title-color);
 }
@@ -68,7 +69,7 @@
     font-weight: 700;
     margin: 1.2em 0 0.5em;
     line-height: 1.35;
-    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', 'FangSong', Georgia, serif;
+    font-family: var(--article-heading-font-family, 'Noto Serif SC', 'Songti SC', 'SimSun', 'FangSong', Georgia, serif);
 }
 
 .article-content h2 {
