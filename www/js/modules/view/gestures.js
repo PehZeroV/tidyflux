@@ -166,6 +166,12 @@ export const Gestures = {
                 return;
             }
 
+            // 检查是否在上下文菜单内（滑块拖动等不应触发手势）
+            if (swipeTarget.closest('.context-menu') || swipeTarget.matches('input[type="range"]')) {
+                startX = 0;
+                return;
+            }
+
             // 检查是否在可水平滚动的容器内
             if (this.isInHorizontalScrollableContainer(swipeTarget)) {
                 startX = 0;

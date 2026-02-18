@@ -635,12 +635,12 @@ export const ArticleContentView = {
         const toolbarHTML = `
             <div class="article-toolbar">
                 <div class="article-toolbar-left">
-                    <button class="article-toolbar-btn" id="article-back-btn" title="${i18n.t('keyboard.go_back')}">
+                    <button class="article-toolbar-btn" id="article-back-btn" data-tooltip="${i18n.t('keyboard.go_back')}">
                         ${Icons.arrow_back}
                     </button>
                 </div>
                 <div class="article-toolbar-right">
-                    <button class="article-toolbar-btn" id="digest-delete-btn" title="${i18n.t('digest.delete')}">
+                    <button class="article-toolbar-btn" id="digest-delete-btn" data-tooltip="${i18n.t('digest.delete')}">
                         ${Icons.delete}
                     </button>
                 </div>
@@ -783,29 +783,29 @@ export const ArticleContentView = {
         const toolbarHTML = `
             <div class="article-toolbar">
                 <div class="article-toolbar-left">
-                    <button class="article-toolbar-btn" id="article-back-btn" title="${i18n.t('common.close')}">
+                    <button class="article-toolbar-btn" id="article-back-btn" data-tooltip="${i18n.t('common.close')}">
                         ${Icons.arrow_back}
                     </button>
                 </div>
                 <div class="article-toolbar-right">
-                   <button class="article-toolbar-btn ${isRead ? 'is-read' : 'active'}" id="article-toggle-read-btn" title="${isRead ? i18n.t('article.mark_unread') : i18n.t('article.mark_read')}">
+                   <button class="article-toolbar-btn ${isRead ? 'is-read' : 'active'}" id="article-toggle-read-btn" data-tooltip="${isRead ? i18n.t('article.mark_unread') : i18n.t('article.mark_read')}">
                         ${isRead ? Icons.mark_read : Icons.mark_unread}
                     </button>
-                    <button class="article-toolbar-btn ${isFavorited ? 'active' : ''}" id="article-toggle-fav-btn" title="${isFavorited ? i18n.t('article.unstar') : i18n.t('article.star')}">
+                    <button class="article-toolbar-btn ${isFavorited ? 'active' : ''}" id="article-toggle-fav-btn" data-tooltip="${isFavorited ? i18n.t('article.unstar') : i18n.t('article.star')}">
                         ${isFavorited ? Icons.star : Icons.star_border}
                     </button>
-                    <button class="article-toolbar-btn" id="article-fetch-content-btn" title="${i18n.t('feed.fetch_content')}">
+                    <button class="article-toolbar-btn" id="article-fetch-content-btn" data-tooltip="${i18n.t('feed.fetch_content')}">
                         ${Icons.fetch_original}
                     </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>
-                    <button class="article-toolbar-btn" id="article-translate-btn" title="${i18n.t('ai.translate_btn')}">
+                    <button class="article-toolbar-btn" id="article-translate-btn" data-tooltip="${i18n.t('ai.translate_btn')}">
                         ${Icons.translate}
                     </button>
-                    <button class="article-toolbar-btn" id="article-summarize-btn" title="${i18n.t('ai.summarize_btn')}">
+                    <button class="article-toolbar-btn" id="article-summarize-btn" data-tooltip="${i18n.t('ai.summarize_btn')}">
                         ${Icons.summarize}
                     </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>
-                    <button class="article-toolbar-btn" id="article-more-btn" title="${i18n.t('article.more_actions')}">
+                    <button class="article-toolbar-btn" id="article-more-btn" data-tooltip="${i18n.t('article.more_actions')}">
                         ${Icons.more_vert}
                     </button>
                 </div>
@@ -1035,7 +1035,7 @@ export const ArticleContentView = {
             header.className = 'code-block-header';
             header.innerHTML = `
                 <span class="code-language">${language.toUpperCase()}</span>
-                <button class="code-copy-btn" title="${i18n.t('ai.copy')}">
+                <button class="code-copy-btn" data-tooltip="${i18n.t('ai.copy')}">
                     ${Icons.copy}
                     <span class="copy-text">${i18n.t('ai.copy')}</span>
                 </button>
@@ -1219,14 +1219,14 @@ export const ArticleContentView = {
 
         let html = '';
         // 始终显示上一篇按钮，第一篇时禁用
-        html += `<button class="article-nav-btn${prevId ? '' : ' disabled'}" ${prevId ? `data-nav-id="${prevId}"` : ''} title="${i18n.t('keyboard.prev_article')}">${Icons.arrow_back}</button>`;
+        html += `<button class="article-nav-btn${prevId ? '' : ' disabled'}" ${prevId ? `data-nav-id="${prevId}"` : ''} data-tooltip="${i18n.t('keyboard.prev_article')}">${Icons.arrow_back}</button>`;
         // 始终显示下一篇按钮，最后一篇时禁用（除非可以加载更多）
         if (nextId) {
-            html += `<button class="article-nav-btn" data-nav-id="${nextId}" title="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
+            html += `<button class="article-nav-btn" data-nav-id="${nextId}" data-tooltip="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
         } else if (canLoadMore) {
-            html += `<button class="article-nav-btn load-more-nav-btn" title="${i18n.t('common.loading')}">${Icons.arrow_forward}</button>`;
+            html += `<button class="article-nav-btn load-more-nav-btn" data-tooltip="${i18n.t('common.loading')}">${Icons.arrow_forward}</button>`;
         } else {
-            html += `<button class="article-nav-btn disabled" title="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
+            html += `<button class="article-nav-btn disabled" data-tooltip="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
         }
 
         container.innerHTML = html;

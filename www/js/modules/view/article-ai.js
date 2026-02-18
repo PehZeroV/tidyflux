@@ -439,7 +439,7 @@ export const ArticleAIMixin = {
             // 如果已有翻译缓存
             if (article._translatedContent) {
                 translateBtn.classList.add('active');
-                translateBtn.title = i18n.t('ai.original_content');
+                translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
             }
 
             translateBtn.addEventListener('click', async (e) => {
@@ -462,7 +462,7 @@ export const ArticleAIMixin = {
                         if (titleTransBlock) titleTransBlock.remove();
 
                         translateBtn.classList.remove('active');
-                        translateBtn.title = i18n.t('ai.translate_btn');
+                        translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
 
                         showToast(i18n.t('ai.translate_cancelled'));
                     }
@@ -496,7 +496,7 @@ export const ArticleAIMixin = {
                     existingBlocks.forEach(el => el.style.display = newDisplay);
 
                     translateBtn.classList.toggle('active', !anyVisible);
-                    translateBtn.title = !anyVisible ? i18n.t('ai.original_content') : i18n.t('ai.translate_btn');
+                    translateBtn.setAttribute('data-tooltip', !anyVisible ? i18n.t('ai.original_content') : i18n.t('ai.translate_btn'));
                     return;
                 }
 
@@ -504,7 +504,7 @@ export const ArticleAIMixin = {
                 const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
                 if (cacheRestored) {
                     translateBtn.classList.add('active');
-                    translateBtn.title = i18n.t('ai.original_content');
+                    translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
                     return;
                 }
 
@@ -516,7 +516,7 @@ export const ArticleAIMixin = {
                     await this.translateBilingual(bodyEl, titleEl, article._translateController.signal, article.id);
                     translateBtn.classList.remove('loading');
                     translateBtn.classList.add('active');
-                    translateBtn.title = i18n.t('ai.original_content');
+                    translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
                 } catch (err) {
                     if (err.name === 'AbortError') return;
                     console.error('Translation failed', err);
@@ -670,7 +670,7 @@ export const ArticleAIMixin = {
             if (cacheRestored) {
                 if (translateBtn) {
                     translateBtn.classList.add('active');
-                    translateBtn.title = i18n.t('ai.original_content');
+                    translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
                 }
                 return;
             }
@@ -685,7 +685,7 @@ export const ArticleAIMixin = {
             if (translateBtn) {
                 translateBtn.classList.remove('loading');
                 translateBtn.classList.add('active');
-                translateBtn.title = i18n.t('ai.original_content');
+                translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
             }
         } catch (err) {
             if (err.name === 'AbortError') return;

@@ -67,8 +67,10 @@ class I18n {
                 el.setAttribute('placeholder', translation);
             } else if (el.tagName === 'META') {
                 el.setAttribute('content', translation);
-            } else if (el.hasAttribute('title')) {
-                el.setAttribute('title', translation);
+            } else if (el.hasAttribute('title') || el.hasAttribute('data-tooltip')) {
+                // Use custom tooltip instead of native title
+                el.setAttribute('data-tooltip', translation);
+                if (el.hasAttribute('title')) el.removeAttribute('title');
                 // Also update text content if it's not a button with only icons
                 if (el.textContent.trim() !== '' && !el.querySelector('svg')) {
                     el.textContent = translation;

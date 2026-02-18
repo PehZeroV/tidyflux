@@ -406,3 +406,101 @@ export function renderMarkdown(markdown) {
     return `<p>${html}</p>`;
 }
 
+/**
+ * 自定义工具提示（替代原生 title）
+ * 使用 data-tooltip 属性，悬停时在元素下方显示 toast 风格的提示
+ */
+let tooltipEl = null;
+let tooltipShowTimer = null;
+const TOOLTIP_DELAY = 500; // ms
+
+function getTooltipEl() {
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'custom-tooltip';
+        document.body.appendChild(tooltipEl);
+    }
+    return tooltipEl;
+}
+
+function showTooltip(target) {
+    const text = target.getAttribute('data-tooltip');
+    if (!text) return;
+
+    const el = getTooltipEl();
+    el.textContent = text;
+
+    // Position below the element, horizontally centered
+    const rect = target.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    let topY = rect.bottom + 6;
+
+    el.style.left = `${centerX}px`;
+    el.style.top = `${topY}px`;
+
+    // Force reflow then show
+    el.offsetWidth;
+    el.classList.add('visible');
+
+    // Check if tooltip overflows viewport right/left
+    requestAnimationFrame(() => {
+        const tooltipRect = el.getBoundingClientRect();
+        if (tooltipRect.right > window.innerWidth - 8) {
+            el.style.left = `${window.innerWidth - tooltipRect.width / 2 - 8}px`;
+        }
+        if (tooltipRect.left < 8) {
+            el.style.left = `${tooltipRect.width / 2 + 8}px`;
+        }
+    });
+}
+
+function hideTooltip() {
+    if (tooltipShowTimer) {
+        clearTimeout(tooltipShowTimer);
+        tooltipShowTimer = null;
+    }
+    if (tooltipEl) {
+        tooltipEl.classList.remove('visible');
+    }
+}
+
+/**
+ * 初始化自定义工具提示（事件委托）
+ * 在 document.body 上监听 mouseover/mouseout，自动处理所有 [data-tooltip] 元素
+ */
+export function initTooltips() {
+    let currentTarget = null;
+
+    document.body.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (!target || target === currentTarget) return;
+
+        // 清除之前的
+        hideTooltip();
+        currentTarget = target;
+
+        tooltipShowTimer = setTimeout(() => {
+            if (currentTarget === target) {
+                showTooltip(target);
+            }
+        }, TOOLTIP_DELAY);
+    });
+
+    document.body.addEventListener('mouseout', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        // 检查是否移动到同一个 tooltip 元素的子元素
+        const related = e.relatedTarget;
+        if (related && target.contains(related)) return;
+
+        currentTarget = null;
+        hideTooltip();
+    });
+
+    // 点击时隐藏
+    document.body.addEventListener('mousedown', () => {
+        hideTooltip();
+        currentTarget = null;
+    });
+}

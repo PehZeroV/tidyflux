@@ -12,11 +12,13 @@ import { i18n } from './modules/i18n.js';
 import { AIService } from './modules/ai-service.js';
 import { AICache } from './modules/ai-cache.js';
 import { initPanelResizer } from './modules/panel-resizer.js';
+import { initTooltips } from './modules/view/utils.js';
 
 async function initApp() {
     // 初始化主题（在登录页面也需要）
     initTheme();
     i18n.translatePage();
+    initTooltips();
 
     // 检查登录状态
     if (!AuthManager.isLoggedIn()) {

@@ -60,7 +60,7 @@ export const ArticleToolbarMixin = {
                         btn.classList.remove('is-read');
                         btn.classList.add('active');
                         btn.innerHTML = Icons.mark_unread;
-                        btn.title = i18n.t('article.mark_read');
+                        btn.setAttribute('data-tooltip', i18n.t('article.mark_read'));
 
                         // 增加未读计数
                         this.updateLocalUnreadCount(article.feed_id, 1);
@@ -70,7 +70,7 @@ export const ArticleToolbarMixin = {
                         btn.classList.add('is-read');
                         btn.classList.remove('active');
                         btn.innerHTML = Icons.mark_read;
-                        btn.title = i18n.t('article.mark_unread');
+                        btn.setAttribute('data-tooltip', i18n.t('article.mark_unread'));
                         this.updateLocalUnreadCount(article.feed_id);
                     }
 
@@ -93,13 +93,13 @@ export const ArticleToolbarMixin = {
                         await FeedManager.unfavoriteArticle(article.id);
                         article.is_favorited = 0;
                         btn.classList.remove('active');
-                        btn.title = i18n.t('article.star');
+                        btn.setAttribute('data-tooltip', i18n.t('article.star'));
                         btn.innerHTML = Icons.star_border;
                     } else {
                         await FeedManager.favoriteArticle(article.id);
                         article.is_favorited = 1;
                         btn.classList.add('active');
-                        btn.title = i18n.t('article.unstar');
+                        btn.setAttribute('data-tooltip', i18n.t('article.unstar'));
                         btn.innerHTML = Icons.star;
                     }
 
@@ -127,7 +127,7 @@ export const ArticleToolbarMixin = {
             // 如果已有原始内容缓存，更新按钮状态
             if (article._originalContent) {
                 fetchBtn.innerHTML = Icons.restore_original;
-                fetchBtn.title = i18n.t('feed.restore_original');
+                fetchBtn.setAttribute('data-tooltip', i18n.t('feed.restore_original'));
                 fetchBtn.classList.add('active');
             }
 
@@ -181,7 +181,7 @@ export const ArticleToolbarMixin = {
                         translateBtn.classList.remove('loading');
                         if (!titleTransBlock) {
                             translateBtn.classList.remove('active');
-                            translateBtn.title = i18n.t('ai.translate_btn');
+                            translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
                         }
                     }
 
@@ -207,7 +207,7 @@ export const ArticleToolbarMixin = {
                     delete article._originalContent;
                     fetchBtn.innerHTML = Icons.fetch_original;
                     btn.classList.remove('active');
-                    btn.title = i18n.t('feed.fetch_content');
+                    btn.setAttribute('data-tooltip', i18n.t('feed.fetch_content'));
 
                     // 恢复原文后重新触发自动 AI（如果已启用）
                     this.autoSummarize(article);
@@ -266,7 +266,7 @@ export const ArticleToolbarMixin = {
                         translateBtn.classList.remove('loading');
                         if (!titleTransBlock) {
                             translateBtn.classList.remove('active');
-                            translateBtn.title = i18n.t('ai.translate_btn');
+                            translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
                         }
                     }
 
@@ -298,7 +298,7 @@ export const ArticleToolbarMixin = {
 
                     setTimeout(() => {
                         btn.innerHTML = Icons.restore_original;
-                        btn.title = i18n.t('feed.restore_original');
+                        btn.setAttribute('data-tooltip', i18n.t('feed.restore_original'));
                         btn.classList.add('active');
                         btn.classList.remove('loading');
 
@@ -380,7 +380,7 @@ export const ArticleToolbarMixin = {
                         <input type="range" class="context-menu-slider font-size-slider" min="0.9" max="1.5" step="0.05" value="${currentFontSize}">
                         <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); margin-top: 2px; user-select: none;">
                             <span>${i18n.t('context.font_size_small')}</span>
-                            <span class="font-size-value" style="cursor: pointer;">${currentFontSize}em</span>
+                            <span class="font-size-value" style="cursor: pointer;" data-tooltip="${i18n.t('settings.keyboard_reset')}">${currentFontSize}em</span>
                             <span>${i18n.t('context.font_size_large')}</span>
                         </div>
                     </div>
@@ -391,7 +391,7 @@ export const ArticleToolbarMixin = {
                             <input type="range" class="context-menu-slider width-slider" min="300" max="600" step="10" value="${currentWidth}">
                             <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); margin-top: 2px; user-select: none;">
                                 <span>${i18n.t('context.page_width_narrow')}</span>
-                                <span class="page-width-value" style="cursor: pointer;">${currentWidth * 2}</span>
+                                <span class="page-width-value" style="cursor: pointer;" data-tooltip="${i18n.t('settings.keyboard_reset')}">${currentWidth * 2}</span>
                                 <span>${i18n.t('context.page_width_wide')}</span>
                             </div>
                         </div>
