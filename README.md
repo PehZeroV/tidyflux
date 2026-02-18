@@ -1,7 +1,7 @@
 # Tidyflux
 
 <p align="center">
-  A clean and beautiful web client developed based on Miniflux API
+  A clean and elegant AI-powered client for Miniflux
 </p>
 
 > 👋 **Preface**: I am a **complete novice who knows nothing about code**, this project was **completely written using Google Antigravity**. Special thanks to the powerful capabilities of AI, allowing imagination to no longer be limited by coding ability. Looking forward to AI helping more ordinary people realize their small ideas in the future! 🚀
@@ -113,7 +113,7 @@ curl -o docker-compose.yml https://raw.githubusercontent.com/PehZeroV/tidyflux/m
 ```
 
 > ⚠️ **Important Security Note**:
-> Before starting, please be sure to edit `docker-compose.yml` and change `ADMIN_PASSWORD` (Miniflux password) and `MINIFLUX_PASSWORD` (TidyFlux connection password) to the **same strong password**.
+> Before starting, please be sure to edit `docker-compose.yml` and change `ADMIN_PASSWORD` (Miniflux password) and `MINIFLUX_PASSWORD` (Tidyflux connection password) to the **same strong password**.
 
 2. Start all services:
 

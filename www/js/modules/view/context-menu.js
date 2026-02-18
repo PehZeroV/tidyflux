@@ -48,10 +48,6 @@ export const ContextMenu = {
                 ${Icons.pin}
                 ${isPinned ? i18n.t('context.unpin_group') : i18n.t('context.pin_group')}
             </div>
-            <div class="context-menu-item" data-action="refresh-group" data-group-id="${groupId}">
-                ${Icons.refresh}
-                ${i18n.t('context.refresh_group')}
-            </div>
             <div class="context-menu-item" data-action="rename" data-group-id="${groupId}">
                 ${Icons.edit}
                 ${i18n.t('context.rename')}
@@ -76,13 +72,6 @@ export const ContextMenu = {
             if (action === 'toggle-pin') {
                 const pinned = this.viewManager.getPinnedGroups().includes(parseInt(gid, 10));
                 await this.viewManager.togglePinGroup(gid, !pinned);
-            } else if (action === 'refresh-group') {
-                showToast(i18n.t('common.refreshing'));
-                try {
-                    await FeedManager.refreshGroup(gid);
-                } catch (err) {
-                    alert(err.message || i18n.t('common.refresh_failed'));
-                }
 
             } else if (action === 'rename') {
                 const newName = await Modal.prompt(i18n.t('context.enter_new_name'), group.name);
@@ -105,11 +94,6 @@ export const ContextMenu = {
     showFeedContextMenu(event, feedId) {
 
         const html = `
-            <div class="context-menu-item" data-action="refresh" data-feed-id="${feedId}">
-                ${Icons.refresh}
-                ${i18n.t('context.refresh_feed')}
-            </div>
-            <div class="context-menu-divider"></div>
             <div class="context-menu-item" data-action="edit-feed" data-feed-id="${feedId}">
                 ${Icons.edit}
                 ${i18n.t('dialogs.edit_subscription')}
@@ -126,15 +110,7 @@ export const ContextMenu = {
             const fid = item.dataset.feedId;
             cleanup();
 
-            if (action === 'refresh') {
-                showToast(i18n.t('common.refreshing'));
-                try {
-                    await FeedManager.refreshFeed(fid);
-                } catch (err) {
-                    alert(err.message || i18n.t('common.refresh_failed'));
-                }
-
-            } else if (action === 'edit-feed') {
+            if (action === 'edit-feed') {
                 this.viewManager.showEditFeedDialog(fid);
             }
         });

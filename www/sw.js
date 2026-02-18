@@ -26,7 +26,6 @@ const URLS_TO_CACHE = [
   '/icons/icon-512x512.png',
   '/manifest.json',
   '/icons/apple-touch-icon.png',
-  '/icons/favicon.png',
   '/icons/rss.svg',
   '/js/modules/keyboard.js',
   '/css/keyboard.css'

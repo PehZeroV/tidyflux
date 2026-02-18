@@ -561,7 +561,7 @@ export const ArticleContentView = {
         const toolbarHTML = `
             <div class="article-toolbar">
                 <div class="article-toolbar-left">
-                    <button class="article-toolbar-btn" id="article-back-btn" title="返回列表">
+                    <button class="article-toolbar-btn" id="article-back-btn" title="${i18n.t('keyboard.go_back')}">
                         ${Icons.arrow_back}
                     </button>
                 </div>
@@ -1097,12 +1097,12 @@ export const ArticleContentView = {
 
         let html = '';
         if (prevId) {
-            html += `<button class="article-nav-btn" data-nav-id="${prevId}" title="上一篇">${Icons.arrow_back}</button>`;
+            html += `<button class="article-nav-btn" data-nav-id="${prevId}" title="${i18n.t('keyboard.prev_article')}">${Icons.arrow_back}</button>`;
         }
         if (nextId) {
-            html += `<button class="article-nav-btn" data-nav-id="${nextId}" title="下一篇">${Icons.arrow_forward}</button>`;
+            html += `<button class="article-nav-btn" data-nav-id="${nextId}" title="${i18n.t('keyboard.next_article')}">${Icons.arrow_forward}</button>`;
         } else if (canLoadMore) {
-            html += `<button class="article-nav-btn load-more-nav-btn" title="加载更多">${Icons.arrow_forward}</button>`;
+            html += `<button class="article-nav-btn load-more-nav-btn" title="${i18n.t('common.loading')}">${Icons.arrow_forward}</button>`;
         }
 
         container.innerHTML = html;
@@ -1134,7 +1134,7 @@ export const ArticleContentView = {
                             // Failed to find next article or still at end? Restore button
                             btn.innerHTML = originalHtml;
                             btn.style.pointerEvents = 'auto';
-                            showToast(i18n.t('article.no_more_articles') || '没有更多文章了');
+                            showToast(i18n.t('article.no_more_articles'));
                         }
                     } catch (err) {
                         console.error('Auto load next failed:', err);

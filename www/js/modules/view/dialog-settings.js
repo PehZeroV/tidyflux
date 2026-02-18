@@ -272,8 +272,6 @@ export const SettingsDialogMixin = {
                     <a href="https://github.com/PehZeroV/tidyflux" target="_blank" rel="noopener noreferrer" class="settings-github-link">
                         ${Icons.github}
                         <span>Tidyflux</span>
-                        <span class="settings-github-dot">·</span>
-                        <span class="settings-github-desc">${i18n.t('app.description')}</span>
                     </a>
                 </div>
                 ` : ''}

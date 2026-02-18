@@ -1,7 +1,7 @@
 # Tidyflux
 
 <p align="center">
-  一个基于 Miniflux API 开发的简洁美观的网页客户端
+  简洁优雅的 AI 驱动 Miniflux 客户端
 </p>
 
 > 👋 **写在前面**：我是个**完全不懂代码的小白**，这个项目是**完全靠 Google Antigravity 写出来的**。特别感谢 AI 的强大能力，让想象力不再受限于代码能力。期待未来 AI 能帮助更多普通人实现自己的一个个小想法！🚀
@@ -113,7 +113,7 @@ curl -o docker-compose.yml https://raw.githubusercontent.com/PehZeroV/tidyflux/m
 ```
 
 > ⚠️ **重要安全提示**：
-> 启动前，请务必编辑 `docker-compose.yml`，将 `ADMIN_PASSWORD` (Miniflux 密码) 和 `MINIFLUX_PASSWORD` (TidyFlux 连接密码) 修改为**相同的强密码**。
+> 启动前，请务必编辑 `docker-compose.yml`，将 `ADMIN_PASSWORD` (Miniflux 密码) 和 `MINIFLUX_PASSWORD` (Tidyflux 连接密码) 修改为**相同的强密码**。
 
 2. 启动所有服务：
 

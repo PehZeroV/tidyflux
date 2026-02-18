@@ -197,10 +197,10 @@ export class CustomSelect {
         // Add tabindex for keyboard focus
         this.trigger.setAttribute('tabindex', '0');
         this.wrapper.appendChild(this.trigger);
-        // Create Options List
+        // Create Options List - appended to body for fixed positioning
         this.optionsList = document.createElement('div');
         this.optionsList.className = 'custom-select-options';
-        this.wrapper.appendChild(this.optionsList);
+        document.body.appendChild(this.optionsList);
 
         // Event Delegation for options
         this.optionsList.addEventListener('click', (e) => {
@@ -235,13 +235,47 @@ export class CustomSelect {
 
         // Close when clicking outside
         this.clickOutsideHandler = (e) => {
-            if (!this.wrapper.contains(e.target)) {
+            if (!this.wrapper.contains(e.target) && !this.optionsList.contains(e.target)) {
                 this.close();
             }
         };
         document.addEventListener('click', this.clickOutsideHandler);
 
+        // Reposition on scroll/resize
+        this._scrollHandler = () => {
+            if (this.wrapper.classList.contains('open')) {
+                this._positionOptions();
+            }
+        };
+        this._resizeHandler = this._scrollHandler;
+
         this.nativeSelect.dataset.customSelectInitialized = 'true';
+
+        // Store reference on wrapper for external access
+        this.wrapper._customSelect = this;
+
+        // Auto-cleanup when wrapper is removed from DOM (e.g., dialog close)
+        this._mutationObserver = new MutationObserver(() => {
+            if (!document.body.contains(this.wrapper)) {
+                this.destroy();
+            }
+        });
+        this._mutationObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    /**
+     * Clean up all event listeners and remove orphaned DOM elements
+     */
+    destroy() {
+        this.close();
+        if (this.optionsList && this.optionsList.parentNode) {
+            this.optionsList.remove();
+        }
+        document.removeEventListener('click', this.clickOutsideHandler);
+        if (this._mutationObserver) {
+            this._mutationObserver.disconnect();
+            this._mutationObserver = null;
+        }
     }
 
     refresh() {
@@ -315,13 +349,69 @@ export class CustomSelect {
 
         this.wrapper.classList.add('open');
         this.trigger.classList.add('open');
+        this.optionsList.classList.add('custom-select-options-visible');
+        this._positionOptions();
+
+        // Listen for scroll on all ancestors and window resize
+        window.addEventListener('resize', this._resizeHandler);
+        this._scrollAncestors = [];
+        let el = this.wrapper.parentElement;
+        while (el) {
+            el.addEventListener('scroll', this._scrollHandler, { passive: true });
+            this._scrollAncestors.push(el);
+            el = el.parentElement;
+        }
     }
 
     close() {
         this.wrapper.classList.remove('open');
         this.trigger.classList.remove('open');
+        this.optionsList.classList.remove('custom-select-options-visible');
         if (CustomSelect.activeInstance === this) {
             CustomSelect.activeInstance = null;
+        }
+
+        // Remove scroll/resize listeners
+        window.removeEventListener('resize', this._resizeHandler);
+        if (this._scrollAncestors) {
+            this._scrollAncestors.forEach(el => {
+                el.removeEventListener('scroll', this._scrollHandler);
+            });
+            this._scrollAncestors = null;
+        }
+    }
+
+    /**
+     * Position the options list using fixed positioning relative to the trigger
+     */
+    _positionOptions() {
+        const triggerRect = this.trigger.getBoundingClientRect();
+        const optsList = this.optionsList;
+
+        // Temporarily make visible for measurement
+        optsList.style.position = 'fixed';
+        optsList.style.left = `${triggerRect.left}px`;
+        optsList.style.width = `${triggerRect.width}px`;
+
+        // Measure dropdown height
+        const optsHeight = optsList.scrollHeight;
+        const maxH = Math.min(400, window.innerHeight * 0.4);
+        const actualHeight = Math.min(optsHeight, maxH);
+
+        // Check if there's enough space below, otherwise open upward
+        const spaceBelow = window.innerHeight - triggerRect.bottom - 10;
+        const spaceAbove = triggerRect.top - 10;
+
+        if (spaceBelow >= actualHeight || spaceBelow >= spaceAbove) {
+            // Open downward
+            optsList.style.top = `${triggerRect.bottom + 6}px`;
+            optsList.style.bottom = 'auto';
+            optsList.style.maxHeight = `${Math.min(maxH, spaceBelow)}px`;
+        } else {
+            // Open upward
+            optsList.style.top = 'auto';
+            optsList.style.bottom = `${window.innerHeight - triggerRect.top + 6}px`;
+            optsList.style.maxHeight = `${Math.min(maxH, spaceAbove)}px`;
         }
     }
 

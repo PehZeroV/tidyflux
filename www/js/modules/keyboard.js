@@ -76,29 +76,29 @@ const DEFAULT_SHORTCUTS = {
  * Grouped by context for display in help and settings
  */
 const ACTION_META = {
-    nextItem: { group: 'list', zhLabel: '下一篇文章', enLabel: 'Next article' },
-    prevItem: { group: 'list', zhLabel: '上一篇文章', enLabel: 'Previous article' },
-    openItem: { group: 'list', zhLabel: '打开文章', enLabel: 'Open article' },
-    search: { group: 'list', zhLabel: '搜索', enLabel: 'Search' },
-    refresh: { group: 'list', zhLabel: '刷新列表', enLabel: 'Refresh list' },
-    addFeed: { group: 'list', zhLabel: '添加订阅', enLabel: 'Add feed' },
+    nextItem: { group: 'list', i18nKey: 'keyboard.next_item' },
+    prevItem: { group: 'list', i18nKey: 'keyboard.prev_item' },
+    openItem: { group: 'list', i18nKey: 'keyboard.open_item' },
+    search: { group: 'list', i18nKey: 'keyboard.search' },
+    refresh: { group: 'list', i18nKey: 'keyboard.refresh' },
+    addFeed: { group: 'list', i18nKey: 'keyboard.add_feed' },
 
-    nextArticle: { group: 'reading', zhLabel: '下一篇', enLabel: 'Next article' },
-    prevArticle: { group: 'reading', zhLabel: '上一篇', enLabel: 'Previous article' },
-    toggleStar: { group: 'reading', zhLabel: '收藏 / 取消收藏', enLabel: 'Toggle star' },
-    toggleRead: { group: 'reading', zhLabel: '已读 / 未读', enLabel: 'Toggle read/unread' },
-    openOriginal: { group: 'reading', zhLabel: '打开原文', enLabel: 'Open original' },
-    fetchContent: { group: 'reading', zhLabel: '获取全文', enLabel: 'Fetch content' },
-    saveThirdParty: { group: 'reading', zhLabel: '保存到第三方', enLabel: 'Save to third-party' },
-    goBack: { group: 'reading', zhLabel: '返回列表', enLabel: 'Go back' },
+    nextArticle: { group: 'reading', i18nKey: 'keyboard.next_article' },
+    prevArticle: { group: 'reading', i18nKey: 'keyboard.prev_article' },
+    toggleStar: { group: 'reading', i18nKey: 'keyboard.toggle_star' },
+    toggleRead: { group: 'reading', i18nKey: 'keyboard.toggle_read' },
+    openOriginal: { group: 'reading', i18nKey: 'keyboard.open_original' },
+    fetchContent: { group: 'reading', i18nKey: 'keyboard.fetch_content' },
+    saveThirdParty: { group: 'reading', i18nKey: 'keyboard.save_third_party' },
+    goBack: { group: 'reading', i18nKey: 'keyboard.go_back' },
 
-    showHelp: { group: 'global', zhLabel: '快捷键帮助', enLabel: 'Shortcuts help' },
+    showHelp: { group: 'global', i18nKey: 'keyboard.show_help' },
 };
 
-const GROUP_LABELS = {
-    list: { zh: '文章列表', en: 'Article List' },
-    reading: { zh: '文章阅读', en: 'Reading View' },
-    global: { zh: '通用', en: 'General' },
+const GROUP_I18N_KEYS = {
+    list: 'keyboard.group_list',
+    reading: 'keyboard.group_reading',
+    global: 'keyboard.group_global',
 };
 
 /**
@@ -573,11 +573,10 @@ export const KeyboardShortcuts = {
             this._buildReverseMap();
         }
 
-        const isZh = (AppState.user?.language || navigator.language || 'zh-CN').startsWith('zh');
-        const title = isZh ? '快捷键管理' : 'Keyboard Shortcuts';
-        const resetText = isZh ? '恢复默认' : 'Reset to Defaults';
-        const saveText = isZh ? '保存' : 'Save';
-        const hintText = isZh ? '点击按键框可自定义快捷键' : 'Click a key box to customize';
+        const title = i18n.t('settings.keyboard_shortcuts');
+        const resetText = i18n.t('settings.keyboard_reset');
+        const saveText = i18n.t('settings.keyboard_save');
+        const hintText = i18n.t('settings.keyboard_shortcuts_hint');
 
         const groupOrder = ['list', 'reading', 'global'];
         const groups = {};
@@ -586,7 +585,7 @@ export const KeyboardShortcuts = {
             groups[meta.group].push({
                 action,
                 keys: [...(this.shortcuts[action] || [])],
-                label: isZh ? meta.zhLabel : meta.enLabel,
+                label: i18n.t(meta.i18nKey),
             });
         }
 
@@ -594,7 +593,7 @@ export const KeyboardShortcuts = {
 
         const { dialog, close } = createDialog('settings-dialog', `
             <div class="settings-dialog-content" style="position: relative; max-width: 480px; display: flex; flex-direction: column; overflow-x: hidden;">
-                <button class="icon-btn close-dialog-btn" title="${isZh ? '关闭' : 'Close'}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; z-index: 10;">
+                <button class="icon-btn close-dialog-btn" title="${i18n.t('common.close')}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; z-index: 10;">
                     ${CloseIcon}
                 </button>
                 <h3>${title}</h3>
@@ -602,7 +601,7 @@ export const KeyboardShortcuts = {
                 <div style="flex: 1; min-height: 0; overflow-y: auto; margin: 0 -24px; padding: 0 24px;">
                     ${groupOrder.map(g => `
                         <div class="keyboard-help-section">
-                            <h3>${isZh ? GROUP_LABELS[g].zh : GROUP_LABELS[g].en}</h3>
+                            <h3>${i18n.t(GROUP_I18N_KEYS[g])}</h3>
                             <div class="keyboard-customize-items">
                                 ${(groups[g] || []).map(item => `
                                     <div class="keyboard-customize-row" data-action="${item.action}">
@@ -642,7 +641,7 @@ export const KeyboardShortcuts = {
             const prevKeys = draft[prevAction] || [];
             activeInput.innerHTML = prevKeys.length
                 ? prevKeys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')
-                : `<span style="color: var(--meta-color); font-size: 0.8em;">${isZh ? '未设置' : 'None'}</span>`;
+                : `<span style="color: var(--meta-color); font-size: 0.8em;">${i18n.t('settings.keyboard_none')}</span>`;
             activeInput = null;
         };
 
@@ -659,7 +658,7 @@ export const KeyboardShortcuts = {
                 if (activeInput) cancelRecording();
                 activeInput = input;
                 input.classList.add('recording');
-                input.innerHTML = `<span class="recording-hint">${isZh ? '请按键...' : 'Press a key...'}</span>`;
+                input.innerHTML = `<span class="recording-hint">${i18n.t('settings.keyboard_press_key')}</span>`;
             });
         });
 
@@ -687,11 +686,9 @@ export const KeyboardShortcuts = {
                 if (otherKeys.includes(key)) {
                     // Found conflict - show warning and clear the conflicting binding
                     const meta = ACTION_META[otherAction];
-                    const conflictLabel = meta ? (isZh ? meta.zhLabel : meta.enLabel) : otherAction;
+                    const conflictLabel = meta ? i18n.t(meta.i18nKey) : otherAction;
                     showToast(
-                        isZh
-                            ? `⚠️ "${this._formatKey(key)}" 已被「${conflictLabel}」使用，已自动解除`
-                            : `⚠️ "${this._formatKey(key)}" was used by "${conflictLabel}", auto-removed`,
+                        i18n.t('settings.keyboard_conflict', { key: this._formatKey(key), label: conflictLabel }),
                         3000,
                         true
                     );
@@ -705,7 +702,7 @@ export const KeyboardShortcuts = {
                         const remainingKeys = draft[otherAction];
                         conflictInput.innerHTML = remainingKeys.length
                             ? remainingKeys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' ')
-                            : `<span style="color: var(--meta-color); font-size: 0.8em;">${isZh ? '未设置' : 'None'}</span>`;
+                            : `<span style="color: var(--meta-color); font-size: 0.8em;">${i18n.t('settings.keyboard_none')}</span>`;
                         // Flash the conflicting row
                         const row = conflictInput.closest('.keyboard-customize-row');
                         if (row) {
@@ -744,7 +741,7 @@ export const KeyboardShortcuts = {
             this._buildReverseMap();
             this._saveShortcuts();
             close();
-            showToast(isZh ? '✓ 快捷键已保存' : '✓ Shortcuts saved', 2000, false);
+            showToast(i18n.t('settings.keyboard_saved'), 2000, false);
         });
     },
 };
