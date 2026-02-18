@@ -557,44 +557,44 @@ export const ContextMenu = {
                 getFeed: (id) => AIService.getFeedTranslationOverride(id),
                 getGroup: (id) => AIService.getGroupTranslationOverride(id),
                 setFeed: (id, v) => AIService.setFeedTranslationOverride(id, v),
-                setGroup: (id, v) => AIService.setGroupTranslationOverride(id, v),
                 shouldFeed: (id) => AIService.shouldTranslateFeed(id),
+                setBatch: (entries) => AIService.setBatchTranslationOverrides(entries),
             },
             translate: {
                 getFeed: (id) => AIService.getFeedAutoTranslateOverride(id),
                 getGroup: (id) => AIService.getGroupAutoTranslateOverride(id),
                 setFeed: (id, v) => AIService.setFeedAutoTranslateOverride(id, v),
-                setGroup: (id, v) => AIService.setGroupAutoTranslateOverride(id, v),
                 shouldFeed: (id) => AIService.shouldAutoTranslate(id),
+                setBatch: (entries) => AIService.setBatchAutoTranslateOverrides(entries),
             },
             summary: {
                 getFeed: (id) => AIService.getFeedSummaryOverride(id),
                 getGroup: (id) => AIService.getGroupSummaryOverride(id),
                 setFeed: (id, v) => AIService.setFeedSummaryOverride(id, v),
-                setGroup: (id, v) => AIService.setGroupSummaryOverride(id, v),
                 shouldFeed: (id) => AIService.shouldAutoSummarize(id),
+                setBatch: (entries) => AIService.setBatchSummaryOverrides(entries),
             },
         };
 
-        const { getFeed, getGroup, setFeed, setGroup, shouldFeed } = overrideMap[mode];
+        const { getFeed, getGroup, setFeed, shouldFeed, setBatch } = overrideMap[mode];
 
         if (feedId) {
-            // Toggle for specific feed
+            // Toggle for specific feed — single item, no batch needed
             const currentlyOn = shouldFeed(feedId);
             const newValue = currentlyOn ? 'off' : 'on';
             await setFeed(feedId, newValue);
         } else if (groupId) {
-            // Toggle for group
+            // Toggle for group — batch: group + all child feeds
             const currentlyOn = getGroup(groupId) === 'on';
             const newValue = currentlyOn ? 'off' : 'on';
-            await setGroup(groupId, newValue);
-            // Reset all child feeds in this group to inherit
+            const batchEntries = [{ type: 'group', id: groupId, value: newValue }];
             const feeds = (AppState.feeds || []).filter(f => f.group_id == groupId);
             for (const f of feeds) {
-                await setFeed(f.id, 'inherit');
+                batchEntries.push({ type: 'feed', id: f.id, value: 'inherit' });
             }
+            await setBatch(batchEntries);
         } else {
-            // Toggle for all: set all groups and ungrouped feeds
+            // Toggle for all — batch: all groups + all feeds
             const groups = AppState.groups || [];
             const feeds = AppState.feeds || [];
             const ungrouped = feeds.filter(f => !f.group_id);
@@ -605,18 +605,19 @@ export const ContextMenu = {
             const currentlyAllOn = (groups.length > 0 || ungrouped.length > 0) && allGroupsOn && allUngroupedOn;
 
             const newValue = currentlyAllOn ? 'off' : 'on';
+            const batchEntries = [];
 
             for (const g of groups) {
-                await setGroup(g.id, newValue);
-                // Reset all feeds in group to inherit
+                batchEntries.push({ type: 'group', id: g.id, value: newValue });
                 const groupFeeds = feeds.filter(f => f.group_id == g.id);
                 for (const f of groupFeeds) {
-                    await setFeed(f.id, 'inherit');
+                    batchEntries.push({ type: 'feed', id: f.id, value: 'inherit' });
                 }
             }
             for (const f of ungrouped) {
-                await setFeed(f.id, newValue);
+                batchEntries.push({ type: 'feed', id: f.id, value: newValue });
             }
+            await setBatch(batchEntries);
         }
     }
 };
