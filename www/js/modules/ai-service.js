@@ -168,6 +168,20 @@ export const AIService = {
     },
 
     /**
+     * 批量设置翻译覆盖（仅保存一次）
+     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
+     */
+    async setBatchTranslationOverrides(entries) {
+        if (!this._titleTranslationOverrides.feeds) this._titleTranslationOverrides.feeds = {};
+        if (!this._titleTranslationOverrides.groups) this._titleTranslationOverrides.groups = {};
+        for (const { type, id, value } of entries) {
+            const store = type === 'group' ? this._titleTranslationOverrides.groups : this._titleTranslationOverrides.feeds;
+            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
+        }
+        await this._saveTranslationOverrides();
+    },
+
+    /**
      * 判断某个订阅源是否应该翻译标题
      * 优先级：订阅源设置 > 分组设置 > 默认关闭
      * @param {string|number} feedId
@@ -249,6 +263,20 @@ export const AIService = {
     },
 
     /**
+     * 批量设置摘要覆盖（仅保存一次）
+     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
+     */
+    async setBatchSummaryOverrides(entries) {
+        if (!this._autoSummaryOverrides.feeds) this._autoSummaryOverrides.feeds = {};
+        if (!this._autoSummaryOverrides.groups) this._autoSummaryOverrides.groups = {};
+        for (const { type, id, value } of entries) {
+            const store = type === 'group' ? this._autoSummaryOverrides.groups : this._autoSummaryOverrides.feeds;
+            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
+        }
+        await this._saveSummaryOverrides();
+    },
+
+    /**
      * 判断某个订阅源是否应该自动摘要
      * 优先级：订阅源设置 > 分组设置 > 默认关闭
      * @param {string|number} feedId
@@ -321,6 +349,20 @@ export const AIService = {
             delete this._autoTranslateOverrides.groups[groupId];
         } else {
             this._autoTranslateOverrides.groups[groupId] = value;
+        }
+        await this._saveAutoTranslateOverrides();
+    },
+
+    /**
+     * 批量设置自动翻译全文覆盖（仅保存一次）
+     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
+     */
+    async setBatchAutoTranslateOverrides(entries) {
+        if (!this._autoTranslateOverrides.feeds) this._autoTranslateOverrides.feeds = {};
+        if (!this._autoTranslateOverrides.groups) this._autoTranslateOverrides.groups = {};
+        for (const { type, id, value } of entries) {
+            const store = type === 'group' ? this._autoTranslateOverrides.groups : this._autoTranslateOverrides.feeds;
+            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
         }
         await this._saveAutoTranslateOverrides();
     },

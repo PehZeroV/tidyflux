@@ -284,8 +284,16 @@ export function setupListSwipeGesture() {
 
 
 
+let _setupDone = false;
+
 // 全局事件监听
 export function setupEventListeners(viewManager) {
+    if (_setupDone) {
+        // If already set up, just re-init keyboard shortcuts (to update viewManager ref)
+        KeyboardShortcuts.init(viewManager);
+        return;
+    }
+    _setupDone = true;
     setupPullToRefresh(viewManager);
     setupSwipeGesture();
     setupListSwipeGesture();

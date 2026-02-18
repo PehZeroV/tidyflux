@@ -7,6 +7,9 @@ import { DOMElements } from '../../dom.js';
 import { AuthManager } from '../auth-manager.js';
 import { i18n } from '../i18n.js';
 import { AIService } from '../ai-service.js';
+import { AICache } from '../ai-cache.js';
+import { setupEventListeners } from '../events.js';
+import { initPanelResizer } from '../panel-resizer.js';
 
 /**
  * 认证视图管理
@@ -80,7 +83,8 @@ export const AuthView = {
                 const aiInitPromise = AIService.init();
                 const configPromise = AuthManager.getMinifluxConfig();
 
-                await aiInitPromise; // Wait for AI init (non-blocking for login flow usually, but good to have)
+                await aiInitPromise;
+                AICache.init(); // Async cleanup, non-blocking
 
                 // 检查 Miniflux 配置
                 try {
@@ -98,6 +102,8 @@ export const AuthView = {
                 }
 
                 await this.viewManager.initThreeColumnLayout();
+                initPanelResizer();
+                setupEventListeners(this.viewManager);
 
                 if (!window.location.hash || window.location.hash === '#/') {
                     window.location.hash = '#/all';

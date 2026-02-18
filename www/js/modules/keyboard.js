@@ -127,6 +127,8 @@ export const KeyboardShortcuts = {
     shortcuts: null,
     /** Reverse mapping (key → action) for fast lookup, rebuilt on change */
     _keyToAction: null,
+    /** Whether the global keydown listener has been bound */
+    _bound: false,
 
     /**
      * Initialize keyboard shortcuts
@@ -136,7 +138,10 @@ export const KeyboardShortcuts = {
         this.viewManager = viewManager;
         this.shortcuts = this._loadShortcuts();
         this._buildReverseMap();
-        this._bindGlobalKeydown();
+        if (!this._bound) {
+            this._bindGlobalKeydown();
+            this._bound = true;
+        }
     },
 
     /**
@@ -694,6 +699,7 @@ export const KeyboardShortcuts = {
                 </button>
                 <h3>${title}</h3>
                 <div class="keyboard-customize-hint" style="margin-bottom: 12px;">${hintText}</div>
+                <div id="keyboard-conflict-msg" style="display:none; padding: 8px 12px; margin-bottom: 10px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent-color), transparent 88%); color: var(--text-color); font-size: 0.85em; line-height: 1.4; transition: opacity 0.3s;"></div>
                 <div style="flex: 1; min-height: 0; overflow-y: auto; margin: 0 -24px; padding: 0 24px;">
                     ${groupOrder.map(g => `
                         <div class="keyboard-help-section">
@@ -792,11 +798,18 @@ export const KeyboardShortcuts = {
                     // Found conflict - show warning and clear the conflicting binding
                     const meta = ACTION_META[otherAction];
                     const conflictLabel = meta ? i18n.t(meta.i18nKey) : otherAction;
-                    showToast(
-                        i18n.t('settings.keyboard_conflict', { key: this._formatKey(key), label: conflictLabel }),
-                        3000,
-                        true
-                    );
+                    // Show conflict message inside the dialog
+                    const conflictMsg = dialog.querySelector('#keyboard-conflict-msg');
+                    if (conflictMsg) {
+                        conflictMsg.textContent = i18n.t('settings.keyboard_conflict', { key: this._formatKey(key), label: conflictLabel });
+                        conflictMsg.style.display = 'block';
+                        conflictMsg.style.opacity = '1';
+                        clearTimeout(conflictMsg._hideTimer);
+                        conflictMsg._hideTimer = setTimeout(() => {
+                            conflictMsg.style.opacity = '0';
+                            setTimeout(() => { conflictMsg.style.display = 'none'; }, 300);
+                        }, 3000);
+                    }
 
                     // Clear conflicting action's key
                     draft[otherAction] = draft[otherAction].filter(k => k !== key);

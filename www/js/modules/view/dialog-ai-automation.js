@@ -347,11 +347,19 @@ export const TranslationDialogMixin = {
         };
 
         // Select all checkbox → toggle all groups and ungrouped feeds
+        // Batch setter map to avoid N individual HTTP requests
+        const batchSetterMap = {
+            translation: (entries) => AIService.setBatchTranslationOverrides(entries),
+            summary: (entries) => AIService.setBatchSummaryOverrides(entries),
+            translate: (entries) => AIService.setBatchAutoTranslateOverrides(entries),
+        };
         const selectAllCb = container.querySelector(`.${prefix}-select-all-checkbox`);
         if (selectAllCb) {
             selectAllCb.addEventListener('change', async () => {
                 const value = selectAllCb.checked ? 'on' : 'off';
                 selectAllCb.indeterminate = false;
+
+                const batchEntries = [];
 
                 // Toggle all groups
                 const groupCbs = container.querySelectorAll(`.${prefix}-group-checkbox`);
@@ -359,13 +367,13 @@ export const TranslationDialogMixin = {
                     const groupId = gcb.dataset.groupId;
                     gcb.checked = selectAllCb.checked;
                     gcb.indeterminate = false;
-                    await setGroupOverride(groupId, value);
+                    batchEntries.push({ type: 'group', id: groupId, value });
 
                     // Reset child feeds to inherit
                     const group = gcb.closest(`.${prefix}-group`);
                     const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
                     for (const fcb of feedCbs) {
-                        await setFeedOverride(fcb.dataset.feedId, 'inherit');
+                        batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value: 'inherit' });
                         fcb.checked = selectAllCb.checked;
                     }
                 }
@@ -374,8 +382,11 @@ export const TranslationDialogMixin = {
                 const ungroupedFeedCbs = container.querySelectorAll(`.${prefix}-feed-checkbox:not([data-group-id])`);
                 for (const fcb of ungroupedFeedCbs) {
                     fcb.checked = selectAllCb.checked;
-                    await setFeedOverride(fcb.dataset.feedId, value);
+                    batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value });
                 }
+
+                // Single save to server
+                await batchSetterMap[mode](batchEntries);
             });
         }
 
@@ -398,17 +409,18 @@ export const TranslationDialogMixin = {
                 const groupId = cb.dataset.groupId;
                 const value = cb.checked ? 'on' : 'off';
                 cb.indeterminate = false;
-                await setGroupOverride(groupId, value);
+
+                const batchEntries = [{ type: 'group', id: groupId, value }];
 
                 // Reset all child feeds to inherit
                 const group = cb.closest(`.${prefix}-group`);
                 const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
                 for (const feedCb of feedCbs) {
-                    const feedId = feedCb.dataset.feedId;
-                    await setFeedOverride(feedId, 'inherit');
+                    batchEntries.push({ type: 'feed', id: feedCb.dataset.feedId, value: 'inherit' });
                     feedCb.checked = cb.checked;
                 }
 
+                await batchSetterMap[mode](batchEntries);
                 updateSelectAllState();
             });
         });
