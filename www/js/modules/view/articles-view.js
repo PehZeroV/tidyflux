@@ -13,7 +13,7 @@ const ARTICLES_CONFIG = {
     VIRTUAL_SCROLL_THRESHOLD: 50,      // 触发虚拟滚动的文章数量阈值
     PAGINATION_LIMIT: 50,              // 每页加载的文章数量
     SCROLL_TOP_THRESHOLD: 300,         // 显示回到顶部按钮的滚动高度
-    NEW_ARTICLES_CHECK_MS: 60 * 1000,  // 新文章轮询间隔 (1分钟)
+    NEW_ARTICLES_CHECK_MS: 10 * 1000,  // 新文章轮询间隔 (10秒)
     VIRTUAL_ITEM_HEIGHT: 85,           // 虚拟列表项预计高度
     VIRTUAL_BUFFER_SIZE: 8,            // 虚拟列表缓冲区页数
     SKELETON_COUNT: 12,                // 初始加载时的骨架屏数量
@@ -119,7 +119,7 @@ export const ArticlesView = {
         if (this.currentRequestId !== requestId) return;
 
         const digestsData = result.digests || { pinned: [], normal: [] };
-        const allItems = this.mergeDigestsAndArticles(digestsData, []);
+        const allItems = this._buildDigestList(digestsData);
 
         AppState.articles = allItems;
         AppState.pagination = {
@@ -207,32 +207,16 @@ export const ArticlesView = {
     },
 
     /**
-     * 合并简报和文章
+     * 构建简报列表（置顶优先，其余按时间排序）
      * @param {Object} digests - 简报数据 { pinned, normal }
-     * @param {Array} articles - 文章数组
-     * @returns {Array} 合并后的列表
+     * @returns {Array} 排序后的简报列表
      */
-    mergeDigestsAndArticles(digests, articles) {
-        const result = [];
-
-        // 1. 先添加置顶的简报（当天未读）
-        if (digests.pinned && digests.pinned.length > 0) {
-            result.push(...digests.pinned);
-        }
-
-        // 2. 合并普通简报和文章，按时间排序
-        const normalDigests = digests.normal || [];
-        const allNormal = [...normalDigests, ...articles];
-
-        // 按发布时间降序排序
-        allNormal.sort((a, b) => {
-            const dateA = new Date(a.published_at || a.generatedAt);
-            const dateB = new Date(b.published_at || b.generatedAt);
-            return dateB - dateA;
+    _buildDigestList(digests) {
+        const pinned = digests.pinned || [];
+        const normal = (digests.normal || []).sort((a, b) => {
+            return new Date(b.published_at) - new Date(a.published_at);
         });
-
-        result.push(...allNormal);
-        return result;
+        return [...pinned, ...normal];
     },
 
     /**
@@ -261,11 +245,6 @@ export const ArticlesView = {
             this.useVirtualScroll = true;
             this.initVirtualList();
 
-            // 预处理缩略图（直接使用服务端返回的 thumbnail_url）
-            const showThumbnails = AppState.preferences?.show_thumbnails !== false;
-            if (!showThumbnails) {
-                articles.forEach(a => { a.thumbnail_url = null; });
-            }
 
             this.virtualList.setItems(articles);
         } else {
@@ -470,6 +449,9 @@ export const ArticlesView = {
      * @param {Object} article - 文章对象
      * @returns {string} 标题 HTML
      */
+    // 翻译失败的标题 Map（临时，不持久化，key: title||langId, value: 错误信息）
+    _titleTranslationFailed: new Map(),
+
     _buildTitleHtml(article) {
         const escaped = escapeHtml(article.title);
 
@@ -489,6 +471,13 @@ export const ArticlesView = {
             }
             // 双语模式
             return `<div class="article-title-translated">${escapeHtml(cached)}</div><div class="article-title-original">${escaped}</div>`;
+        }
+
+        // 翻译失败的标题：显示错误提示 + 原标题
+        const failKey = `${article.title}||${targetLangId}`;
+        const failMsg = this._titleTranslationFailed.get(failKey);
+        if (failMsg) {
+            return `<div class="title-translate-error">${escapeHtml(failMsg)}</div><div class="article-title-original">${escaped}</div>`;
         }
 
         // 尚未翻译，显示 loading 占位 + 原标题（与翻译后布局一致：翻译在上，原文在下）
@@ -512,53 +501,93 @@ export const ArticlesView = {
         const abortController = new AbortController();
         if (cancelPrevious) {
             this._titleTranslationAbort = abortController;
+            // 重新开始翻译时清除失败标记，允许重试
+            this._titleTranslationFailed.clear();
         }
         const signal = abortController.signal;
 
         const targetLangId = aiConfig.targetLang || 'zh-CN';
         const mode = aiConfig.titleTranslationMode || 'bilingual';
 
-        // 过滤出需要翻译的文章（未缓存、非 digest、且该订阅源允许翻译）
+        // 过滤出需要翻译的文章（未缓存、且该订阅源允许翻译）
         const needTranslate = articles.filter(a => {
-            if (a.type === 'digest') return false;
             if (!AIService.shouldTranslateFeed(a.feed_id)) return false;
             return !AIService.getTitleCache(a.title, targetLangId);
         });
 
-        if (needTranslate.length === 0) return;
-
-        // 分批翻译，每批 10 个
-        const BATCH_SIZE = 10;
-        for (let i = 0; i < needTranslate.length; i += BATCH_SIZE) {
-            if (signal.aborted) break;
-
-            const batch = needTranslate.slice(i, i + BATCH_SIZE);
-            try {
-                const resultMap = await AIService.translateTitlesBatch(batch, targetLangId, signal);
-
-                if (signal.aborted) break;
-
-                // 更新 DOM
-                resultMap.forEach((translated, articleId) => {
-                    const titleEl = DOMElements.articlesList.querySelector(`.article-item-title[data-article-id="${articleId}"]`);
-                    if (!titleEl) return;
-
-                    const article = articles.find(a => a.id == articleId);
-                    if (!article) return;
-
-                    const escaped = escapeHtml(article.title);
-                    if (mode === 'translated') {
-                        titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div>`;
-                    } else {
-                        // 双语模式
-                        titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div><div class="article-title-original">${escaped}</div>`;
-                    }
-                    titleEl.classList.add('has-translation');
-                });
-            } catch (e) {
-                console.error('[ArticlesView] Title translation batch failed:', e);
+        if (needTranslate.length === 0) {
+            // 即使不需要翻译，如果是虚拟列表模式也可能需要刷新（开启翻译后缓存已有）
+            if (this.useVirtualScroll && this.virtualList) {
+                this.virtualList.refreshVisibleItems();
             }
+            return;
         }
+
+        // 分批翻译，每批 10 个，按并发数限制执行
+        const BATCH_SIZE = 10;
+        const CONCURRENT_LIMIT = aiConfig.concurrency || 5;
+        const batches = [];
+        for (let i = 0; i < needTranslate.length; i += BATCH_SIZE) {
+            batches.push(needTranslate.slice(i, i + BATCH_SIZE));
+        }
+
+        let batchIndex = 0;
+
+        const processNextBatch = async () => {
+            while (batchIndex < batches.length) {
+                if (signal.aborted) return;
+                const batch = batches[batchIndex++];
+
+                try {
+                    const resultMap = await AIService.translateTitlesBatch(batch, targetLangId, signal);
+
+                    if (signal.aborted) return;
+
+                    if (this.useVirtualScroll && this.virtualList) {
+                        this.virtualList.refreshVisibleItems();
+                    } else {
+                        resultMap.forEach((translated, articleId) => {
+                            const titleEl = DOMElements.articlesList.querySelector(`.article-item-title[data-article-id="${articleId}"]`);
+                            if (!titleEl) return;
+
+                            const article = articles.find(a => a.id == articleId);
+                            if (!article) return;
+
+                            const escaped = escapeHtml(article.title);
+                            if (mode === 'translated') {
+                                titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div>`;
+                            } else {
+                                titleEl.innerHTML = `<div class="article-title-translated">${escapeHtml(translated)}</div><div class="article-title-original">${escaped}</div>`;
+                            }
+                            titleEl.classList.add('has-translation');
+                        });
+                    }
+                } catch (e) {
+                    console.error('[ArticlesView] Title translation batch failed:', e);
+                    const statusCode = e.statusCode || e.status || '';
+                    const errorMsg = statusCode ? `${i18n.t('ai.translate_failed')} (${statusCode})` : i18n.t('ai.translate_failed');
+                    batch.forEach(a => {
+                        this._titleTranslationFailed.set(`${a.title}||${targetLangId}`, errorMsg);
+                    });
+                    if (this.useVirtualScroll && this.virtualList) {
+                        this.virtualList.refreshVisibleItems();
+                    } else {
+                        batch.forEach(a => {
+                            const titleEl = DOMElements.articlesList.querySelector(`.article-item-title[data-article-id="${a.id}"]`);
+                            if (!titleEl) return;
+                            titleEl.innerHTML = `<div class="title-translate-error">${escapeHtml(errorMsg)}</div><div class="article-title-original">${escapeHtml(a.title)}</div>`;
+                            titleEl.classList.add('has-translation');
+                        });
+                    }
+                }
+            }
+        };
+
+        const workers = [];
+        for (let i = 0; i < Math.min(CONCURRENT_LIMIT, batches.length); i++) {
+            workers.push(processNextBatch());
+        }
+        await Promise.all(workers);
     },
 
     /**
@@ -628,10 +657,6 @@ export const ArticlesView = {
             if (AppState.isSearchMode && AppState.searchQuery) {
                 result = await FeedManager.searchArticles(AppState.searchQuery, nextPage);
             } else {
-                // 构建游标：在 unreadOnly 或 今天 模式下，使用最后一篇文章的信息作为游标
-                // 这样即使前面的文章被标记为已读，也不会影响下一页的加载
-                // 今天模式必须使用游标，因为 after_published_at 会导致服务器重置 offset
-                // 注意：历史记录模式不能用游标，因为排序字段是 changed_at 而非 published_at
                 let cursor = null;
                 if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
                     const lastArticle = AppState.articles[AppState.articles.length - 1];
@@ -850,11 +875,7 @@ export const ArticlesView = {
             if (newArticles.length > 0) {
                 console.debug(`Found ${newArticles.length} new articles, prepending...`);
 
-                // 预处理缩略图（直接使用服务端返回的 thumbnail_url）
-                const showThumbnails = AppState.preferences?.show_thumbnails !== false;
-                if (!showThumbnails) {
-                    newArticles.forEach(a => { a.thumbnail_url = null; });
-                }
+
 
                 AppState.articles = [...newArticles, ...AppState.articles];
 

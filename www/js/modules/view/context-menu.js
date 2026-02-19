@@ -4,6 +4,7 @@
  */
 
 import { AppState } from '../../state.js';
+import { DOMElements } from '../../dom.js';
 import { FeedManager } from '../feed-manager.js';
 import { showToast, createContextMenu } from './utils.js';
 import { i18n } from '../i18n.js';
@@ -11,6 +12,8 @@ import { Modal } from './components.js';
 import { Icons } from '../icons.js';
 import { Dialogs } from './dialogs.js';
 import { AIService } from '../ai-service.js';
+import { ArticlesView } from './articles-view.js';
+import { ArticleContentView } from './article-content.js';
 
 
 /**
@@ -344,6 +347,8 @@ export const ContextMenu = {
 
                     if (aiAction === 'toggle-title-translate') {
                         await this._toggleAIOverride('translation', feedId, groupId);
+                        // 立即触发当前列表的标题翻译
+                        ArticlesView.triggerTitleTranslations(AppState.articles);
                     } else if (aiAction === 'toggle-auto-translate') {
                         await this._toggleAIOverride('translate', feedId, groupId);
                     } else if (aiAction === 'toggle-auto-summary') {
@@ -540,6 +545,101 @@ export const ContextMenu = {
                     this.viewManager.renderArticlesList(AppState.articles);
                 } catch (err) {
                     console.error('Save pref error:', err);
+                }
+            }
+        });
+    },
+
+    /**
+     * 显示文章项右键菜单（文章列表中）
+     * @param {MouseEvent} event - 鼠标事件
+     * @param {string|number} articleId - 文章 ID
+     */
+    showArticleItemContextMenu(event, articleId) {
+        const article = AppState.articles?.find(a => a.id == articleId);
+        if (!article) return;
+
+        // 跳过简报类型
+        if (article.type === 'digest') return;
+
+        const isRead = !!article.is_read;
+        const isFavorited = !!article.is_favorited;
+
+        const html = `
+            <div class="context-menu-item" data-action="toggle-read" data-article-id="${articleId}">
+                ${isRead ? Icons.mark_unread : Icons.mark_read}
+                ${isRead ? i18n.t('article.mark_unread') : i18n.t('article.mark_read')}
+            </div>
+            <div class="context-menu-item" data-action="toggle-favorite" data-article-id="${articleId}">
+                ${isFavorited ? Icons.star : Icons.star_border}
+                ${isFavorited ? i18n.t('article.unstar') : i18n.t('article.star')}
+            </div>
+        `;
+
+        const { menu, cleanup } = createContextMenu(event, html);
+
+        menu.addEventListener('click', async (e) => {
+            const item = e.target.closest('.context-menu-item');
+            if (!item) return;
+
+            const action = item.dataset.action;
+            cleanup();
+
+            if (action === 'toggle-read') {
+                try {
+                    const listItem = DOMElements.articlesList?.querySelector(`.article-item[data-id="${articleId}"]`);
+                    if (article.is_read) {
+                        await FeedManager.markAsUnread(articleId);
+                        article.is_read = 0;
+                        if (listItem) listItem.classList.add('unread');
+                        // 增加未读计数
+                        ArticleContentView.updateLocalUnreadCount(article.feed_id, 1);
+                    } else {
+                        await FeedManager.markAsRead(articleId);
+                        article.is_read = 1;
+                        if (listItem) listItem.classList.remove('unread');
+                        // 减少未读计数
+                        ArticleContentView.updateLocalUnreadCount(article.feed_id, -1);
+                    }
+
+                    // 如果虚拟列表正在使用，刷新可见项
+                    if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                        ArticlesView.virtualList.refreshVisibleItems();
+                    }
+                } catch (err) {
+                    console.error('Toggle read status failed', err);
+                }
+            } else if (action === 'toggle-favorite') {
+                try {
+                    const listItem = DOMElements.articlesList?.querySelector(`.article-item[data-id="${articleId}"]`);
+                    if (article.is_favorited) {
+                        await FeedManager.unfavoriteArticle(articleId);
+                        article.is_favorited = 0;
+                    } else {
+                        await FeedManager.favoriteArticle(articleId);
+                        article.is_favorited = 1;
+                    }
+
+                    // 更新列表中的收藏星标
+                    const listMeta = listItem?.querySelector('.article-item-meta');
+                    if (listMeta) {
+                        const existingStar = listMeta.querySelector('.favorited-icon');
+                        if (article.is_favorited && !existingStar) {
+                            const starEl = document.createElement('span');
+                            starEl.className = 'favorited-icon';
+                            starEl.innerHTML = '★';
+                            listMeta.prepend(starEl);
+                        } else if (!article.is_favorited && existingStar) {
+                            existingStar.remove();
+                        }
+                    }
+
+                    // 如果虚拟列表正在使用，刷新可见项
+                    if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                        ArticlesView.virtualList.refreshVisibleItems();
+                    }
+                } catch (err) {
+                    console.error('Toggle favorite failed', err);
                 }
             }
         });

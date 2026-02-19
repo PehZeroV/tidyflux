@@ -158,7 +158,7 @@ export const ArticleAIMixin = {
         });
 
         // 3. 并发队列执行翻译
-        const CONCURRENT_LIMIT = 5;
+        const CONCURRENT_LIMIT = AIService.getConfig().concurrency || 5;
         let currentIndex = 0;
 
         const processNext = async () => {
@@ -187,7 +187,8 @@ export const ArticleAIMixin = {
                 } catch (err) {
                     if (err.name === 'AbortError') return;
                     console.error('Block translate error:', err);
-                    block.transEl.innerHTML = `<span style="color:red; font-size: 0.85em;">Translation failed</span>`;
+                    block.failed = true;
+                    this._showBlockTranslateError(block, err, blocks);
                 }
             }
         };
@@ -199,8 +200,9 @@ export const ArticleAIMixin = {
 
         await Promise.all(workers);
 
-        // 翻译完成后写入 IndexedDB 缓存
-        if (entryId && !signal?.aborted) {
+        // 翻译完成后写入 IndexedDB 缓存（仅在全部成功时缓存，避免缓存错误信息）
+        const hasFailure = blocks.some(b => b.failed);
+        if (entryId && !signal?.aborted && !hasFailure) {
             try {
                 const aiConfig = AIService.getConfig();
                 const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
@@ -212,6 +214,59 @@ export const ArticleAIMixin = {
                 AICache.setTranslation(entryId, lang, JSON.stringify(cacheData)).catch(() => { });
             } catch { /* ignore */ }
         }
+    },
+
+    /**
+     * 显示翻译块的错误信息和重试按钮（点击重试所有失败块）
+     */
+    _showBlockTranslateError(block, err, blocks) {
+        const statusCode = err.statusCode || err.status || '';
+        const errorMsg = statusCode ? `${i18n.t('ai.translate_failed')} (${statusCode})` : i18n.t('ai.translate_failed');
+        block.transEl.innerHTML = `<span style="color: #e55; font-size: 0.85em;">${errorMsg}</span><button class="ai-retry-btn">${i18n.t('common.retry')}</button>`;
+        block.transEl.querySelector('.ai-retry-btn')?.addEventListener('click', () => {
+            this._retryFailedBlocks(blocks);
+        });
+    },
+
+    /**
+     * 批量重试所有失败的翻译块
+     */
+    async _retryFailedBlocks(blocks) {
+        const failedBlocks = blocks.filter(b => b.failed);
+        if (failedBlocks.length === 0) return;
+
+        // 将所有失败块设为加载状态
+        failedBlocks.forEach(block => {
+            block.transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
+        });
+
+        const aiConfig = AIService.getConfig();
+        const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+
+        // 并发重试
+        const CONCURRENT_LIMIT = AIService.getConfig().concurrency || 5;
+        let currentIndex = 0;
+
+        const processNext = async () => {
+            while (currentIndex < failedBlocks.length) {
+                const block = failedBlocks[currentIndex++];
+                try {
+                    const translation = await AIService.translate(block.text, targetLang);
+                    block.transEl.innerHTML = this.parseMarkdown(translation);
+                    block.failed = false;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error('Block translate retry error:', err);
+                    this._showBlockTranslateError(block, err, blocks);
+                }
+            }
+        };
+
+        const retryWorkers = [];
+        for (let i = 0; i < CONCURRENT_LIMIT; i++) {
+            retryWorkers.push(processNext());
+        }
+        await Promise.all(retryWorkers);
     },
 
     /**
@@ -426,7 +481,12 @@ export const ArticleAIMixin = {
                         return;
                     }
                     console.error('Summarize failed:', err);
-                    summaryContent.innerHTML = `<span style="color: red;">${i18n.t('ai.api_error')}: ${err.message}</span>`;
+                    const statusCode = err.statusCode || err.status || '';
+                    const errorMsg = statusCode ? `${i18n.t('ai.api_error')} (${statusCode})` : `${i18n.t('ai.api_error')}`;
+                    summaryContent.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${errorMsg}</span><button class="ai-retry-btn">${i18n.t('common.retry')}</button>`;
+                    summaryContent.querySelector('.ai-retry-btn')?.addEventListener('click', () => {
+                        summarizeBtn.click();
+                    });
                     summarizeBtn.classList.remove('loading');
                 } finally {
                     article._summarizeController = null;
@@ -620,7 +680,12 @@ export const ArticleAIMixin = {
                 return;
             }
             console.error('[AutoSummary] 失败:', err);
-            summaryContent.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${i18n.t('ai.api_error')}: ${err.message}</span>`;
+            const statusCode = err.statusCode || err.status || '';
+            const errorMsg = statusCode ? `${i18n.t('ai.api_error')} (${statusCode})` : `${i18n.t('ai.api_error')}`;
+            summaryContent.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${errorMsg}</span><button class="ai-retry-btn">${i18n.t('common.retry')}</button>`;
+            summaryContent.querySelector('.ai-retry-btn')?.addEventListener('click', () => {
+                this.autoSummarize(article);
+            });
             if (summarizeBtn) summarizeBtn.classList.remove('loading');
         } finally {
             article._autoSummarizeController = null;
@@ -690,7 +755,6 @@ export const ArticleAIMixin = {
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error('[AutoTranslate] 失败:', err);
-            showToast(`${i18n.t('ai.auto_translate_failed')}: ${err.message}`);
             if (translateBtn) translateBtn.classList.remove('loading');
         }
     },

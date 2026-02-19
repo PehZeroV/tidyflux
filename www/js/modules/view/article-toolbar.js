@@ -373,7 +373,7 @@ export const ArticleToolbarMixin = {
                 const fontFamilyOptions = [
                     { label: i18n.t('context.font_family_system'), value: 'system-ui' },
                     { label: i18n.t('context.font_family_sans_serif'), value: 'sans-serif' },
-                    { label: i18n.t('context.font_family_serif'), value: 'serif' },
+                    { label: i18n.t('context.font_family_serif'), value: "Georgia, serif" },
                     { label: 'Fira Sans', value: "'Fira Sans', sans-serif" },
                     { label: 'Open Sans', value: "'Open Sans', sans-serif" },
                     { label: 'Noto Sans', value: "'Noto Sans', sans-serif" },
@@ -396,7 +396,7 @@ export const ArticleToolbarMixin = {
                     <div class="context-menu-divider"></div>
                     <div class="context-menu-label" style="padding-bottom: 0;">${i18n.t('context.font_size')}</div>
                     <div style="padding: 0 16px 10px;">
-                        <input type="range" class="context-menu-slider font-size-slider" min="0.9" max="1.5" step="0.05" value="${currentFontSize}">
+                        <input type="range" class="context-menu-slider font-size-slider" min="0.9" max="1.3" step="0.02" value="${currentFontSize}">
                         <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); margin-top: 2px; user-select: none;">
                             <span>${i18n.t('context.font_size_small')}</span>
                             <span class="font-size-value" style="cursor: pointer;" data-tooltip="${i18n.t('settings.keyboard_reset')}">${currentFontSize}em</span>

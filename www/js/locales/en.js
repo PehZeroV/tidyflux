@@ -186,7 +186,7 @@ export default {
         font_size_small: 'Small',
         font_size_large: 'Large',
         font_family: 'Font',
-        font_family_system: 'System Default',
+        font_family_system: 'Default',
         font_family_sans_serif: 'Sans Serif',
         font_family_serif: 'Serif',
     },
@@ -318,6 +318,7 @@ export default {
         rate_limit_warning: 'Rapidly scrolling through the article list or quickly switching articles may easily trigger API rate limits. Enable only as needed.',
         not_configured: 'AI service not configured, please configure in settings',
         auto_translate_failed: 'Auto translation failed',
+        translate_failed: 'Translation failed',
         translate_cancelled: 'Translation cancelled'
     },
     theme: {

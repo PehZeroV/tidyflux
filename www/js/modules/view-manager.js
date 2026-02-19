@@ -577,6 +577,10 @@ export const ViewManager = {
         ContextMenu.showArticlesContextMenu(event);
     },
 
+    showArticleItemContextMenu(event, articleId) {
+        ContextMenu.showArticleItemContextMenu(event, articleId);
+    },
+
     // ==================== Digest 相关 ====================
 
     generateDigest(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null) {
@@ -820,6 +824,8 @@ export const ViewManager = {
                 await this._renderDigests();
             } else if (AppState.viewingFavorites) {
                 await this._renderFavorites();
+            } else if (AppState.viewingHistory) {
+                await this._renderHistory();
             } else if (AppState.currentGroupId) {
                 await this._renderGroup(AppState.currentGroupId);
             } else {
@@ -866,6 +872,18 @@ export const ViewManager = {
         document.getElementById('articles-menu-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.showArticlesContextMenu(e);
+        });
+
+        // 文章列表项右键菜单（事件委托，适用于虚拟列表和普通列表）
+        DOMElements.articlesList?.addEventListener('contextmenu', (e) => {
+            const articleItem = e.target.closest('.article-item');
+            if (articleItem) {
+                e.preventDefault();
+                const articleId = articleItem.dataset.id;
+                if (articleId) {
+                    this.showArticleItemContextMenu(e, articleId);
+                }
+            }
         });
 
         // 移动端显示订阅源面板按钮

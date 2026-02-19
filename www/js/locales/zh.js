@@ -186,7 +186,7 @@ export default {
         font_size_small: '小',
         font_size_large: '大',
         font_family: '字体',
-        font_family_system: '系统默认',
+        font_family_system: '默认',
         font_family_sans_serif: '无衬线',
         font_family_serif: '衬线',
     },
@@ -318,6 +318,7 @@ export default {
         rate_limit_warning: '快速滚动文章列表或者快速切换文章极易触发 API 速率限制，建议按需开启',
         not_configured: 'AI 服务未配置，请先在设置中配置',
         auto_translate_failed: '自动翻译失败',
+        translate_failed: '翻译失败',
         translate_cancelled: '翻译已取消'
     },
     theme: {

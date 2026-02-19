@@ -4,6 +4,8 @@
  * 动态高度：记录每个卡片的实际高度，使用累积高度精确计算位置
  */
 
+import { AppState } from '../state.js';
+
 export class VirtualList {
     constructor(options) {
         this.container = options.container;
@@ -616,14 +618,14 @@ export class VirtualList {
     }
 
     hasImage(item) {
-        return !!item.thumbnail_url;
+        const showThumbnails = AppState.preferences?.show_thumbnails !== false;
+        return showThumbnails && !!item.thumbnail_url;
     }
 
     _precalculateHasImage(items) {
+        const showThumbnails = AppState.preferences?.show_thumbnails !== false;
         for (const item of items) {
-            if (item._has_image === undefined) {
-                item._has_image = !!item.thumbnail_url;
-            }
+            item._has_image = showThumbnails && !!item.thumbnail_url;
         }
     }
 
@@ -649,6 +651,19 @@ export class VirtualList {
         if (item) {
             if (updates.is_read !== undefined) {
                 item.is_read = updates.is_read;
+            }
+        }
+    }
+
+    /**
+     * 强制刷新当前已渲染的可见项（保持滚动位置）
+     * 原地更新已渲染元素的 innerHTML，避免删除重建导致的滚动抖动
+     */
+    refreshVisibleItems() {
+        for (const [id, el] of this.renderedItems) {
+            const item = this.items.find(i => String(i.id) === id);
+            if (item && el.parentNode) {
+                el.innerHTML = this.renderItem(item);
             }
         }
     }

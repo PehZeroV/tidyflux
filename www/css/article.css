@@ -548,6 +548,22 @@
     font-size: inherit;
 }
 
+/* AI Retry Button */
+.ai-retry-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 0.85em;
+    padding: 0;
+    cursor: pointer;
+    margin-left: 8px;
+    font-family: inherit;
+}
+
+.ai-retry-btn:hover {
+    text-decoration: underline;
+}
+
 /* Article Title Link */
 .article-title-link {
     color: inherit !important;
@@ -645,142 +661,35 @@
     overflow: hidden;
 }
 
-.article-preview-header {
-    padding: 0 0 12px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.article-preview-title {
-    font-size: 1.35em;
-    font-weight: 700;
-    color: var(--title-color);
-    line-height: 1.4;
-    margin: 0 0 10px;
-    font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif;
-}
-
-.article-preview-title a {
-    color: inherit;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.article-preview-title a:hover {
-    color: var(--accent-color);
-}
-
-.article-preview-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.78em;
-    color: var(--meta-color);
-    flex-wrap: wrap;
-}
-
-.article-preview-meta img.favicon {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    display: inline-block;
-    vertical-align: middle;
-    margin-right: 4px;
-}
-
 .article-preview-scroll {
     flex: 1;
     overflow-y: auto;
     padding: 20px 24px 24px;
-    font-size: 1.05em;
+    font-family: var(--article-font-family, inherit);
+    font-size: var(--article-font-size, 1.05em);
     line-height: 1.8;
     color: var(--text-color);
     -webkit-overflow-scrolling: touch;
 }
 
-.article-preview-content img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 1em auto;
-}
-
-.article-preview-content {
+/* 预览弹窗内的 .article-content 布局属性重置
+   因为 .article-preview-content 同时带有 .article-content 类来复用排版样式,
+   需要重置掉 .article-content 的布局属性避免冲突 */
+.article-preview-content.article-content {
+    flex: unset;
+    overflow-y: visible;
+    padding: 0;
+    width: auto;
+    touch-action: auto;
+    overscroll-behavior: auto;
+    animation: none;
+    font-size: inherit;
     overflow-x: hidden;
-    word-break: break-word;
 }
 
-.article-preview-content * {
+.article-preview-content.article-content * {
     max-width: 100%;
     box-sizing: border-box;
-}
-
-.article-preview-content pre {
-    overflow-x: auto;
-}
-
-.article-preview-content iframe,
-.article-preview-content video,
-.article-preview-content embed,
-.article-preview-content object {
-    max-width: 100%;
-    height: auto;
-}
-
-.article-preview-content table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin: 1em 0;
-    font-size: 0.9em;
-    line-height: 1.6;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-    display: table;
-}
-
-.article-preview-content table thead th {
-    background: color-mix(in srgb, var(--accent-color), transparent 88%);
-    color: var(--title-color);
-    font-weight: 600;
-    font-size: 0.88em;
-    padding: 8px 12px;
-    text-align: left;
-    white-space: nowrap;
-    border-bottom: 2px solid color-mix(in srgb, var(--accent-color), transparent 70%);
-}
-
-.article-preview-content table thead th:not(:last-child) {
-    border-right: 1px solid color-mix(in srgb, var(--accent-color), transparent 85%);
-}
-
-.article-preview-content table tbody td {
-    padding: 7px 12px;
-    border-bottom: 1px solid var(--border-color);
-    vertical-align: top;
-}
-
-.article-preview-content table tbody td:not(:last-child) {
-    border-right: 1px solid var(--border-color);
-}
-
-.article-preview-content table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.article-preview-content table tbody tr:nth-child(even) {
-    background-color: color-mix(in srgb, var(--hover-bg), transparent 40%);
-}
-
-.article-preview-content table tbody tr:hover {
-    background-color: color-mix(in srgb, var(--accent-color), transparent 93%);
-}
-
-.article-preview-content a {
-    color: var(--accent-color);
-    text-decoration: underline;
-    text-underline-offset: 3px;
 }
 
 .article-preview-footer {

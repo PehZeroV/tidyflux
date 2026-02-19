@@ -424,7 +424,7 @@ export const ArticleContentView = {
             const title = ref ? ref.title : `#${articleId}`;
             const tooltip = title.replace(/"/g, '&quot;');
             const placeholder = `\x00ARTREF_${idx}\x00`;
-            placeholders[placeholder] = `<a href="#/article/${articleId}" class="digest-article-ref" data-article-id="${articleId}" title="${tooltip}"><sup>[↗]</sup></a>`;
+            placeholders[placeholder] = `<a href="#/article/${articleId}" class="digest-article-ref" data-article-id="${articleId}" title="${tooltip}"><sup>[↗\uFE0E]</sup></a>`;
             idx++;
             return placeholder;
         });
@@ -461,6 +461,17 @@ export const ArticleContentView = {
                 </div>
             </div>
         `;
+        // 将文章字体设置传递到预览弹窗（因为弹窗挂在 body 上，不会继承 #article-content 的 CSS 变量）
+        const articleContent = document.getElementById('article-content');
+        if (articleContent) {
+            const fontFamily = articleContent.style.getPropertyValue('--article-font-family');
+            const headingFontFamily = articleContent.style.getPropertyValue('--article-heading-font-family');
+            const fontSize = articleContent.style.getPropertyValue('--article-font-size');
+            if (fontFamily) overlay.style.setProperty('--article-font-family', fontFamily);
+            if (headingFontFamily) overlay.style.setProperty('--article-heading-font-family', headingFontFamily);
+            if (fontSize) overlay.style.setProperty('--article-font-size', fontSize);
+        }
+
         document.body.appendChild(overlay);
 
         // 动画展开 + 背景模糊
@@ -506,26 +517,46 @@ export const ArticleContentView = {
                 ? `<a href="${article.url}" target="_blank" rel="noopener noreferrer">${titleText}</a>`
                 : titleText;
 
-            // 构建 meta HTML
-            let metaHTML = '';
-            const metaParts = [];
+            // 构建与正常文章一致的 header HTML
+            let feedSourceHTML = '';
             if (article.feed_id && feedName) {
-                metaParts.push(`<img src="/api/favicon?feedId=${article.feed_id}" class="favicon" alt=""><span>${feedName}</span>`);
+                feedSourceHTML = `
+                    <a href="#/feed/${article.feed_id}" class="article-feed-source" title="${feedName}">
+                        <img src="/api/favicon?feedId=${article.feed_id}" class="favicon" loading="lazy" decoding="async" alt="${feedName}" style="width: 14px; height: 14px; border-radius: 3px; margin: 0; display: block;">
+                        <span>${feedName}</span>
+                    </a>
+                `;
             } else if (feedName) {
-                metaParts.push(`<span>${feedName}</span>`);
+                feedSourceHTML = `
+                    <span class="article-feed-source" style="cursor: default;">
+                        <span>${feedName}</span>
+                    </span>
+                `;
             }
-            if (date) {
-                metaParts.push(`<span>${date}</span>`);
-            }
-            metaHTML = metaParts.join('<span style="opacity:0.4;">·</span>');
+
+            const previewTitleHTML = article.url
+                ? `<h1><a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-title-link">${titleText}</a></h1>`
+                : `<h1>${titleText}</h1>`;
 
             // 一次性替换整个滚动区域内容
             scrollArea.innerHTML = `
-                <div class="article-preview-header">
-                    <div class="article-preview-title">${titleHTML}</div>
-                    <div class="article-preview-meta">${metaHTML}</div>
-                </div>
-                <div class="article-preview-content">${content || `<div class="article-preview-error">${i18n.t('article.empty_content') || 'No content'}</div>`}</div>
+                <header class="article-header" style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                    ${feedSourceHTML}
+                    ${previewTitleHTML}
+                    <div class="article-header-info" style="
+                        color: var(--meta-color); 
+                        font-size: 12px; 
+                        margin-top: 0; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: flex-start;
+                        flex-wrap: wrap;
+                        gap: 4px;
+                    ">
+                        ${date ? `<span>${date}</span>` : ''}
+                    </div>
+                </header>
+                <div class="article-preview-content article-content">${content || `<div class="article-preview-error">${i18n.t('article.empty_content') || 'No content'}</div>`}</div>
             `;
 
             // === 自动摘要 ===
@@ -585,7 +616,14 @@ export const ArticleContentView = {
             if (err.name === 'AbortError') return;
             console.error('[PreviewSummary] Failed:', err);
             const contentEl = summaryEl.querySelector('.preview-summary-content');
-            if (contentEl) contentEl.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${i18n.t('ai.api_error')}</span>`;
+            if (contentEl) {
+                const statusCode = err.statusCode || err.status || '';
+                const errorMsg = statusCode ? `${i18n.t('ai.api_error')} (${statusCode})` : i18n.t('ai.api_error');
+                contentEl.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${errorMsg}</span><button class="ai-retry-btn">${i18n.t('common.retry')}</button>`;
+                contentEl.querySelector('.ai-retry-btn')?.addEventListener('click', () => {
+                    this._previewAutoSummarize(overlay, article, signal);
+                });
+            }
         }
     },
 
@@ -609,7 +647,7 @@ export const ArticleContentView = {
      */
     async _previewAutoTranslate(overlay, article, signal) {
         const contentEl = overlay.querySelector('.article-preview-content');
-        const titleEl = overlay.querySelector('.article-preview-title a') || overlay.querySelector('.article-preview-title');
+        const titleEl = overlay.querySelector('.article-header .article-title-link') || overlay.querySelector('.article-header h1');
         if (!contentEl) return;
 
         // 先检查缓存

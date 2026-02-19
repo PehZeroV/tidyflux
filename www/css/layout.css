@@ -373,6 +373,15 @@ body.panel-resizing .panel-resize-handle {
     }
 }
 
+.title-translate-error {
+    font-size: 0.8em;
+    color: #e55;
+    display: block;
+    margin-bottom: 4px;
+    line-height: 1.4;
+    opacity: 0.85;
+}
+
 .article-item-meta {
     font-size: 0.8em;
     color: var(--meta-color);

@@ -569,85 +569,108 @@ export const AIService = {
      * @param {AbortSignal} signal - 用于请求取消的信号
      * @returns {Promise<string>} AI 响应
      */
-    async callAPI(prompt, onChunk = null, signal = null) {
+    async callAPI(prompt, onChunk = null, signal = null, timeout = 120000) {
         const config = this.getConfig();
 
         if (!config.apiUrl || !config.apiKey) {
             throw new Error(i18n.t('ai.not_configured'));
         }
 
-        const response = await AuthManager.fetchWithAuth(API_ENDPOINTS.AI.CHAT, {
-            method: 'POST',
-            signal: signal,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: config.model || DEFAULT_AI_MODEL,
-                temperature: config.temperature ?? 1,
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
-                stream: !!onChunk
-            })
-        });
+        // 前端超时控制（默认 2 分钟）
+        const timeoutController = new AbortController();
+        const timer = setTimeout(() => timeoutController.abort(), timeout);
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            const statusCode = error.status || response.status;
-            const msg = error.error || `AI API Error`;
-            const err = new Error(`[${statusCode}] ${msg}`);
-            err.statusCode = statusCode;
-            throw err;
+        // 合并外部 signal 和超时 signal
+        let combinedSignal;
+        if (signal) {
+            if (typeof AbortSignal.any === 'function') {
+                combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+            } else {
+                // 兼容旧浏览器：手动监听外部信号
+                combinedSignal = timeoutController.signal;
+                const onExternalAbort = () => timeoutController.abort();
+                signal.addEventListener('abort', onExternalAbort, { once: true });
+            }
+        } else {
+            combinedSignal = timeoutController.signal;
         }
 
-        if (onChunk) {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let fullContent = '';
-            let buffer = ''; // 缓冲区，存储不完整的行
+        try {
+            const response = await AuthManager.fetchWithAuth(API_ENDPOINTS.AI.CHAT, {
+                method: 'POST',
+                signal: combinedSignal,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: config.model || DEFAULT_AI_MODEL,
+                    temperature: config.temperature ?? 1,
+                    messages: [
+                        { role: 'user', content: prompt }
+                    ],
+                    stream: !!onChunk
+                })
+            });
 
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                const statusCode = error.status || response.status;
+                const msg = error.error || `AI API Error`;
+                const err = new Error(`[${statusCode}] ${msg}`);
+                err.statusCode = statusCode;
+                throw err;
+            }
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
+            if (onChunk) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                let buffer = ''; // 缓冲区，存储不完整的行
 
-                    // 保留最后一个可能不完整的行
-                    buffer = lines.pop() || '';
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.slice(6).trim();
-                            if (dataStr === '[DONE]') continue;
-                            if (!dataStr) continue;
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
 
-                            try {
-                                const data = JSON.parse(dataStr);
-                                const content = data.choices[0]?.delta?.content || '';
-                                if (content) {
-                                    fullContent += content;
-                                    onChunk(content);
-                                }
-                            } catch (e) {
-                                // 仅在明显不是JSON时才warn，避免日志污染
-                                if (dataStr.startsWith('{')) {
-                                    console.warn('Failed to parse SSE data:', dataStr.substring(0, 50));
+                        // 保留最后一个可能不完整的行
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6).trim();
+                                if (dataStr === '[DONE]') continue;
+                                if (!dataStr) continue;
+
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    const content = data.choices[0]?.delta?.content || '';
+                                    if (content) {
+                                        fullContent += content;
+                                        onChunk(content);
+                                    }
+                                } catch (e) {
+                                    // 仅在明显不是JSON时才warn，避免日志污染
+                                    if (dataStr.startsWith('{')) {
+                                        console.warn('Failed to parse SSE data:', dataStr.substring(0, 50));
+                                    }
                                 }
                             }
                         }
                     }
+                } finally {
+                    reader.releaseLock();
                 }
-            } finally {
-                reader.releaseLock();
-            }
 
-            return fullContent;
-        } else {
-            const data = await response.json();
-            return data.choices?.[0]?.message?.content || '';
+                return fullContent;
+            } else {
+                const data = await response.json();
+                return data.choices?.[0]?.message?.content || '';
+            }
+        } finally {
+            clearTimeout(timer);
         }
     },
 
@@ -675,28 +698,6 @@ export const AIService = {
             .replace('{{content}}', content);
 
         return this.callAPI(prompt, onChunk, signal);
-    },
-
-    /**
-     * 翻译单个标题
-     * @param {string} title - 原始标题
-     * @param {string} targetLangId - 目标语言 ID
-     * @returns {Promise<string>} 翻译后的标题
-     */
-    async translateTitle(title, targetLangId) {
-        if (!title || !title.trim()) return title;
-        const cacheKey = `${title}||${targetLangId}`;
-        if (this._titleCache.has(cacheKey)) {
-            return this._titleCache.get(cacheKey);
-        }
-        const targetLang = this.getLanguageName(targetLangId);
-        const prompt = `Translate the following title into ${targetLang}. Output ONLY the translated title, nothing else:\n\n${title}`;
-        const result = await this.callAPI(prompt);
-        const translated = result.trim();
-        this._titleCache.set(cacheKey, translated);
-        this._titleCacheDirty = true;
-        this._saveTitleCache();
-        return translated;
     },
 
     /**
@@ -745,6 +746,7 @@ export const AIService = {
             this._saveTitleCache();
         } catch (e) {
             console.error('[AIService] Batch title translation failed:', e);
+            throw e;
         }
 
         return resultMap;

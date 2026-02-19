@@ -8,6 +8,7 @@ import { createDialog } from './utils.js';
 import { i18n } from '../i18n.js';
 import { AIService } from '../ai-service.js';
 import { Icons } from '../icons.js';
+import { ArticlesView } from './articles-view.js';
 
 /**
  * AI 自动化管理对话框
@@ -387,6 +388,11 @@ export const TranslationDialogMixin = {
 
                 // Single save to server
                 await batchSetterMap[mode](batchEntries);
+
+                // 标题翻译模式：立即触发当前列表的标题翻译
+                if (mode === 'translation') {
+                    ArticlesView.triggerTitleTranslations(AppState.articles);
+                }
             });
         }
 
@@ -422,6 +428,11 @@ export const TranslationDialogMixin = {
 
                 await batchSetterMap[mode](batchEntries);
                 updateSelectAllState();
+
+                // 标题翻译模式：立即触发当前列表的标题翻译
+                if (mode === 'translation') {
+                    ArticlesView.triggerTitleTranslations(AppState.articles);
+                }
             });
         });
 
@@ -445,6 +456,11 @@ export const TranslationDialogMixin = {
                 }
 
                 updateSelectAllState();
+
+                // 标题翻译模式：立即触发当前列表的标题翻译
+                if (mode === 'translation') {
+                    ArticlesView.triggerTitleTranslations(AppState.articles);
+                }
             });
         });
     },
