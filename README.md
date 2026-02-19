@@ -40,7 +40,7 @@
   - 🏷️ **Auto Title Translation in Article List**: Automatically translate feed list titles to your target language
   - 🌍 **Auto Full-Text Translation**: Automatically translate articles with bilingual side-by-side view when opening articles
   - 📝 **Auto Article Summarization**: Automatically generate AI summaries when opening articles
-  - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in IndexedDB — zero cost on repeat visits
+  - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in server-side SQLite database — zero cost on repeat visits, synced across devices
   - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
   - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
 

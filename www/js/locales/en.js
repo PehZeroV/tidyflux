@@ -281,6 +281,7 @@ export default {
         model_input_placeholder: 'Enter model name',
         temperature: 'Temperature',
         concurrency: 'Concurrency',
+        concurrency_hint: 'Recommended: 5. Higher values may slow page loading. HTTP/2 (HTTPS) supports higher concurrency',
         target_lang: 'Target Language',
         test_success: 'Connection successful',
         test_response: 'Response',
@@ -324,7 +325,11 @@ export default {
         not_configured: 'AI service not configured, please configure in settings',
         auto_translate_failed: 'Auto translation failed',
         translate_failed: 'Translation failed',
-        translate_cancelled: 'Translation cancelled'
+        translate_cancelled: 'Translation cancelled',
+        translate_titles: 'Translate Titles',
+        cancel_translate: 'Cancel Translation',
+        show_translate_btn: 'Show Translate Buttons',
+        show_summarize_btn: 'Show Summarize Button'
     },
     theme: {
         default: 'Default',

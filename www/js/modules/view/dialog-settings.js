@@ -179,7 +179,7 @@ export const SettingsDialogMixin = {
                             <input type="text" id="ai-model-input" class="auth-input" placeholder="${i18n.t('ai.model_input_placeholder')}" style="margin-bottom: 8px;" autocomplete="off">
                         </div>
 
-                        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <div style="display: flex; gap: 12px;">
                             <div style="flex: 1;">
                                 <label class="miniflux-input-label">${i18n.t('ai.temperature')}</label>
                                 <input type="number" id="ai-temperature" class="auth-input" min="0" max="2" step="0.1" placeholder="0.7">
@@ -189,6 +189,7 @@ export const SettingsDialogMixin = {
                                 <input type="number" id="ai-concurrency" class="auth-input" min="1" max="50" step="1" placeholder="5">
                             </div>
                         </div>
+                        <div style="font-size: 0.75em; color: var(--meta-color); margin-top: 4px; margin-bottom: 12px;">${i18n.t('ai.concurrency_hint')}</div>
 
                         <div style="margin-bottom: 12px;">
                             <label class="miniflux-input-label">${i18n.t('ai.target_lang')}</label>
@@ -199,6 +200,17 @@ export const SettingsDialogMixin = {
                             </select>
                         </div>
 
+
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: var(--text-color); margin-bottom: 8px;">
+                                <input type="checkbox" id="ai-show-translate-btn" style="accent-color: var(--accent-color);">
+                                ${i18n.t('ai.show_translate_btn')}
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: var(--text-color);">
+                                <input type="checkbox" id="ai-show-summarize-btn" style="accent-color: var(--accent-color);">
+                                ${i18n.t('ai.show_summarize_btn')}
+                            </label>
+                        </div>
 
                         <div class="collapsible-section" style="margin-bottom: 16px;">
                             <button type="button" class="collapsible-toggle" style="background: none; border: none; padding: 0; color: var(--accent-color); font-size: 0.9em; cursor: pointer; display: flex; align-items: center; gap: 4px;">
@@ -552,6 +564,11 @@ export const SettingsDialogMixin = {
             aiTargetLangSelect.dispatchEvent(new Event('change'));
         }
 
+        const aiShowTranslateBtn = dialog.querySelector('#ai-show-translate-btn');
+        const aiShowSummarizeBtn = dialog.querySelector('#ai-show-summarize-btn');
+        if (aiShowTranslateBtn) aiShowTranslateBtn.checked = aiConfig.showTranslateBtn !== false;
+        if (aiShowSummarizeBtn) aiShowSummarizeBtn.checked = aiConfig.showSummarizeBtn !== false;
+
         const aiTitleTranslatePromptInput = dialog.querySelector('#ai-title-translate-prompt');
         if (aiTitleTranslatePromptInput) aiTitleTranslatePromptInput.value = aiConfig.titleTranslatePrompt || defaultTitleTranslatePrompt;
         if (aiTranslatePromptInput) aiTranslatePromptInput.value = aiConfig.translatePrompt || defaultTranslatePrompt;
@@ -669,6 +686,8 @@ export const SettingsDialogMixin = {
                     temperature: parseFloat(aiTemperatureInput?.value) || 0.7,
                     concurrency: parseInt(aiConcurrencyInput?.value) || 5,
                     targetLang: aiTargetLangSelect.value,
+                    showTranslateBtn: dialog.querySelector('#ai-show-translate-btn')?.checked !== false,
+                    showSummarizeBtn: dialog.querySelector('#ai-show-summarize-btn')?.checked !== false,
                     titleTranslatePrompt: aiTitleTranslatePromptInput ? aiTitleTranslatePromptInput.value.trim() : (AIService.getConfig().titleTranslatePrompt || ''),
                     translatePrompt: aiTranslatePromptInput.value.trim(),
                     summarizePrompt: aiSummarizePromptInput.value.trim(),
@@ -678,6 +697,20 @@ export const SettingsDialogMixin = {
                 try {
                     await AIService.saveConfig(config);
                     aiMsg.innerHTML = `<span style="color: var(--accent-color);">✓ ${i18n.t('ai.save_success')}</span>`;
+
+                    // 立即更新按钮可见性
+                    const listTranslateBtn = document.getElementById('articles-translate-btn');
+                    if (listTranslateBtn) {
+                        listTranslateBtn.style.display = config.showTranslateBtn === false ? 'none' : '';
+                    }
+                    const articleTranslateBtn = document.getElementById('article-translate-btn');
+                    if (articleTranslateBtn) {
+                        articleTranslateBtn.style.display = config.showTranslateBtn === false ? 'none' : '';
+                    }
+                    const articleSummarizeBtn = document.getElementById('article-summarize-btn');
+                    if (articleSummarizeBtn) {
+                        articleSummarizeBtn.style.display = config.showSummarizeBtn === false ? 'none' : '';
+                    }
                 } catch (err) {
                     console.error('Save AI settings error:', err);
                     aiMsg.innerHTML = `<span style="color: var(--danger-color);">${i18n.t('ai.api_error')}</span>`;

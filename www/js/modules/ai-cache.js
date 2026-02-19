@@ -1,55 +1,17 @@
 /**
- * AI 缓存模块 - 使用 IndexedDB 缓存翻译和摘要结果
+ * AI 缓存模块 - 使用服务端 SQLite 缓存翻译和摘要结果
+ * 
+ * 对外 API 保持不变（getSummary / setSummary / getTranslation / setTranslation / ...）
+ * 通过调用 /api/cache 服务端接口实现持久化。
  * @module ai-cache
  */
 
-const DB_NAME = 'tidyflux_ai_cache';
-const DB_VERSION = 1;
-const STORE_NAME = 'ai_results';
+import { AuthManager } from './auth-manager.js';
 
-// 最大缓存条目数
-const MAX_ENTRIES = 5000;
-
-let _db = null;
-
-/**
- * 打开/获取数据库连接
- * @returns {Promise<IDBDatabase>}
- */
-function _getDB() {
-    if (_db) return Promise.resolve(_db);
-
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'key' });
-                store.createIndex('timestamp', 'timestamp', { unique: false });
-            }
-        };
-
-        request.onsuccess = (e) => {
-            _db = e.target.result;
-            // 连接断开时置空
-            _db.onclose = () => { _db = null; };
-            resolve(_db);
-        };
-
-        request.onerror = (e) => {
-            console.warn('[AICache] Failed to open IndexedDB:', e.target.error);
-            reject(e.target.error);
-        };
-    });
-}
+const CACHE_API = '/api/cache';
 
 /**
  * 生成缓存 key
- * @param {number|string} entryId - 文章 ID
- * @param {'summary'|'translation'} type - 缓存类型
- * @param {string} [lang] - 目标语言（翻译用）
- * @returns {string}
  */
 function _makeKey(entryId, type, lang = '') {
     return `${type}:${entryId}${lang ? ':' + lang : ''}`;
@@ -57,20 +19,14 @@ function _makeKey(entryId, type, lang = '') {
 
 export const AICache = {
     /**
-     * 初始化缓存（清理超量条目）
+     * 初始化缓存（服务端自动管理，前端无需操作）
      */
     async init() {
-        try {
-            await this._cleanup();
-        } catch (e) {
-            console.warn('[AICache] Init cleanup failed:', e);
-        }
+        // 服务端自动管理清理，无需前端操作
     },
 
     /**
      * 获取缓存的摘要
-     * @param {number|string} entryId
-     * @returns {Promise<string|null>}
      */
     async getSummary(entryId) {
         return this._get(_makeKey(entryId, 'summary'));
@@ -78,8 +34,6 @@ export const AICache = {
 
     /**
      * 保存摘要到缓存
-     * @param {number|string} entryId
-     * @param {string} content
      */
     async setSummary(entryId, content) {
         return this._set(_makeKey(entryId, 'summary'), content);
@@ -87,9 +41,6 @@ export const AICache = {
 
     /**
      * 获取缓存的翻译
-     * @param {number|string} entryId
-     * @param {string} lang - 目标语言
-     * @returns {Promise<string|null>} 翻译后的段落数组 JSON，或 null
      */
     async getTranslation(entryId, lang) {
         return this._get(_makeKey(entryId, 'translation', lang));
@@ -97,9 +48,6 @@ export const AICache = {
 
     /**
      * 保存翻译到缓存
-     * @param {number|string} entryId
-     * @param {string} lang
-     * @param {string} content - 翻译结果（JSON 序列化的段落数组）
      */
     async setTranslation(entryId, lang, content) {
         return this._set(_makeKey(entryId, 'translation', lang), content);
@@ -107,7 +55,6 @@ export const AICache = {
 
     /**
      * 删除缓存的摘要
-     * @param {number|string} entryId
      */
     async deleteSummary(entryId) {
         return this._delete(_makeKey(entryId, 'summary'));
@@ -115,74 +62,74 @@ export const AICache = {
 
     /**
      * 删除缓存的翻译
-     * @param {number|string} entryId
-     * @param {string} lang - 目标语言
      */
     async deleteTranslation(entryId, lang) {
         return this._delete(_makeKey(entryId, 'translation', lang));
     },
 
     /**
-     * 批量加载标题翻译缓存（启动时一次性读取）
-     * @returns {Promise<Map|null>} 标题翻译 Map，或 null
+     * 批量加载标题翻译缓存
+     * @returns {Promise<Map|null>}
      */
     async loadTitleCache() {
         try {
-            const raw = await this._get('title_cache_bulk');
-            if (raw) {
-                const entries = JSON.parse(raw);
-                return new Map(entries);
+            const response = await AuthManager.fetchWithAuth(`${CACHE_API}/batch/get`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prefix: 'title:' })
+            });
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            if (data.entries && data.entries.length > 0) {
+                const map = new Map();
+                for (const entry of data.entries) {
+                    // 去掉 'title:' 前缀，还原为原始 key 格式 (e.g. "原标题||zh-CN")
+                    const originalKey = entry.key.startsWith('title:') ? entry.key.slice(6) : entry.key;
+                    map.set(originalKey, entry.content);
+                }
+                return map;
             }
-        } catch { /* ignore */ }
+        } catch (e) {
+            console.warn('[AICache] Load title cache failed:', e);
+        }
         return null;
     },
 
     /**
-     * 批量保存标题翻译缓存
-     * @param {Map} titleMap - 标题翻译 Map
-     * @param {number} maxEntries - 最大条目数
+     * 增量保存标题翻译缓存（仅保存本次新增的条目）
+     * @param {Array<{cacheKey: string, content: string}>} newEntries - 新翻译的条目
      */
-    async saveTitleCache(titleMap, maxEntries = 5000) {
+    async saveTitleCacheBatch(newEntries) {
+        if (!newEntries || newEntries.length === 0) return;
         try {
-            // 淘汰最旧的条目
-            if (titleMap.size > maxEntries) {
-                const excess = titleMap.size - maxEntries;
-                const iter = titleMap.keys();
-                for (let i = 0; i < excess; i++) {
-                    titleMap.delete(iter.next().value);
-                }
-            }
-            const entries = Array.from(titleMap.entries());
-            await this._set('title_cache_bulk', JSON.stringify(entries));
+            const entries = newEntries.map(e => ({
+                key: `title:${e.cacheKey}`,
+                content: e.content
+            }));
+
+            await AuthManager.fetchWithAuth(`${CACHE_API}/batch/set`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entries })
+            });
         } catch (e) {
-            console.warn('[AICache] Save title cache failed:', e);
+            console.warn('[AICache] Save title cache batch failed:', e);
         }
     },
 
     /**
      * 通用读取
-     * @param {string} key
-     * @returns {Promise<string|null>}
      */
     async _get(key) {
         try {
-            const db = await _getDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const request = store.get(key);
-
-                request.onsuccess = () => {
-                    const record = request.result;
-                    if (!record) {
-                        resolve(null);
-                        return;
-                    }
-                    resolve(record.content);
-                };
-
-                request.onerror = () => resolve(null);
-            });
+            const response = await AuthManager.fetchWithAuth(
+                `${CACHE_API}/${encodeURIComponent(key)}`
+            );
+            if (!response.ok) return null;
+            const data = await response.json();
+            return data.content ?? null;
         } catch {
             return null;
         }
@@ -190,22 +137,13 @@ export const AICache = {
 
     /**
      * 通用写入
-     * @param {string} key
-     * @param {string} content
      */
     async _set(key, content) {
         try {
-            const db = await _getDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                store.put({
-                    key,
-                    content,
-                    timestamp: Date.now()
-                });
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
+            await AuthManager.fetchWithAuth(`${CACHE_API}/${encodeURIComponent(key)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
             });
         } catch (e) {
             console.warn('[AICache] Write failed:', e);
@@ -214,16 +152,11 @@ export const AICache = {
 
     /**
      * 删除条目
-     * @param {string} key
      */
     async _delete(key) {
         try {
-            const db = await _getDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                tx.objectStore(STORE_NAME).delete(key);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => resolve();
+            await AuthManager.fetchWithAuth(`${CACHE_API}/${encodeURIComponent(key)}`, {
+                method: 'DELETE'
             });
         } catch {
             // ignore
@@ -231,58 +164,14 @@ export const AICache = {
     },
 
     /**
-     * 控制总量，淘汰最旧的条目
-     */
-    async _cleanup() {
-        try {
-            const db = await _getDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const countReq = store.count();
-
-            countReq.onsuccess = () => {
-                const total = countReq.result;
-                if (total <= MAX_ENTRIES) return;
-
-                const excess = total - MAX_ENTRIES;
-                const oldIndex = store.index('timestamp');
-                const cursor = oldIndex.openCursor();
-                let removed = 0;
-
-                cursor.onsuccess = (e) => {
-                    const c = e.target.result;
-                    if (c && removed < excess) {
-                        c.delete();
-                        removed++;
-                        c.continue();
-                    }
-                };
-            };
-
-            await new Promise((resolve) => {
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => resolve();
-            });
-        } catch (e) {
-            console.warn('[AICache] Cleanup failed:', e);
-        }
-    },
-
-    /**
-     * 清空所有缓存（供设置页使用）
+     * 清空所有缓存
      */
     async clear() {
         try {
-            const db = await _getDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                tx.objectStore(STORE_NAME).clear();
-                tx.oncomplete = () => {
-                    console.debug('[AICache] Cache cleared');
-                    resolve();
-                };
-                tx.onerror = () => resolve();
+            await AuthManager.fetchWithAuth(CACHE_API, {
+                method: 'DELETE'
             });
+            console.debug('[AICache] Cache cleared');
         } catch {
             // ignore
         }

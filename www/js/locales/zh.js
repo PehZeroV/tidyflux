@@ -281,6 +281,7 @@ export default {
         model_input_placeholder: '输入模型名称',
         temperature: 'Temperature',
         concurrency: '并发数',
+        concurrency_hint: '并发数建议为 5，过高可能影响页面加载，使用 HTTP/2 (HTTPS) 可支持更高并发',
         target_lang: '生成语言',
         test_success: '连接成功',
         test_response: '响应',
@@ -324,7 +325,11 @@ export default {
         not_configured: 'AI 服务未配置，请先在设置中配置',
         auto_translate_failed: '自动翻译失败',
         translate_failed: '翻译失败',
-        translate_cancelled: '翻译已取消'
+        translate_cancelled: '翻译已取消',
+        translate_titles: '翻译标题',
+        cancel_translate: '取消翻译',
+        show_translate_btn: '显示翻译按钮',
+        show_summarize_btn: '显示摘要按钮'
     },
     theme: {
         default: '默认',

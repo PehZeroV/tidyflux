@@ -42,6 +42,9 @@ export const API_ENDPOINTS = {
     },
     FAVICON: {
         BASE: '/api/favicon',
+    },
+    CACHE: {
+        BASE: '/api/cache',
     }
 };
 

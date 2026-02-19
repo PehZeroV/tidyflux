@@ -157,50 +157,37 @@ export const ArticleAIMixin = {
             }
         });
 
-        // 3. 并发队列执行翻译
-        const CONCURRENT_LIMIT = AIService.getConfig().concurrency || 5;
-        let currentIndex = 0;
+        // 3. 并发翻译（由 AIService 全局信号量控制并发数）
+        const translateBlock = async (block) => {
+            if (signal?.aborted) return;
 
-        const processNext = async () => {
-            while (currentIndex < blocks.length) {
-                const index = currentIndex++;
-                const block = blocks[index];
+            try {
+                const aiConfig = AIService.getConfig();
+                const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
 
-                if (signal?.aborted) return;
-
-                try {
-                    const aiConfig = AIService.getConfig();
-                    const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
-
-                    // 标题块优先读取标题翻译缓存（列表自动翻译已缓存）
-                    if (block.isTitle) {
-                        const cachedTitle = AIService.getTitleCache(block.text, targetLang);
-                        if (cachedTitle) {
-                            block.transEl.innerHTML = this.parseMarkdown(cachedTitle);
-                            continue;
-                        }
+                // 标题块优先读取标题翻译缓存（列表自动翻译已缓存）
+                if (block.isTitle) {
+                    const cachedTitle = AIService.getTitleCache(block.text, targetLang);
+                    if (cachedTitle) {
+                        block.transEl.innerHTML = this.parseMarkdown(cachedTitle);
+                        return;
                     }
-
-                    const translation = await AIService.translate(block.text, targetLang, null, signal);
-                    if (signal?.aborted) return;
-                    block.transEl.innerHTML = this.parseMarkdown(translation);
-                } catch (err) {
-                    if (err.name === 'AbortError') return;
-                    console.error('Block translate error:', err);
-                    block.failed = true;
-                    this._showBlockTranslateError(block, err, blocks);
                 }
+
+                const translation = await AIService.translate(block.text, targetLang, null, signal);
+                if (signal?.aborted) return;
+                block.transEl.innerHTML = this.parseMarkdown(translation);
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error('Block translate error:', err);
+                block.failed = true;
+                this._showBlockTranslateError(block, err, blocks);
             }
         };
 
-        const workers = [];
-        for (let i = 0; i < CONCURRENT_LIMIT; i++) {
-            workers.push(processNext());
-        }
+        await Promise.all(blocks.map(b => translateBlock(b)));
 
-        await Promise.all(workers);
-
-        // 翻译完成后写入 IndexedDB 缓存（仅在全部成功时缓存，避免缓存错误信息）
+        // 翻译完成后写入缓存（仅在全部成功时缓存，避免缓存错误信息）
         const hasFailure = blocks.some(b => b.failed);
         if (entryId && !signal?.aborted && !hasFailure) {
             try {
@@ -270,7 +257,7 @@ export const ArticleAIMixin = {
     },
 
     /**
-     * 从 IndexedDB 恢复翻译缓存
+     * 从缓存恢复翻译结果
      * @param {HTMLElement} bodyEl
      * @param {HTMLElement} titleEl
      * @param {number|string} entryId
@@ -443,7 +430,7 @@ export const ArticleAIMixin = {
                 summaryContent.innerHTML = `<div class="loading-spinner">${i18n.t('ai.summarizing')}</div>`;
 
                 try {
-                    // 先检查 IndexedDB 缓存
+                    // 先检查缓存
                     const cached = await AICache.getSummary(article.id);
                     if (cached) {
                         summaryContent.innerHTML = this.parseMarkdown(cached);
@@ -470,7 +457,7 @@ export const ArticleAIMixin = {
                         summaryContent.innerHTML = this.parseMarkdown(streamedText);
                     }, signal);
 
-                    // 写入 IndexedDB 缓存
+                    // 写入缓存
                     AICache.setSummary(article.id, streamedText).catch(() => { });
 
                     summarizeBtn.classList.remove('loading');
@@ -545,10 +532,10 @@ export const ArticleAIMixin = {
                 const existingBlocks = bodyEl.querySelectorAll('.ai-trans-block');
                 const existingTitleBlock = document.querySelector('.ai-title-trans-block');
 
-                if (existingBlocks.length > 0 || existingTitleBlock) {
-                    // 切换显示/隐藏
+                if (existingBlocks.length > 0) {
+                    // 正文已有翻译块 → 切换显示/隐藏
                     const anyVisible = (existingTitleBlock && existingTitleBlock.style.display !== 'none') ||
-                        (existingBlocks.length > 0 && existingBlocks[0].style.display !== 'none');
+                        existingBlocks[0].style.display !== 'none';
 
                     const newDisplay = anyVisible ? 'none' : 'block';
 
@@ -560,8 +547,11 @@ export const ArticleAIMixin = {
                     return;
                 }
 
-                // 先检查 IndexedDB 翻译缓存
-                const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
+                // 标题已翻译但正文未翻译（如获取全文后）→ 跳过标题，仅翻译正文
+                const effectiveTitleEl = existingTitleBlock ? null : titleEl;
+
+                // 先检查翻译缓存
+                const cacheRestored = await this._restoreTranslationFromCache(bodyEl, effectiveTitleEl, article.id);
                 if (cacheRestored) {
                     translateBtn.classList.add('active');
                     translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
@@ -573,7 +563,7 @@ export const ArticleAIMixin = {
 
                 try {
                     article._translateController = new AbortController();
-                    await this.translateBilingual(bodyEl, titleEl, article._translateController.signal, article.id);
+                    await this.translateBilingual(bodyEl, effectiveTitleEl, article._translateController.signal, article.id);
                     translateBtn.classList.remove('loading');
                     translateBtn.classList.add('active');
                     translateBtn.setAttribute('data-tooltip', i18n.t('ai.original_content'));
@@ -619,7 +609,7 @@ export const ArticleAIMixin = {
             return;
         }
 
-        // 先检查 IndexedDB 缓存
+        // 先检查缓存
         try {
             const cached = await AICache.getSummary(article.id);
             if (cached) {
@@ -667,7 +657,7 @@ export const ArticleAIMixin = {
                 summaryContent.innerHTML = this.parseMarkdown(streamedText);
             }, signal);
 
-            // 缓存结果到内存和 IndexedDB
+            // 缓存结果到内存和服务端
             article._aiSummary = streamedText;
             AICache.setSummary(article.id, streamedText).catch(() => { });
             if (summarizeBtn) {
@@ -729,7 +719,7 @@ export const ArticleAIMixin = {
         // 如果标题已翻译，只翻译正文（跳过标题避免重复创建翻译块）
         const effectiveTitleEl = existingTitleBlock ? null : titleEl;
 
-        // 先检查 IndexedDB 翻译缓存（仅在标题未翻译时尝试，否则缓存中的正文部分已过期）
+        // 先检查翻译缓存（仅在标题未翻译时尝试，否则缓存中的正文部分已过期）
         if (!existingTitleBlock) {
             const cacheRestored = await this._restoreTranslationFromCache(bodyEl, titleEl, article.id);
             if (cacheRestored) {

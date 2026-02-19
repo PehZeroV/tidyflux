@@ -836,10 +836,10 @@ export const ArticleContentView = {
                         ${Icons.fetch_original}
                     </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>
-                    <button class="article-toolbar-btn" id="article-translate-btn" data-tooltip="${i18n.t('ai.translate_btn')}">
+                    <button class="article-toolbar-btn" id="article-translate-btn" data-tooltip="${i18n.t('ai.translate_btn')}" style="${AIService.getConfig().showTranslateBtn === false ? 'display:none' : ''}">
                         ${Icons.translate}
                     </button>
-                    <button class="article-toolbar-btn" id="article-summarize-btn" data-tooltip="${i18n.t('ai.summarize_btn')}">
+                    <button class="article-toolbar-btn" id="article-summarize-btn" data-tooltip="${i18n.t('ai.summarize_btn')}" style="${AIService.getConfig().showSummarizeBtn === false ? 'display:none' : ''}">
                         ${Icons.summarize}
                     </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>

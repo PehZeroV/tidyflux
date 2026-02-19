@@ -11,11 +11,14 @@ import preferenceRoutes from './routes/preferences.js';
 import faviconRoutes from './routes/favicon.js';
 import digestRoutes from './routes/digest.js';
 import aiRoutes from './routes/ai.js';
+import cacheRoutes from './routes/cache.js';
 
 import helmet from 'helmet';
 import { UserStore } from './utils/user-store.js';
 import { DigestScheduler } from './jobs/digest-scheduler.js';
 import { PreferenceStore } from './utils/preference-store.js';
+import { DigestStore } from './utils/digest-store.js';
+import { getDb, closeDb } from './utils/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -57,6 +60,7 @@ async function startServer() {
         app.use('/api/favicon', faviconRoutes);
         app.use('/api/digest', digestRoutes);
         app.use('/api/ai', aiRoutes);
+        app.use('/api/cache', cacheRoutes);
 
 
 
@@ -85,8 +89,12 @@ async function startServer() {
             res.sendFile(join(wwwPath, 'index.html'));
         });
 
-        // 启动前迁移偏好设置结构
+        // 初始化数据库
+        getDb();
+
+        // 启动前迁移
         await PreferenceStore.migrateAll();
+        await DigestStore.migrateFromJson();
 
         app.listen(PORT, () => {
             console.log(`Tidyflux Adapter running on http://localhost:${PORT}`);
@@ -100,3 +108,13 @@ async function startServer() {
 }
 
 startServer();
+
+// 优雅退出：关闭数据库连接
+process.on('SIGINT', () => {
+    closeDb();
+    process.exit(0);
+});
+process.on('SIGTERM', () => {
+    closeDb();
+    process.exit(0);
+});

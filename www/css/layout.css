@@ -214,15 +214,22 @@ body.panel-resizing .panel-resize-handle {
     }
 }
 
-/* 主题色按钮 - 添加订阅、菜单、订阅源按钮、搜索按钮、刷新按钮 */
+/* 主题色按钮 - 添加订阅、菜单、订阅源按钮、搜索按钮、刷新按钮、翻译按钮 */
 #add-feed-btn,
 #articles-menu-btn,
 #articles-search-btn,
 #articles-refresh-btn,
+#articles-translate-btn,
 #show-feeds-btn {
     color: var(--accent-color);
 }
 
+#articles-translate-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+#articles-translate-btn,
 #articles-search-btn,
 #articles-refresh-btn {
     margin-right: 4px;
@@ -232,6 +239,7 @@ body.panel-resizing .panel-resize-handle {
 #articles-menu-btn:hover,
 #articles-search-btn:hover,
 #articles-refresh-btn:hover,
+#articles-translate-btn:hover,
 #show-feeds-btn:hover {
     color: var(--accent-color);
     background: var(--hover-bg);

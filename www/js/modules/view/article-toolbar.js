@@ -167,7 +167,7 @@ export const ArticleToolbarMixin = {
                     delete article._aiSummary;
                     delete article._translatedContent;
 
-                    // 清除 IndexedDB 中的 AI 缓存
+                    // 清除服务端 AI 缓存
                     AICache.deleteSummary(article.id).catch(() => { });
                     const aiConfig = AIService.getConfig();
                     const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
@@ -253,7 +253,7 @@ export const ArticleToolbarMixin = {
                     delete article._aiSummary;
                     delete article._translatedContent;
 
-                    // 清除 IndexedDB 中该文章的 AI 缓存
+                    // 清除服务端该文章的 AI 缓存
                     AICache.deleteSummary(article.id).catch(() => { });
                     const aiConfig = AIService.getConfig();
                     const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');

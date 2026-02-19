@@ -40,9 +40,11 @@ export const AIService = {
     // 标题翻译缓存 (key: title||langId, value: translated title)
     _titleCache: new Map(),
     // 标题缓存上限
-    _TITLE_CACHE_MAX: 5000,
-    // 标题缓存是否有未持久化的变更
-    _titleCacheDirty: false,
+    _TITLE_CACHE_MAX: 50000,
+
+    // 全局并发控制（信号量）
+    _activeRequests: 0,
+    _waitingQueue: [],
     // 标题翻译覆盖设置 { feeds: { feedId: 'on'|'off' }, groups: { groupId: 'on'|'off' } }
     _titleTranslationOverrides: { feeds: {}, groups: {} },
     // 自动摘要覆盖设置（同结构）
@@ -62,7 +64,7 @@ export const AIService = {
     },
 
     /**
-     * 从 IndexedDB 加载标题翻译缓存
+     * 从服务端加载标题翻译缓存
      */
     async _loadTitleCache() {
         try {
@@ -78,12 +80,11 @@ export const AIService = {
     },
 
     /**
-     * 将标题翻译缓存持久化到 IndexedDB
+     * 增量保存标题翻译缓存（仅保存新增条目）
+     * @param {Array<{cacheKey: string, content: string}>} newEntries
      */
-    _saveTitleCache() {
-        if (!this._titleCacheDirty) return;
-        this._titleCacheDirty = false;
-        AICache.saveTitleCache(this._titleCache, this._TITLE_CACHE_MAX).catch((e) => {
+    _saveTitleCacheBatch(newEntries) {
+        AICache.saveTitleCacheBatch(newEntries).catch((e) => {
             console.warn('[AIService] Failed to save title cache:', e);
         });
     },
@@ -566,6 +567,46 @@ export const AIService = {
     },
 
     /**
+     * 获取并发许可（全局信号量）
+     * 所有 AI API 请求共享同一个并发限制
+     */
+    async _acquireConcurrency(signal) {
+        const limit = this.getConfig().concurrency || 5;
+        if (this._activeRequests < limit) {
+            this._activeRequests++;
+            return;
+        }
+        // 等待空闲槽位
+        return new Promise((resolve, reject) => {
+            const waiter = { resolve, reject };
+            this._waitingQueue.push(waiter);
+            // 如果外部取消了请求，从等待队列中移除
+            if (signal) {
+                const onAbort = () => {
+                    const idx = this._waitingQueue.indexOf(waiter);
+                    if (idx !== -1) this._waitingQueue.splice(idx, 1);
+                    reject(new DOMException('Aborted', 'AbortError'));
+                };
+                signal.addEventListener('abort', onAbort, { once: true });
+                waiter.cleanupAbort = () => signal.removeEventListener('abort', onAbort);
+            }
+        });
+    },
+
+    /**
+     * 释放并发许可
+     */
+    _releaseConcurrency() {
+        this._activeRequests--;
+        if (this._waitingQueue.length > 0) {
+            const waiter = this._waitingQueue.shift();
+            this._activeRequests++;
+            if (waiter.cleanupAbort) waiter.cleanupAbort();
+            waiter.resolve();
+        }
+    },
+
+    /**
      * 调用 AI API
      * @param {string} prompt - 完整的提示词
      * @param {Function} onChunk - 流式响应回调函数
@@ -573,6 +614,20 @@ export const AIService = {
      * @returns {Promise<string>} AI 响应
      */
     async callAPI(prompt, onChunk = null, signal = null, timeout = 120000) {
+        // 全局并发控制：等待空闲槽位
+        await this._acquireConcurrency(signal);
+
+        try {
+            return await this._doCallAPI(prompt, onChunk, signal, timeout);
+        } finally {
+            this._releaseConcurrency();
+        }
+    },
+
+    /**
+     * 实际执行 API 调用（由 callAPI 包装）
+     */
+    async _doCallAPI(prompt, onChunk = null, signal = null, timeout = 120000) {
         const config = this.getConfig();
 
         if (!config.apiUrl || !config.apiKey) {
@@ -747,16 +802,17 @@ export const AIService = {
                 }
             }
 
+            const newEntries = [];
             for (let i = 0; i < needTranslate.length; i++) {
                 const num = i + 1; // 编号从 1 开始
                 let translated = numberedMap.get(num) || needTranslate[i].title; // 按编号匹配，找不到则回退到原标题
                 const cacheKey = `${needTranslate[i].title}||${targetLangId}`;
                 this._titleCache.set(cacheKey, translated);
                 resultMap.set(needTranslate[i].id, translated);
+                newEntries.push({ cacheKey, content: translated });
             }
-            // 批次翻译完成，持久化缓存
-            this._titleCacheDirty = true;
-            this._saveTitleCache();
+            // 增量保存本批新翻译的条目
+            this._saveTitleCacheBatch(newEntries);
         } catch (e) {
             console.error('[AIService] Batch title translation failed:', e);
             throw e;

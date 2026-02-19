@@ -8,6 +8,7 @@ import { DOMElements } from '../dom.js';
 import { AppState } from '../state.js';
 import { FeedManager } from './feed-manager.js';
 import { i18n } from './i18n.js';
+import { AIService } from './ai-service.js';
 
 // 导入子模块
 import { AuthView } from './view/auth-view.js';
@@ -836,6 +837,44 @@ export const ViewManager = {
         document.getElementById('articles-search-btn')?.addEventListener('click', () => {
             SearchView.showInlineSearchBox();
         });
+
+        // 翻译标题按钮（切换：显示翻译 / 隐藏翻译）
+        const translateBtn = document.getElementById('articles-translate-btn');
+        if (translateBtn) {
+            // 根据配置控制按钮可见性
+            if (AIService.getConfig().showTranslateBtn === false) {
+                translateBtn.style.display = 'none';
+            }
+            translateBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!AIService.isConfigured()) {
+                    Modal.alertWithSettings(i18n.t('ai.not_configured'), i18n.t('common.go_to_settings'), () => Dialogs.showSettingsDialog(false));
+                    return;
+                }
+
+                // 判断当前视图是否整体开启了自动翻译
+                let isAutoTranslateView = false;
+                if (!ArticlesView._translationHidden) {
+                    if (AppState.currentFeedId) {
+                        isAutoTranslateView = AIService.shouldTranslateFeed(AppState.currentFeedId);
+                    } else if (AppState.currentGroupId) {
+                        isAutoTranslateView = AIService.getGroupTranslationOverride(AppState.currentGroupId) === 'on';
+                    }
+                }
+
+                if (ArticlesView._manualTranslateActive || isAutoTranslateView) {
+                    // 翻译正在显示 → 隐藏所有
+                    ArticlesView.hideAllTranslations();
+                } else if (ArticlesView._translationHidden) {
+                    // 翻译已隐藏 → 恢复显示
+                    await ArticlesView.showAllTranslations();
+                } else {
+                    // 初始状态（无自动翻译）→ 启动手动翻译
+                    await ArticlesView.manualTranslateTitles();
+                }
+                ArticlesView.updateTranslateBtnTooltip();
+            });
+        }
 
         document.getElementById('articles-refresh-btn')?.addEventListener('click', async (e) => {
             e.stopPropagation();
