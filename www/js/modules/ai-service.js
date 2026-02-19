@@ -8,6 +8,7 @@ const DEFAULT_AI_MODEL = 'gpt-4.1-mini';
 
 // 默认提示词
 const DEFAULT_PROMPTS = {
+    titleTranslate: 'Translate each of the following titles into {{targetLang}}. Output ONLY the translated titles, one per line, in the same numbered format (e.g. "1. translated title"). Do not add any extra text:\n\n{{content}}',
     translate: 'Please translate the following text into {{targetLang}}, maintaining the original format and paragraph structure. Return only the translated content, directly outputting the translation result without any additional text:\n\n{{content}}',
     summarize: 'Please summarize this article in {{targetLang}} in a few sentences. Output the result directly without any introductory text like "Here is the summary".\n\n{{content}}',
     digest: 'You are a professional news editor. Please generate a concise digest based on the following list of recent articles.\n\n## Output Requirements:\n1. Output in {{targetLang}}\n2. Start with a 2-3 sentence overview of today\'s/recent key content\n3. Categorize by topic or importance, listing key information in concise bullet points\n4. If multiple articles relate to the same topic, combine them\n5. Keep the format concise and compact, using Markdown\n6. Output the content directly, no opening remarks like "Here is the digest"\n7. When mentioning or referencing a specific article, use [ref:ARTICLE_ID] after the relevant text (where ARTICLE_ID is the ID from the article list), so readers can click to jump to the original. Each [ref:] tag must contain exactly ONE article ID. If referencing multiple articles, use separate tags like [ref:111][ref:222]. Example: "OpenAI released GPT-5 [ref:12345]".\n\n## Article List:\n\n{{content}}'
@@ -435,6 +436,7 @@ export const AIService = {
             model: DEFAULT_AI_MODEL,
             temperature: 1,
             concurrency: 5,
+            titleTranslatePrompt: '',
             translatePrompt: '',
             summarizePrompt: '',
             digestPrompt: '',
@@ -464,7 +466,7 @@ export const AIService = {
         if (!config) return config;
 
         // 迁移旧占位符 {xxx} → {{xxx}}，并自动补全缺失的 {{content}}
-        const promptKeys = ['translatePrompt', 'summarizePrompt', 'digestPrompt'];
+        const promptKeys = ['titleTranslatePrompt', 'translatePrompt', 'summarizePrompt', 'digestPrompt'];
         promptKeys.forEach((key) => {
             if (config[key]) {
                 // 迁移旧格式占位符
@@ -544,7 +546,8 @@ export const AIService = {
     getPrompt(type) {
         const config = this.getConfig();
         let customPrompt = '';
-        if (type === 'translate') customPrompt = config.translatePrompt;
+        if (type === 'titleTranslate') customPrompt = config.titleTranslatePrompt;
+        else if (type === 'translate') customPrompt = config.translatePrompt;
         else if (type === 'summarize') customPrompt = config.summarizePrompt;
         else if (type === 'digest') customPrompt = config.digestPrompt;
 
@@ -725,18 +728,28 @@ export const AIService = {
         const targetLang = this.getLanguageName(targetLangId);
         // 构建批量翻译提示词
         const titlesBlock = needTranslate.map((item, i) => `${i + 1}. ${item.title}`).join('\n');
-        const prompt = `Translate each of the following titles into ${targetLang}. Output ONLY the translated titles, one per line, in the same numbered format (e.g. "1. translated title"). Do not add any extra text:\n\n${titlesBlock}`;
+        const promptTemplate = this.getPrompt('titleTranslate');
+        const prompt = promptTemplate
+            .replace('{{targetLang}}', targetLang)
+            .replace('{{content}}', titlesBlock);
 
         try {
             const result = await this.callAPI(prompt, null, signal);
             const lines = result.trim().split('\n').filter(l => l.trim());
 
-            for (let i = 0; i < needTranslate.length; i++) {
-                let translated = needTranslate[i].title; // 回退到原标题
-                if (i < lines.length) {
-                    // 去除行号前缀 (如 "1. ", "2. ")
-                    translated = lines[i].replace(/^\d+\.\s*/, '').trim();
+            // 解析编号行，建立 编号 -> 翻译内容 的映射
+            // 支持 AI 返回额外文字（如 "以下是翻译结果"）的情况
+            const numberedMap = new Map();
+            for (const line of lines) {
+                const match = line.match(/^(\d+)\.\s*(.+)/);
+                if (match) {
+                    numberedMap.set(parseInt(match[1]), match[2].trim());
                 }
+            }
+
+            for (let i = 0; i < needTranslate.length; i++) {
+                const num = i + 1; // 编号从 1 开始
+                let translated = numberedMap.get(num) || needTranslate[i].title; // 按编号匹配，找不到则回退到原标题
                 const cacheKey = `${needTranslate[i].title}||${targetLangId}`;
                 this._titleCache.set(cacheKey, translated);
                 resultMap.set(needTranslate[i].id, translated);

@@ -563,6 +563,7 @@ export const ArticlesView = {
                         });
                     }
                 } catch (e) {
+                    if (e.name === 'AbortError') return;
                     console.error('[ArticlesView] Title translation batch failed:', e);
                     const statusCode = e.statusCode || e.status || '';
                     const errorMsg = statusCode ? `${i18n.t('ai.translate_failed')} (${statusCode})` : i18n.t('ai.translate_failed');

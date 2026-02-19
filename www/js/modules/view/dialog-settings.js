@@ -205,13 +205,20 @@ export const SettingsDialogMixin = {
                                 <span class="toggle-icon">▶</span> ${i18n.t('settings.edit_config')}
                             </button>
                             <div class="collapsible-content" style="display: none; margin-top: 12px;">
+                                <label class="miniflux-input-label">${i18n.t('ai.title_translate_prompt')}</label>
+                                <div style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 4px;">${i18n.t('ai.title_translate_prompt_desc')}</div>
+                                <textarea id="ai-title-translate-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.translate_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
+
                                 <label class="miniflux-input-label">${i18n.t('ai.translate_prompt')}</label>
+                                <div style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 4px;">${i18n.t('ai.translate_prompt_desc')}</div>
                                 <textarea id="ai-translate-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.translate_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
 
                                 <label class="miniflux-input-label">${i18n.t('ai.summarize_prompt')}</label>
+                                <div style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 4px;">${i18n.t('ai.summarize_prompt_desc')}</div>
                                 <textarea id="ai-summarize-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.summarize_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
 
                                 <label class="miniflux-input-label">${i18n.t('ai.digest_prompt')}</label>
+                                <div style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 4px;">${i18n.t('ai.digest_prompt_desc')}</div>
                                 <textarea id="ai-digest-prompt" class="auth-input" rows="3" placeholder="${i18n.t('ai.digest_prompt_placeholder')}" style="margin-bottom: 8px; resize: vertical; min-height: 80px;"></textarea>
                                 <div style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 8px;">${i18n.t('digest.prompt_hint')}</div>
 
@@ -442,6 +449,7 @@ export const SettingsDialogMixin = {
 
         // 加载当前 AI 配置
         const aiConfig = AIService.getConfig();
+        const defaultTitleTranslatePrompt = AIService.getDefaultPrompt('titleTranslate');
         const defaultTranslatePrompt = AIService.getDefaultPrompt('translate');
         const defaultSummarizePrompt = AIService.getDefaultPrompt('summarize');
         const defaultDigestPrompt = AIService.getDefaultPrompt('digest');
@@ -544,6 +552,8 @@ export const SettingsDialogMixin = {
             aiTargetLangSelect.dispatchEvent(new Event('change'));
         }
 
+        const aiTitleTranslatePromptInput = dialog.querySelector('#ai-title-translate-prompt');
+        if (aiTitleTranslatePromptInput) aiTitleTranslatePromptInput.value = aiConfig.titleTranslatePrompt || defaultTitleTranslatePrompt;
         if (aiTranslatePromptInput) aiTranslatePromptInput.value = aiConfig.translatePrompt || defaultTranslatePrompt;
         if (aiSummarizePromptInput) aiSummarizePromptInput.value = aiConfig.summarizePrompt || defaultSummarizePrompt;
         const aiDigestPromptInput = dialog.querySelector('#ai-digest-prompt');
@@ -591,6 +601,7 @@ export const SettingsDialogMixin = {
         const aiResetPromptsBtn = dialog.querySelector('#ai-reset-prompts-btn');
         if (aiResetPromptsBtn) {
             aiResetPromptsBtn.addEventListener('click', () => {
+                if (aiTitleTranslatePromptInput) aiTitleTranslatePromptInput.value = defaultTitleTranslatePrompt;
                 if (aiTranslatePromptInput) aiTranslatePromptInput.value = defaultTranslatePrompt;
                 if (aiSummarizePromptInput) aiSummarizePromptInput.value = defaultSummarizePrompt;
                 if (aiDigestPromptInput) aiDigestPromptInput.value = defaultDigestPrompt;
@@ -658,6 +669,7 @@ export const SettingsDialogMixin = {
                     temperature: parseFloat(aiTemperatureInput?.value) || 0.7,
                     concurrency: parseInt(aiConcurrencyInput?.value) || 5,
                     targetLang: aiTargetLangSelect.value,
+                    titleTranslatePrompt: aiTitleTranslatePromptInput ? aiTitleTranslatePromptInput.value.trim() : (AIService.getConfig().titleTranslatePrompt || ''),
                     translatePrompt: aiTranslatePromptInput.value.trim(),
                     summarizePrompt: aiSummarizePromptInput.value.trim(),
                     digestPrompt: aiDigestPromptInput ? aiDigestPromptInput.value.trim() : (AIService.getConfig().digestPrompt || '')
