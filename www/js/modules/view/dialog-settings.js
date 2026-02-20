@@ -177,7 +177,7 @@ export const SettingsDialogMixin = {
                         <label class="miniflux-input-label">${i18n.t('ai.api_url')}</label>
                         <input type="text" id="ai-api-url" class="auth-input" placeholder="https://api.openai.com/v1" style="margin-bottom: 8px;">
 
-                        <label class="miniflux-input-label">${i18n.t('ai.api_key')}</label>
+                        <label class="miniflux-input-label" id="ai-api-key-label">${i18n.t('ai.api_key')}</label>
                         <input type="text" id="ai-api-key" class="auth-input auth-input-secret" placeholder="sk-..." style="margin-bottom: 8px;" autocomplete="off" spellcheck="false">
 
                         <label class="miniflux-input-label">${i18n.t('ai.model')}</label>
@@ -533,8 +533,7 @@ export const SettingsDialogMixin = {
             }
 
             // Show/hide API Key based on provider
-            const aiKeyContainer = aiKeyInput?.parentElement;
-            const aiKeyLabel = aiKeyContainer?.previousElementSibling;
+            const aiKeyLabel = dialog.querySelector('#ai-api-key-label');
             if (providerConfig.noApiKey) {
                 if (aiKeyInput) aiKeyInput.style.display = 'none';
                 if (aiKeyLabel) aiKeyLabel.style.display = 'none';
