@@ -23,6 +23,7 @@
 @import url('./css/context-menu.css');
 @import url('./css/skeleton.css');
 @import url('./css/keyboard.css');
+@import url('./css/chat.css');
 
 /* 认证页面 */
 @import url('./css/auth.css');

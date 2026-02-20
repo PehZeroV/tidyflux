@@ -278,9 +278,7 @@ export function setupSwipeGesture() {
     }, { passive: true });
 }
 
-export function setupListSwipeGesture() {
-    // 列表页滑动手势
-}
+
 
 
 
@@ -296,6 +294,5 @@ export function setupEventListeners(viewManager) {
     _setupDone = true;
     setupPullToRefresh(viewManager);
     setupSwipeGesture();
-    setupListSwipeGesture();
     KeyboardShortcuts.init(viewManager);
 }

@@ -20,7 +20,6 @@ export const API_ENDPOINTS = {
     ARTICLES: {
         BASE: '/api/articles',
         SAVE: '/api/articles/{id}/save',
-        INTEGRATIONS_STATUS: '/api/articles/integrations/status',
     },
     GROUPS: {
         BASE: '/api/groups',
@@ -32,6 +31,9 @@ export const API_ENDPOINTS = {
     AI: {
         CHAT: '/api/ai/chat',
         TEST: '/api/ai/test',
+    },
+    CHAT: {
+        BASE: '/api/chat',
     },
     DIGEST: {
         LIST: '/api/digest/list',

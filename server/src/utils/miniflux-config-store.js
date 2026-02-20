@@ -16,8 +16,8 @@ const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../../data');
 const CONFIG_FILE = path.join(DATA_DIR, 'miniflux-config.json');
 
 // 认证类型常量
-export const AUTH_TYPE_API_KEY = 'api_key';
-export const AUTH_TYPE_BASIC = 'basic';
+const AUTH_TYPE_API_KEY = 'api_key';
+const AUTH_TYPE_BASIC = 'basic';
 
 // Ensure data directory exists
 if (!existsSync(DATA_DIR)) {

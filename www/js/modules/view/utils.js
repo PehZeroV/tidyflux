@@ -80,91 +80,6 @@ export function isMobileDevice() {
     );
 }
 
-const isInvalidImageUrl = (url) => {
-    if (!url) return true;
-    const lowerUrl = url.toLowerCase();
-    // 排除 SVG (性能黑洞) 和 占位符
-    return lowerUrl.endsWith('.svg') || lowerUrl.includes('.svg?') || lowerUrl.includes('grey-placeholder.png');
-};
-
-// Pre-compiled regex patterns for better performance
-const IMG_WIDTH_REGEX = /width\s*=\s*["']?(\d+)["']?/i;
-const IMG_HEIGHT_REGEX = /height\s*=\s*["']?(\d+)["']?/i;
-
-// 检查图片尺寸是否太小
-const isImgTooSmall = (imgTag) => {
-    const widthMatch = imgTag.match(IMG_WIDTH_REGEX);
-    const heightMatch = imgTag.match(IMG_HEIGHT_REGEX);
-    return !!((widthMatch && parseInt(widthMatch[1]) < 100) ||
-        (heightMatch && parseInt(heightMatch[1]) < 100));
-};
-
-/**
- * 从 HTML 内容中提取第一张图片 URL
- * @param {string} content - HTML 内容
- * @returns {string|null} 图片 URL 或 null
- */
-export function extractFirstImage(content) {
-    if (!content) return null;
-
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(content, 'text/html');
-
-        // Helper to check validity
-        const isValid = (src) => {
-            return src &&
-                !src.startsWith('data:') &&
-                !isInvalidImageUrl(src);
-            // Note: DOMParser parses attributes, so we don't need manual width/height regex checks as strictly,
-            // but we can check attributes if needed. For now, we trust the basic URL check.
-        };
-
-        // 1. Selector strategy for <img>
-        const images = doc.querySelectorAll('img');
-        for (const img of images) {
-            const src = img.getAttribute('src') || img.getAttribute('data-src');
-            if (isValid(src)) {
-                // Basic size check if attributes exist (optional optimization)
-                const w = img.getAttribute('width');
-                const h = img.getAttribute('height');
-                if (w && parseInt(w) < 100) continue;
-                if (h && parseInt(h) < 100) continue;
-                return src;
-            }
-        }
-
-        // 2. Fallback to <source> in <picture> if needed (usually <img> covers it)
-        const sources = doc.querySelectorAll('picture source');
-        for (const source of sources) {
-            const srcset = source.getAttribute('srcset');
-            if (srcset) {
-                const firstSrc = srcset.split(',')[0].trim().split(' ')[0];
-                if (isValid(firstSrc)) return firstSrc;
-            }
-        }
-
-    } catch (e) {
-        console.warn('DOMParser failed, falling back to regex', e);
-    }
-
-    // Fallback or if DOMParser fails (rare)
-    // Minimal regex fallback for extreme cases or non-browser envs (though this is frontend code)
-    const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-    return match ? match[1] : null;
-}
-
-/**
- * 生成缩略图 URL
- * @param {string|null} originalUrl - 原始图片 URL
- * @returns {string|null} 缩略图 URL
- */
-export function getThumbnailUrl(originalUrl) {
-    if (!originalUrl) return null;
-    // 直接返回原始 URL，由前端负责加载（减轻服务器压力）
-    return originalUrl;
-}
-
 /**
  * 显示 Toast 提示
  * @param {string} message - 提示消息
@@ -365,46 +280,6 @@ export function createDialog(className, innerHTML, options = {}) {
     return { dialog, close };
 }
 
-/**
- * 简单的 Markdown 渲染器
- * @param {string} markdown - Markdown 文本
- * @returns {string} HTML 字符串
- */
-export function renderMarkdown(markdown) {
-    if (!markdown) return '';
-
-    let html = markdown
-        // 转义 HTML 特殊字符
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        // 标题
-        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        // 粗体
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        // 斜体
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        // 无序列表
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/^• (.+)$/gm, '<li>$1</li>')
-        // 有序列表
-        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-        // 代码块
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // 换行
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-
-    // 包装列表项
-    html = html.replace(/(<li>.*?<\/li>)+/gs, '<ul>$&</ul>');
-
-    // 清理多余的 ul 标签
-    html = html.replace(/<\/ul>\s*<ul>/g, '');
-
-    return `<p>${html}</p>`;
-}
 
 /**
  * 自定义工具提示（替代原生 title）

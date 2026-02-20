@@ -269,10 +269,11 @@ export const FeedManager = {
         }
     },
 
-    async markAllAsRead(feedId = null, groupId = null) {
+    async markAllAsRead(feedId = null, groupId = null, afterPublishedAt = null) {
         const body = {};
         if (feedId) body.feed_id = feedId;
         if (groupId) body.group_id = groupId;
+        if (afterPublishedAt) body.after_published_at = afterPublishedAt;
 
         const response = await AuthManager.fetchWithAuth('/api/articles/mark-all-read', {
             method: 'POST',

@@ -13,6 +13,7 @@ import { Icons } from '../icons.js';
 import { Dialogs } from './dialogs.js';
 import { AIService } from '../ai-service.js';
 import { ArticlesView } from './articles-view.js';
+import { ArticlesTitleTranslation } from './articles-title-translation.js';
 import { ArticleContentView } from './article-content.js';
 
 
@@ -147,6 +148,10 @@ export const ContextMenu = {
                 ${i18n.t('digest.generate_today')}
             </div>
             <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="mark-all-read">
+                 ${Icons.check}
+                ${i18n.t('context.mark_all_read')}
+            </div>
             <div class="context-menu-item" data-action="toggle-view">
                     ${isUnreadOnly ? Icons.checkbox_checked : Icons.checkbox_unchecked}
                 ${i18n.t('context.show_unread')}
@@ -348,7 +353,7 @@ export const ContextMenu = {
                     if (aiAction === 'toggle-title-translate') {
                         await this._toggleAIOverride('translation', feedId, groupId);
                         // 立即触发当前列表的标题翻译
-                        ArticlesView.triggerTitleTranslations(AppState.articles);
+                        ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
                     } else if (aiAction === 'toggle-auto-translate') {
                         await this._toggleAIOverride('translate', feedId, groupId);
                     } else if (aiAction === 'toggle-auto-summary') {
@@ -503,7 +508,13 @@ export const ContextMenu = {
                 });
             } else if (action === 'mark-all-read') {
                 if (await Modal.confirm(i18n.t('context.confirm_mark_all_read'))) {
-                    await FeedManager.markAllAsRead(AppState.currentFeedId, AppState.currentGroupId);
+                    let afterPublishedAt = null;
+                    if (AppState.viewingToday) {
+                        const now = new Date();
+                        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        afterPublishedAt = todayStart.toISOString();
+                    }
+                    await FeedManager.markAllAsRead(AppState.currentFeedId, AppState.currentGroupId, afterPublishedAt);
                     await Promise.all([
                         this.viewManager.loadArticles(AppState.currentFeedId, AppState.currentGroupId),
                         this.viewManager.loadFeeds()

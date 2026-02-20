@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # 安装构建工具（含 better-sqlite3 原生编译需要的工具链）
 RUN apk add --no-cache bash python3 make g++ && npm install -g esbuild
@@ -13,7 +13,7 @@ COPY . .
 RUN chmod +x build.sh && ./build.sh
 
 # Stage 2: Production
-FROM node:18-alpine
+FROM node:20-alpine
 
 # better-sqlite3 需要编译原生模块
 RUN apk add --no-cache python3 make g++

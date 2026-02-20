@@ -14,19 +14,14 @@ import { AIService } from './ai-service.js';
 import { AuthView } from './view/auth-view.js';
 import { FeedsView } from './view/feeds-view.js';
 import { ArticlesView } from './view/articles-view.js';
+import { ArticlesTitleTranslation } from './view/articles-title-translation.js';
 import { ArticleContentView } from './view/article-content.js';
 import { Dialogs } from './view/dialogs.js';
 import { SearchView } from './view/search-view.js';
 import { Gestures } from './view/gestures.js';
 import { ContextMenu } from './view/context-menu.js';
 import { DigestView } from './view/digest-view.js';
-import {
-    formatDate,
-    isIOSSafari,
-    isMobileDevice,
-    getThumbnailUrl,
-    showToast
-} from './view/utils.js';
+import { isIOSSafari } from './view/utils.js';
 import { Modal } from './view/components.js';
 
 const STORAGE_KEY_FILTERS = 'tidyflux_list_filters';
@@ -95,10 +90,6 @@ export const ViewManager = {
     async showAuthView() {
         this.initSubModules();
         await AuthView.showAuthView();
-    },
-
-    showManualLoginForm(errorMessage = null) {
-        AuthView.showManualLoginForm(errorMessage);
     },
 
     // ==================== 布局初始化 ====================
@@ -219,23 +210,6 @@ export const ViewManager = {
         }
     },
 
-    async moveFeedToGroup(feedId, groupId) {
-        try {
-            await FeedManager.updateFeedGroup(feedId, groupId);
-            await this.loadFeeds();
-        } catch (err) {
-            await Modal.alert(err.message);
-        }
-    },
-
-    async deleteFeed(feedId) {
-        try {
-            await FeedManager.deleteFeed(feedId);
-            await this.loadFeeds();
-        } catch (err) {
-            await Modal.alert(err.message);
-        }
-    },
 
     // ==================== 路由渲染方法 ====================
 
@@ -492,10 +466,7 @@ export const ViewManager = {
         this.checkInterval = ArticlesView.checkInterval;
     },
 
-    stopNewArticlesPoller() {
-        ArticlesView.stopNewArticlesPoller();
-        this.checkInterval = null;
-    },
+
 
     async checkForNewArticles() {
         await ArticlesView.checkForNewArticles();
@@ -676,12 +647,6 @@ export const ViewManager = {
 
     // ==================== Utility 相关 ====================
 
-    formatDate,
-    isIOSSafari,
-    isMobileDevice,
-    getThumbnailUrl,
-    showToast,
-
     handleWindowResize() {
         // 仅在移动端尺寸下处理面板显示逻辑
         if (window.innerWidth <= BREAKPOINT_MOBILE) {
@@ -774,10 +739,76 @@ export const ViewManager = {
         });
     },
 
+    // ==================== 列表栏宽度调节（仅桌面端） ====================
+
+    initArticlesPanelResize() {
+        const panel = DOMElements.articlesPanel;
+        const handle = document.getElementById('articles-panel-resize-handle');
+        if (!panel || !handle) return;
+
+        const STORAGE_WIDTH = 'tidyflux_articlesPanelWidth';
+        const MIN_W = 280;
+        const MAX_W = 600;
+        const HOVER_DELAY = 300; // ms, matches CSS transition-delay
+
+        const applyWidth = (w) => {
+            const px = Math.round(Math.max(MIN_W, Math.min(MAX_W, w))) + 'px';
+            panel.style.width = px;
+            panel.style.minWidth = px;
+            panel.style.maxWidth = px;
+        };
+
+        try {
+            const savedW = parseInt(localStorage.getItem(STORAGE_WIDTH), 10);
+            if (!isNaN(savedW)) applyWidth(savedW);
+        } catch (_) { }
+
+        // Delay cursor change to match CSS transition-delay,
+        // so quick mouse pass-through won't flash col-resize cursor
+        let cursorTimer = null;
+        handle.addEventListener('mouseenter', () => {
+            cursorTimer = setTimeout(() => {
+                handle.style.cursor = 'col-resize';
+            }, HOVER_DELAY);
+        });
+        handle.addEventListener('mouseleave', () => {
+            clearTimeout(cursorTimer);
+            handle.style.cursor = '';
+        });
+
+        let startX = 0, startW = 0;
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            // Immediately show col-resize on drag start
+            clearTimeout(cursorTimer);
+            handle.style.cursor = 'col-resize';
+            startX = e.clientX;
+            startW = panel.offsetWidth;
+            handle.classList.add('articles-panel-resize-handle--dragging');
+            document.body.classList.add('panel-resizing');
+            const onMove = (e2) => {
+                const dx = e2.clientX - startX;
+                applyWidth(startW + dx);
+            };
+            const onUp = () => {
+                handle.classList.remove('articles-panel-resize-handle--dragging');
+                document.body.classList.remove('panel-resizing');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                try {
+                    localStorage.setItem(STORAGE_WIDTH, String(panel.offsetWidth));
+                } catch (_) { }
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    },
+
     // ==================== Event Binding ====================
 
     bindEvents() {
         this.initFeedsPanelResize();
+        this.initArticlesPanelResize();
         this.bindSwipeGestures();
 
         // 绑定窗口调整事件，解决从桌面端切换到移动端时的空白问题
@@ -854,7 +885,7 @@ export const ViewManager = {
 
                 // 判断当前视图是否整体开启了自动翻译
                 let isAutoTranslateView = false;
-                if (!ArticlesView._translationHidden) {
+                if (!ArticlesTitleTranslation._translationHidden) {
                     if (AppState.currentFeedId) {
                         isAutoTranslateView = AIService.shouldTranslateFeed(AppState.currentFeedId);
                     } else if (AppState.currentGroupId) {
@@ -862,17 +893,17 @@ export const ViewManager = {
                     }
                 }
 
-                if (ArticlesView._manualTranslateActive || isAutoTranslateView) {
+                if (ArticlesTitleTranslation._manualTranslateActive || isAutoTranslateView) {
                     // 翻译正在显示 → 隐藏所有
-                    ArticlesView.hideAllTranslations();
-                } else if (ArticlesView._translationHidden) {
+                    ArticlesTitleTranslation.hideAllTranslations();
+                } else if (ArticlesTitleTranslation._translationHidden) {
                     // 翻译已隐藏 → 恢复显示
-                    await ArticlesView.showAllTranslations();
+                    await ArticlesTitleTranslation.showAllTranslations();
                 } else {
                     // 初始状态（无自动翻译）→ 启动手动翻译
-                    await ArticlesView.manualTranslateTitles();
+                    await ArticlesTitleTranslation.manualTranslateTitles();
                 }
-                ArticlesView.updateTranslateBtnTooltip();
+                ArticlesTitleTranslation.updateTranslateBtnTooltip();
             });
         }
 
@@ -965,12 +996,4 @@ export const ViewManager = {
         });
     },
 
-    // ==================== Legacy/Compat 方法 ====================
-
-    /** @deprecated 空方法，保留兼容性 */
-    showListView() { },
-
-    showFeedList() {
-        this.initThreeColumnLayout();
-    }
 };

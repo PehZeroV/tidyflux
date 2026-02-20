@@ -42,6 +42,7 @@
   - 📝 **Auto Article Summarization**: Automatically generate AI summaries when opening articles
   - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in server-side SQLite database — zero cost on repeat visits, synced across devices
   - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
+  - 💬 **AI Chat**: Chat with AI about any article — ask questions, request detailed summaries, or discuss content. Conversations are automatically saved and synced across devices
   - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
 
 ### Supported Operations

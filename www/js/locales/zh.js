@@ -26,7 +26,8 @@ export default {
         go_to_settings: '前往设置',
         retry: '重试',
         dont_show_again: '不再提示',
-        select_all: '全选'
+        select_all: '全选',
+        back_to_top: '回到顶部'
     },
     nav: {
         all: '全部文章',
@@ -166,6 +167,8 @@ export default {
         delete_feed: '删除订阅',
         mark_all_read: '全部已读',
         show_unread: '只显示未读',
+        filter_unread: '未读',
+        filter_all: '全部',
         scroll_mark_read: '滚动标记已读',
         enter_new_name: '请输入新名称',
         confirm_delete_group: '确定要删除这个分组吗？分组内的订阅源也会一并删除。',
@@ -329,7 +332,16 @@ export default {
         translate_titles: '翻译标题',
         cancel_translate: '取消翻译',
         show_translate_btn: '显示翻译按钮',
-        show_summarize_btn: '显示摘要按钮'
+        show_summarize_btn: '显示摘要按钮',
+        chat_btn: 'AI 对话',
+        chat_title: 'AI 助手',
+        chat_welcome: '有什么想问的？',
+        chat_context_hint: '已加载当前文章内容，你可以提问、讨论或请求分析',
+        chat_placeholder: '输入你的问题...',
+        chat_thinking: '思考中...',
+        chat_cancelled: '已取消',
+        chat_clear: '清空对话',
+        chat_quick_summary: '创建详细摘要'
     },
     theme: {
         default: '默认',

@@ -42,6 +42,7 @@ cat "$ROOT_DIR/www/css/variables.css" \
     "$ROOT_DIR/www/css/skeleton.css" \
     "$ROOT_DIR/www/css/keyboard.css" \
     "$ROOT_DIR/www/css/auth.css" \
+    "$ROOT_DIR/www/css/chat.css" \
     | esbuild --loader=css --minify > "$DIST_DIR/www/style-${BUILD_VERSION}.css"
 
 echo "📜 压缩 JavaScript..."

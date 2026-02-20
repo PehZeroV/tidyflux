@@ -41,7 +41,6 @@ const state = {
     },
     // UI 临时状态
     ui: {
-        lastVisitedArticleId: null,
         lastListViewScrollTop: null,
     },
     // 搜索状态
@@ -49,10 +48,6 @@ const state = {
         isSearchMode: false,
         searchQuery: '',
     },
-    // 内部观察者列表（不建议直接访问）
-    _observers: {
-        lazyLoad: null,
-    }
 };
 
 /**
@@ -91,12 +86,4 @@ Object.keys(legacyMap).forEach(key => {
         configurable: true
     });
 });
-
-/**
- * 提供外部访问观察者的受限接口
- */
-export const observers = {
-    get lazyLoad() { return state._observers.lazyLoad; },
-    set lazyLoad(val) { state._observers.lazyLoad = val; }
-};
 

@@ -67,6 +67,37 @@
     }
 }
 
+/* 拖拽调整列表栏宽度（仅桌面三栏模式显示） */
+.articles-panel-resize-handle {
+    display: none;
+    width: 6px;
+    margin-left: -3px;
+    flex-shrink: 0;
+    cursor: default;
+    background: transparent;
+    position: relative;
+    z-index: 15;
+    opacity: 1;
+    transition: background 0s 300ms, opacity 0s 300ms;
+}
+
+.articles-panel-resize-handle:hover,
+.articles-panel-resize-handle.articles-panel-resize-handle--dragging {
+    background: var(--accent-color);
+    opacity: 0.4;
+    transition: background 0s 300ms, opacity 0s 300ms;
+}
+
+.articles-panel-resize-handle:not(:hover) {
+    transition: background 0s 0s, opacity 0s 0s;
+}
+
+@media (min-width: 1101px) {
+    .articles-panel-resize-handle {
+        display: block;
+    }
+}
+
 /* 面板拖拽调节手柄 */
 .panel-resize-handle {
     width: 6px;
@@ -115,7 +146,9 @@ body.panel-resizing * {
     pointer-events: none !important;
 }
 
-body.panel-resizing .panel-resize-handle {
+body.panel-resizing .panel-resize-handle,
+body.panel-resizing .feeds-panel-resize-handle,
+body.panel-resizing .articles-panel-resize-handle {
     pointer-events: auto !important;
 }
 
@@ -264,7 +297,7 @@ body.panel-resizing .panel-resize-handle {
 .articles-list {
     flex: 1;
     overflow-y: auto;
-    padding: 10px;
+    padding: 10px 10px 44px 10px;
     padding-top: 54px;
     /* 6px*2 + 32px + 10px extra */
     touch-action: pan-y;
@@ -730,6 +763,7 @@ body.panel-resizing .panel-resize-handle {
         padding-top: 54px;
         padding-left: 12px;
         padding-right: 12px;
+        padding-bottom: calc(48px + env(safe-area-inset-bottom));
         /* 6*2 + 32 + 10 */
     }
 
@@ -1140,6 +1174,75 @@ body.dialog-open #app-container {
     .scroll-to-top-btn {
         bottom: calc(20px + env(safe-area-inset-bottom));
         right: 20px;
+    }
+}
+
+/* Floating Unread Filter Toggle (Toast style) */
+.filter-toggle-toast {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    background: var(--card-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    user-select: none;
+}
+
+.filter-toggle-toast.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.filter-toggle-toast .filter-toggle-option {
+    padding: 4px 0;
+    width: 60px;
+    font-size: 0.72em;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    color: var(--meta-color);
+    cursor: pointer;
+    border-radius: 16px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-family: inherit;
+    line-height: 1.4;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.filter-toggle-toast .filter-toggle-option:hover {
+    color: var(--text-color);
+}
+
+.filter-toggle-toast .filter-toggle-option.active {
+    background: var(--accent-color);
+    color: #fff;
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--accent-color), transparent 60%);
+}
+
+/* Adjust for mobile */
+@media (max-width: 800px) {
+    .filter-toggle-toast {
+        bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+}
+
+/* 播放器激活时抬高 */
+@media (max-width: 1023px) {
+    body.player-active .filter-toggle-toast {
+        bottom: calc(20px + env(safe-area-inset-bottom) + 60px);
     }
 }
 

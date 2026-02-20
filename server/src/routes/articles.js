@@ -272,9 +272,40 @@ router.post('/batch-read', authenticateToken, async (req, res) => {
 // Mark all read
 router.post('/mark-all-read', authenticateToken, async (req, res) => {
     try {
-        const { feed_id, group_id } = req.body;
+        const { feed_id, group_id, after_published_at } = req.body;
 
-        if (feed_id) {
+        if (after_published_at) {
+            // "Today" mode: fetch all unread entries after timestamp and batch-mark as read
+            const afterTs = Math.floor(new Date(after_published_at).getTime() / 1000);
+            const BATCH_LIMIT = 100;
+            let allEntryIds = [];
+            let offset = 0;
+
+            // Fetch all unread entry IDs in batches
+            while (true) {
+                const params = {
+                    status: 'unread',
+                    after: afterTs,
+                    order: 'published_at',
+                    direction: 'desc',
+                    limit: BATCH_LIMIT,
+                    offset
+                };
+                if (feed_id) params.feed_id = feed_id;
+                if (group_id) params.category_id = group_id;
+
+                const data = await req.miniflux.getEntries(params);
+                const entries = data.entries || [];
+                allEntryIds.push(...entries.map(e => e.id));
+
+                if (entries.length < BATCH_LIMIT) break;
+                offset += BATCH_LIMIT;
+            }
+
+            if (allEntryIds.length > 0) {
+                await req.miniflux.updateEntriesStatus(allEntryIds, 'read');
+            }
+        } else if (feed_id) {
             await req.miniflux.markFeedAsRead(feed_id);
         } else if (group_id) {
             await req.miniflux.markCategoryAsRead(group_id);

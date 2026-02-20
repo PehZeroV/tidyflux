@@ -12,6 +12,7 @@ import faviconRoutes from './routes/favicon.js';
 import digestRoutes from './routes/digest.js';
 import aiRoutes from './routes/ai.js';
 import cacheRoutes from './routes/cache.js';
+import chatRoutes from './routes/chat.js';
 
 import helmet from 'helmet';
 import { UserStore } from './utils/user-store.js';
@@ -61,6 +62,7 @@ async function startServer() {
         app.use('/api/digest', digestRoutes);
         app.use('/api/ai', aiRoutes);
         app.use('/api/cache', cacheRoutes);
+        app.use('/api/chat', chatRoutes);
 
 
 

@@ -124,5 +124,3 @@ export function generateToken(payload) {
         { expiresIn: TOKEN_EXPIRATION }
     );
 }
-
-export { JWT_SECRET };

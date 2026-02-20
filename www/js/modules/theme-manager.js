@@ -20,11 +20,11 @@ export const COLOR_SCHEME_MODES = [
 const THEME_STORAGE_KEY = 'tidyflux-theme';
 const COLOR_SCHEME_STORAGE_KEY = 'tidyflux-color-scheme';
 
-export function getCurrentTheme() {
+function getCurrentTheme() {
     return localStorage.getItem(THEME_STORAGE_KEY) || 'default';
 }
 
-export function getCurrentColorScheme() {
+function getCurrentColorScheme() {
     return localStorage.getItem(COLOR_SCHEME_STORAGE_KEY) || 'auto';
 }
 
@@ -58,16 +58,7 @@ export function setColorScheme(mode) {
     updateThemeColorMeta();
 }
 
-export function getNextTheme() {
-    const currentTheme = getCurrentTheme();
-    const currentIndex = THEMES.findIndex(t => t.id === currentTheme);
-    const nextIndex = (currentIndex + 1) % THEMES.length;
-    return THEMES[nextIndex].id;
-}
 
-export function getThemeInfo(themeId) {
-    return THEMES.find(t => t.id === themeId) || THEMES[0];
-}
 
 function updateThemeColorMeta() {
     const style = getComputedStyle(document.documentElement);

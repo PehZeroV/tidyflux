@@ -5,6 +5,7 @@
  */
 
 import { AppState } from '../state.js';
+import { i18n } from './i18n.js';
 
 export class VirtualList {
     constructor(options) {
@@ -436,7 +437,7 @@ export class VirtualList {
 
     render() {
         if (!this.items.length) {
-            this.contentEl.innerHTML = '<div class="empty-msg" style="padding: 40px 20px; text-align: center; color: var(--text-secondary);">暂无文章</div>';
+            this.contentEl.innerHTML = `<div class="empty-msg" style="padding: 40px 20px; text-align: center; color: var(--text-secondary);">${i18n.t('article.no_articles')}</div>`;
             this.spacerTop.style.height = '0px';
             this.spacerBottom.style.height = '0px';
             return;

@@ -5,6 +5,9 @@
  * 各功能拆分到独立文件：
  * - article-ai.js: AI 功能（翻译 + 总结）
  * - article-toolbar.js: 工具栏事件（文章 + 简报）
+ * - article-lightbox.js: 图片大图查看器（缩放 + 平移）
+ * - article-preview.js: 文章预览弹窗
+ * - article-enhance.js: 内容增强（表格 + 代码块 + 嵌入媒体）
  */
 
 import { DOMElements } from '../../dom.js';
@@ -14,12 +17,14 @@ import { showToast } from './utils.js';
 import { i18n } from '../i18n.js';
 import { Icons } from '../icons.js';
 import { AIService } from '../ai-service.js';
-import { AICache } from '../ai-cache.js';
-
 import { ArticlesView } from './articles-view.js';
 import { GlobalPodcastPlayer } from '../components/podcast-player.js';
 import { ArticleAIMixin } from './article-ai.js';
 import { ArticleToolbarMixin } from './article-toolbar.js';
+import { ArticleLightboxMixin } from './article-lightbox.js';
+import { ArticlePreviewMixin } from './article-preview.js';
+import { ArticleEnhanceMixin } from './article-enhance.js';
+import { ArticleChatMixin } from './article-chat.js';
 
 /**
  * 文章内容视图管理
@@ -79,119 +84,7 @@ export const ArticleContentView = {
         }
     },
 
-    /**
-     * 打开图片大图 lightbox
-     * @param {string} src - 图片 URL
-     */
-    _openImageLightbox(src) {
-        // 移除已有的 lightbox
-        const existing = document.querySelector('.image-lightbox-overlay');
-        if (existing) existing.remove();
-
-        // 收集当前文章内所有非 favicon 图片
-        const allImages = Array.from(
-            (DOMElements.articleContent || document).querySelectorAll('img:not(.favicon)')
-        ).map(img => img.src).filter(Boolean);
-
-        let currentIndex = allImages.indexOf(src);
-        if (currentIndex === -1) {
-            // fallback：如果没找到完全匹配，尝试部分匹配
-            currentIndex = allImages.findIndex(s => s.includes(src) || src.includes(s));
-            if (currentIndex === -1) {
-                allImages.push(src);
-                currentIndex = allImages.length - 1;
-            }
-        }
-
-        const hasMultiple = allImages.length > 1;
-
-        const overlay = document.createElement('div');
-        overlay.className = 'image-lightbox-overlay';
-        overlay.innerHTML = `
-            <button class="image-lightbox-close" aria-label="Close">✕</button>
-            ${hasMultiple ? `<button class="image-lightbox-nav image-lightbox-prev" aria-label="Previous">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>` : ''}
-            <img src="${src}" alt="" />
-            ${hasMultiple ? `<button class="image-lightbox-nav image-lightbox-next" aria-label="Next">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-            </button>` : ''}
-            ${hasMultiple ? `<div class="image-lightbox-counter">${currentIndex + 1} / ${allImages.length}</div>` : ''}
-        `;
-        document.body.appendChild(overlay);
-
-        // 动画展开
-        requestAnimationFrame(() => overlay.classList.add('active'));
-
-        const imgEl = overlay.querySelector('img');
-        const counterEl = overlay.querySelector('.image-lightbox-counter');
-        const prevBtn = overlay.querySelector('.image-lightbox-prev');
-        const nextBtn = overlay.querySelector('.image-lightbox-next');
-
-        const updateNav = () => {
-            if (!hasMultiple) return;
-            prevBtn.classList.toggle('disabled', currentIndex === 0);
-            nextBtn.classList.toggle('disabled', currentIndex === allImages.length - 1);
-        };
-        updateNav();
-
-        const showImage = (index) => {
-            if (index < 0 || index >= allImages.length) return;
-            currentIndex = index;
-            imgEl.src = allImages[currentIndex];
-            if (counterEl) counterEl.textContent = `${currentIndex + 1} / ${allImages.length}`;
-            updateNav();
-        };
-
-        const closeLightbox = () => {
-            overlay.classList.remove('active');
-            setTimeout(() => overlay.remove(), 250);
-            document.removeEventListener('keydown', keyHandler);
-        };
-
-        // 点击遮罩或关闭按钮关闭
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay || e.target.closest('.image-lightbox-close')) {
-                closeLightbox();
-            }
-        });
-
-        // 上一张 / 下一张点击
-        if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); showImage(currentIndex - 1); });
-        if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); showImage(currentIndex + 1); });
-
-        // 键盘：ESC 关闭，← → 切换
-        const keyHandler = (e) => {
-            if (e.key === 'Escape') closeLightbox();
-            if (e.key === 'ArrowLeft') showImage(currentIndex - 1);
-            if (e.key === 'ArrowRight') showImage(currentIndex + 1);
-        };
-        document.addEventListener('keydown', keyHandler);
-
-        // 阻止所有触摸事件穿透到文章页面
-        let touchStartX = 0;
-        let touchStartY = 0;
-        overlay.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            touchStartX = e.changedTouches[0].clientX;
-            touchStartY = e.changedTouches[0].clientY;
-        }, { passive: false });
-        overlay.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, { passive: false });
-        overlay.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            if (!hasMultiple) return;
-            const dx = e.changedTouches[0].clientX - touchStartX;
-            const dy = e.changedTouches[0].clientY - touchStartY;
-            // 水平滑动 > 50px 且水平位移大于垂直位移
-            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-                if (dx < 0) showImage(currentIndex + 1);
-                else showImage(currentIndex - 1);
-            }
-        }, { passive: false });
-    },
+    // _openImageLightbox → article-lightbox.js (ArticleLightboxMixin)
 
     /**
      * 选择文章
@@ -342,6 +235,9 @@ export const ArticleContentView = {
             this.updateLocalUnreadCount(feedId);
         }
 
+        // 关闭聊天面板（如果打开）
+        this.closeChat();
+
         // 取消上一篇文章的 AI 请求
         this._cancelPendingAI();
 
@@ -360,12 +256,6 @@ export const ArticleContentView = {
         try {
             // 如果是简报
             if (isDigest) {
-                // Cleanup player if switching to digest - NO, Global Player persists
-                // if (this.podcastPlayer) {
-                //     this.podcastPlayer.destroy();
-                //     this.podcastPlayer = null;
-                // }
-
                 let digest = cachedArticle;
                 if (!digest || !digest.content) {
                     const result = await FeedManager.getDigest(articleId);
@@ -407,267 +297,14 @@ export const ArticleContentView = {
         }
     },
 
-    /**
-     * 处理简报中的文章引用标记 [ref:ID]
-     * 先替换为占位符，避免 parseMarkdown 转义 HTML
-     * @param {string} content - 简报内容
-     * @param {Object} articleRefs - 文章引用映射 {id: {title, feedTitle}}
-     * @returns {{content: string, placeholders: Object}} 处理后的内容和占位符映射
-     */
-    _processArticleRefs(content, articleRefs) {
-        if (!content) return { content, placeholders: {} };
-        const placeholders = {};
-        let idx = 0;
-        // 匹配 [ref:ID] 格式，ID 可以是数字
-        const processed = content.replace(/\[ref:(\d+)\]/g, (match, articleId) => {
-            const ref = articleRefs && articleRefs[articleId];
-            const title = ref ? ref.title : `#${articleId}`;
-            const tooltip = title.replace(/"/g, '&quot;');
-            const placeholder = `\x00ARTREF_${idx}\x00`;
-            placeholders[placeholder] = `<a href="#/article/${articleId}" class="digest-article-ref" data-article-id="${articleId}" title="${tooltip}"><sup>[↗\uFE0E]</sup></a>`;
-            idx++;
-            return placeholder;
-        });
-        return { content: processed, placeholders };
-    },
-
-    /**
-     * 在桌面端显示文章预览悬浮框
-     * @param {string} articleId - 文章 ID
-     * @param {Object} articleRefs - 文章引用映射
-     */
-    async _showArticlePreview(articleId, articleRefs) {
-        // 移除已存在的预览
-        const existing = document.querySelector('.article-preview-overlay');
-        if (existing) existing.remove();
-
-        const ref = articleRefs && articleRefs[articleId];
-        const previewTitle = ref ? ref.title : `Article #${articleId}`;
-
-        // 创建预览弹窗 — 初始只有 loading 状态
-        const overlay = document.createElement('div');
-        overlay.className = 'article-preview-overlay';
-        overlay.innerHTML = `
-            <div class="article-preview-card">
-                <div class="article-preview-scroll">
-                    <div class="article-preview-loading">
-                        <div class="article-preview-spinner"></div>
-                        <span>${i18n.t('common.loading') || 'Loading...'}</span>
-                    </div>
-                </div>
-                <div class="article-preview-footer">
-                    <button class="article-preview-btn article-preview-btn-secondary preview-close-btn">${i18n.t('common.close') || 'Close'}</button>
-                    <button class="article-preview-btn article-preview-btn-primary preview-goto-btn">${i18n.t('digest.read_full') || 'Read Full Article'} →</button>
-                </div>
-            </div>
-        `;
-        // 将文章字体设置传递到预览弹窗（因为弹窗挂在 body 上，不会继承 #article-content 的 CSS 变量）
-        const articleContent = document.getElementById('article-content');
-        if (articleContent) {
-            const fontFamily = articleContent.style.getPropertyValue('--article-font-family');
-            const headingFontFamily = articleContent.style.getPropertyValue('--article-heading-font-family');
-            const fontSize = articleContent.style.getPropertyValue('--article-font-size');
-            if (fontFamily) overlay.style.setProperty('--article-font-family', fontFamily);
-            if (headingFontFamily) overlay.style.setProperty('--article-heading-font-family', headingFontFamily);
-            if (fontSize) overlay.style.setProperty('--article-font-size', fontSize);
-        }
-
-        document.body.appendChild(overlay);
-
-        // 动画展开 + 背景模糊
-        document.body.classList.add('dialog-open');
-        requestAnimationFrame(() => overlay.classList.add('active'));
-
-        // 用于取消 AI 请求
-        const previewAbortController = new AbortController();
-
-        // 关闭逻辑
-        const closePreview = () => {
-            previewAbortController.abort();
-            overlay.classList.remove('active');
-            document.body.classList.remove('dialog-open');
-            setTimeout(() => overlay.remove(), 300);
-        };
-
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreview(); });
-        overlay.querySelector('.preview-close-btn').addEventListener('click', closePreview);
-        overlay.querySelector('.preview-goto-btn').addEventListener('click', () => {
-            closePreview();
-            window.location.hash = `#/article/${articleId}`;
-        });
-        const escHandler = (e) => {
-            if (e.key === 'Escape') { closePreview(); document.removeEventListener('keydown', escHandler); }
-        };
-        document.addEventListener('keydown', escHandler);
-
-        // 加载文章内容
-        try {
-            const article = await FeedManager.getArticle(articleId);
-            const scrollArea = overlay.querySelector('.article-preview-scroll');
-            if (!scrollArea || !document.body.contains(overlay)) return;
-
-            const locale = AppState.user.language || 'zh-CN';
-            const date = article.published_at
-                ? new Date(article.published_at).toLocaleString(locale)
-                : '';
-            const content = article.content || article.summary || '';
-            const feedName = article.feed?.title || ref?.feedTitle || '';
-            const titleText = article.title || previewTitle;
-            const titleHTML = article.url
-                ? `<a href="${article.url}" target="_blank" rel="noopener noreferrer">${titleText}</a>`
-                : titleText;
-
-            // 构建与正常文章一致的 header HTML
-            let feedSourceHTML = '';
-            if (article.feed_id && feedName) {
-                feedSourceHTML = `
-                    <a href="#/feed/${article.feed_id}" class="article-feed-source" title="${feedName}">
-                        <img src="/api/favicon?feedId=${article.feed_id}" class="favicon" loading="lazy" decoding="async" alt="${feedName}" style="width: 14px; height: 14px; border-radius: 3px; margin: 0; display: block;">
-                        <span>${feedName}</span>
-                    </a>
-                `;
-            } else if (feedName) {
-                feedSourceHTML = `
-                    <span class="article-feed-source" style="cursor: default;">
-                        <span>${feedName}</span>
-                    </span>
-                `;
-            }
-
-            const previewTitleHTML = article.url
-                ? `<h1><a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-title-link">${titleText}</a></h1>`
-                : `<h1>${titleText}</h1>`;
-
-            // 一次性替换整个滚动区域内容
-            scrollArea.innerHTML = `
-                <header class="article-header" style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
-                    ${feedSourceHTML}
-                    ${previewTitleHTML}
-                    <div class="article-header-info" style="
-                        color: var(--meta-color); 
-                        font-size: 12px; 
-                        margin-top: 0; 
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: flex-start;
-                        flex-wrap: wrap;
-                        gap: 4px;
-                    ">
-                        ${date ? `<span>${date}</span>` : ''}
-                    </div>
-                </header>
-                <div class="article-preview-content article-content">${content || `<div class="article-preview-error">${i18n.t('article.empty_content') || 'No content'}</div>`}</div>
-            `;
-
-            // === 自动摘要 ===
-            if (AIService.isConfigured() && article.feed_id && AIService.shouldAutoSummarize(article.feed_id)) {
-                this._previewAutoSummarize(overlay, article, previewAbortController.signal);
-            }
-
-            // === 自动翻译 ===
-            if (AIService.isConfigured() && article.feed_id && AIService.shouldAutoTranslate(article.feed_id)) {
-                this._previewAutoTranslate(overlay, article, previewAbortController.signal);
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') return;
-            console.error('[ArticlePreview] Failed to load article:', err);
-            const scrollArea = overlay.querySelector('.article-preview-scroll');
-            if (scrollArea) {
-                scrollArea.innerHTML = `<div class="article-preview-error">${i18n.t('feed.fetch_articles_failed') || 'Failed to load article'}</div>`;
-            }
-        }
-    },
-
-    /**
-     * 预览弹窗内的自动摘要
-     */
-    async _previewAutoSummarize(overlay, article, signal) {
-        const contentEl = overlay.querySelector('.article-preview-content');
-        if (!contentEl) return;
-
-        const rawContent = AIService.extractText(article.content || '');
-        if (!rawContent || rawContent.trim().length < 50) return;
-
-        // 先检查缓存
-        try {
-            const cached = await AICache.getSummary(article.id);
-            if (cached) {
-                this._insertPreviewSummary(contentEl, this.parseMarkdown(cached));
-                return;
-            }
-        } catch { /* ignore */ }
-
-        // 插入加载中的摘要容器
-        const summaryEl = this._insertPreviewSummary(contentEl, `<span style="opacity:0.6;">${i18n.t('ai.summarizing')}</span>`);
-
-        try {
-            const aiConfig = AIService.getConfig();
-            const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
-            let streamedText = '';
-
-            await AIService.summarize(rawContent, targetLang, (chunk) => {
-                streamedText += chunk;
-                const contentEl = summaryEl.querySelector('.preview-summary-content');
-                if (contentEl) contentEl.innerHTML = this.parseMarkdown(streamedText);
-            }, signal);
-
-            AICache.setSummary(article.id, streamedText).catch(() => { });
-        } catch (err) {
-            if (err.name === 'AbortError') return;
-            console.error('[PreviewSummary] Failed:', err);
-            const contentEl = summaryEl.querySelector('.preview-summary-content');
-            if (contentEl) {
-                const statusCode = err.statusCode || err.status || '';
-                const errorMsg = statusCode ? `${i18n.t('ai.api_error')} (${statusCode})` : i18n.t('ai.api_error');
-                contentEl.innerHTML = `<span style="color: var(--danger-color); font-size: 0.9em;">${errorMsg}</span><button class="ai-retry-btn">${i18n.t('common.retry')}</button>`;
-                contentEl.querySelector('.ai-retry-btn')?.addEventListener('click', () => {
-                    this._previewAutoSummarize(overlay, article, signal);
-                });
-            }
-        }
-    },
-
-    /**
-     * 在预览弹窗正文顶部插入摘要区块
-     */
-    _insertPreviewSummary(bodyEl, initialHTML) {
-        const summaryEl = document.createElement('div');
-        summaryEl.className = 'preview-summary-box';
-        summaryEl.style.cssText = 'margin-bottom: 16px; padding: 14px 16px; background: color-mix(in srgb, var(--accent-color), transparent 94%); border-radius: var(--radius); font-size: 0.92em; line-height: 1.7;';
-        summaryEl.innerHTML = `
-            <div style="font-weight: 600; font-size: 0.85em; color: var(--accent-color); margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">✦ ${i18n.t('ai.summary_title')}</div>
-            <div class="preview-summary-content">${initialHTML}</div>
-        `;
-        bodyEl.insertBefore(summaryEl, bodyEl.firstChild);
-        return summaryEl;
-    },
-
-    /**
-     * 预览弹窗内的自动翻译
-     */
-    async _previewAutoTranslate(overlay, article, signal) {
-        const contentEl = overlay.querySelector('.article-preview-content');
-        const titleEl = overlay.querySelector('.article-header .article-title-link') || overlay.querySelector('.article-header h1');
-        if (!contentEl) return;
-
-        // 先检查缓存
-        const cacheRestored = await this._restoreTranslationFromCache(contentEl, titleEl, article.id);
-        if (cacheRestored) return;
-
-        try {
-            await this.translateBilingual(contentEl, titleEl, signal, article.id);
-        } catch (err) {
-            if (err.name === 'AbortError') return;
-            console.error('[PreviewTranslate] Failed:', err);
-        }
-    },
+    // _processArticleRefs, _showArticlePreview, _previewAutoSummarize,
+    // _insertPreviewSummary, _previewAutoTranslate → article-preview.js (ArticlePreviewMixin)
 
     /**
      * 渲染简报内容
      * @param {Object} digest - 简报对象
      */
     renderDigestContent(digest) {
-
 
         // 工具栏 HTML（简报版，包含返回和删除按钮）
         const toolbarHTML = `
@@ -739,6 +376,7 @@ export const ArticleContentView = {
         });
 
         this.enhanceTables();
+        this.enhanceEmbeds();
         this.bindDigestToolbarEvents(digest);
         this.updateNavButtons(digest.id);
     },
@@ -751,8 +389,6 @@ export const ArticleContentView = {
      */
     renderArticleContent(article) {
         // No auto-cleanup for GlobalPlayer needed, it persists. 
-        // Or maybe we want to hide it if user starts reading a new article but DOESN'T play? 
-        // Usually global players persist until explicit close or new play.
 
         // document.title = article.title || 'Tidyflux';
 
@@ -842,6 +478,9 @@ export const ArticleContentView = {
                     <button class="article-toolbar-btn" id="article-summarize-btn" data-tooltip="${i18n.t('ai.summarize_btn')}" style="${AIService.getConfig().showSummarizeBtn === false ? 'display:none' : ''}">
                         ${Icons.summarize}
                     </button>
+                    <button class="article-toolbar-btn" id="article-chat-btn" data-tooltip="${i18n.t('ai.chat_btn')}">
+                        ${Icons.chat}
+                    </button>
                     <div class="toolbar-divider" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 4px;"></div>
                     <button class="article-toolbar-btn" id="article-more-btn" data-tooltip="${i18n.t('article.more_actions')}">
                         ${Icons.more_vert}
@@ -895,9 +534,11 @@ export const ArticleContentView = {
             });
         }
 
-        this.enhanceCodeBlocks();
         this.enhanceTables();
+        this.enhanceCodeBlocks();
+        this.enhanceEmbeds();
         this.bindArticleToolbarEvents(article);
+        this.bindChatButton(article);
         this.updateNavButtons(article.id);
     },
 
@@ -1004,127 +645,8 @@ export const ArticleContentView = {
         this._currentArticle = null;
     },
 
-    /**
-     * 增强表格显示
-     * 将宽表格包裹在可横向滚动的容器中
-     */
-    enhanceTables() {
-        const articleBody = DOMElements.articleContent?.querySelector('.article-body, .digest-body');
-        if (!articleBody) return;
-
-        const tables = articleBody.querySelectorAll('table');
-        tables.forEach((table) => {
-            // 避免重复处理
-            if (table.parentElement?.classList.contains('table-scroll-wrapper')) return;
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'table-scroll-wrapper';
-            table.parentNode.insertBefore(wrapper, table);
-            wrapper.appendChild(table);
-        });
-    },
-
-    /**
-     * 增强代码块显示
-     * 为 pre 和 code 块添加语言标签和复制按钮
-     */
-    enhanceCodeBlocks() {
-        const articleBody = DOMElements.articleContent?.querySelector('.article-body');
-        if (!articleBody) return;
-
-        const preElements = articleBody.querySelectorAll('pre');
-
-        preElements.forEach((pre) => {
-            // 避免重复处理
-            if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
-
-            // 获取语言类型
-            let language = 'text';
-            const codeEl = pre.querySelector('code');
-            if (codeEl) {
-                const className = codeEl.className || '';
-                const match = className.match(/(?:language-|lang-)(\w+)/);
-                if (match) {
-                    language = match[1];
-                }
-            }
-
-            // 获取代码内容（清理多余换行）
-            const getTextContent = (node) => {
-                if (!node) return '';
-                if (node.nodeType === Node.TEXT_NODE) return node.data;
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'BR') return '\n';
-                    return Array.from(node.childNodes).map(getTextContent).join('');
-                }
-                return '';
-            };
-
-            const codeText = getTextContent(codeEl || pre)
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-
-            // 创建包装器
-            const wrapper = document.createElement('div');
-            wrapper.className = 'code-block-wrapper';
-
-            // 创建头部
-            const header = document.createElement('div');
-            header.className = 'code-block-header';
-            header.innerHTML = `
-                <span class="code-language">${language.toUpperCase()}</span>
-                <button class="code-copy-btn" data-tooltip="${i18n.t('ai.copy')}">
-                    ${Icons.copy}
-                    <span class="copy-text">${i18n.t('ai.copy')}</span>
-                </button>
-            `;
-
-            // 复制功能 (兼容 iOS Safari)
-            const copyBtn = header.querySelector('.code-copy-btn');
-            copyBtn.addEventListener('click', async () => {
-                const showSuccess = () => {
-                    copyBtn.innerHTML = `${Icons.copied}<span class="copy-text">${i18n.t('ai.copied')}</span>`;
-                    copyBtn.classList.add('copied');
-                    setTimeout(() => {
-                        copyBtn.innerHTML = `${Icons.copy}<span class="copy-text">${i18n.t('ai.copy')}</span>`;
-                        copyBtn.classList.remove('copied');
-                    }, 2000);
-                };
-
-                // 优先使用现代 Clipboard API
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    try {
-                        await navigator.clipboard.writeText(codeText);
-                        showSuccess();
-                        return;
-                    } catch (err) {
-                        // Fallback to execCommand
-                    }
-                }
-
-                // Fallback: 使用 textarea + execCommand (兼容 iOS Safari)
-                try {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = codeText;
-                    textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
-                    document.body.appendChild(textarea);
-                    textarea.focus();
-                    textarea.select();
-                    textarea.setSelectionRange(0, codeText.length); // iOS 需要这行
-                    document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    showSuccess();
-                } catch (err) {
-                    console.error('Copy failed:', err);
-                }
-            });
-
-            // 包装 pre 元素
-            pre.parentNode.insertBefore(wrapper, pre);
-            wrapper.appendChild(header);
-            wrapper.appendChild(pre);
-        });
-    },
+    // enhanceEmbeds, enhanceTables, enhanceCodeBlocks,
+    // _detectTableBasedCode, _removeEmptyTableCells → article-enhance.js (ArticleEnhanceMixin)
 
     /**
      * 更新本地未读计数
@@ -1235,10 +757,6 @@ export const ArticleContentView = {
      * 更新导航按钮
      * @param {string|number} currentId
      */
-    /**
-     * 更新导航按钮
-     * @param {string|number} currentId
-     */
     updateNavButtons(currentId) {
         // 先清除旧的
         this.clearNavButtons();
@@ -1317,4 +835,8 @@ export const ArticleContentView = {
     // Mixin methods from sub-modules
     ...ArticleAIMixin,
     ...ArticleToolbarMixin,
+    ...ArticleLightboxMixin,
+    ...ArticlePreviewMixin,
+    ...ArticleEnhanceMixin,
+    ...ArticleChatMixin,
 };

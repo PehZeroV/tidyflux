@@ -26,7 +26,8 @@ export default {
         go_to_settings: 'Go to Settings',
         retry: 'Retry',
         dont_show_again: "Don't show again",
-        select_all: 'Select All'
+        select_all: 'Select All',
+        back_to_top: 'Back to Top'
     },
     nav: {
         all: 'All Articles',
@@ -166,6 +167,8 @@ export default {
         delete_feed: 'Delete Feed',
         mark_all_read: 'Mark All Read',
         show_unread: 'Show Unread Only',
+        filter_unread: 'Unread',
+        filter_all: 'All',
         scroll_mark_read: 'Scroll to Mark Read',
         enter_new_name: 'Enter new name',
         confirm_delete_group: 'Are you sure you want to delete this group? Feeds inside will also be deleted.',
@@ -329,7 +332,16 @@ export default {
         translate_titles: 'Translate Titles',
         cancel_translate: 'Cancel Translation',
         show_translate_btn: 'Show Translate Buttons',
-        show_summarize_btn: 'Show Summarize Button'
+        show_summarize_btn: 'Show Summarize Button',
+        chat_btn: 'AI Chat',
+        chat_title: 'AI Assistant',
+        chat_welcome: 'How can I help you?',
+        chat_context_hint: 'Article content loaded. Ask questions, discuss, or request analysis',
+        chat_placeholder: 'Type your question...',
+        chat_thinking: 'Thinking...',
+        chat_cancelled: 'Cancelled',
+        chat_clear: 'Clear Chat',
+        chat_quick_summary: 'Create Detailed Summary'
     },
     theme: {
         default: 'Default',

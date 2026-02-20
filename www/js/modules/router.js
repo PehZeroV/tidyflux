@@ -146,12 +146,3 @@ export const Router = {
 // 启动路由
 Router.init();
 
-// Export for compatibility
-export function handleRouteChange() {
-    Router.handleHashChange();
-}
-
-export function navigateBackToList() {
-    // try standard back
-    history.back();
-}

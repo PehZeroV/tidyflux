@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 
 <head>
   <script src="/js/theme-init.js"></script>
@@ -36,19 +36,19 @@
 </head>
 
 <body>
-  <!-- 认证容器 -->
+  <!-- Auth container -->
   <div id="auth-container" class="auth-container" style="display: none"></div>
 
-  <!-- 三栏布局主容器 -->
+  <!-- Three-column layout container -->
   <div id="app-container" class="app-container three-column-layout" style="display: none;">
-    <!-- 左栏：订阅源列表 -->
+    <!-- Left column: Feeds panel -->
     <aside id="feeds-panel" class="feeds-panel">
       <div class="panel-header">
         <div class="app-logo feeds-panel-logo">
           <img src="/icons/icon-512x512.svg" alt="Tidyflux Logo" width="100%" height="100%">
         </div>
-        <h2 class="feeds-panel-title" data-i18n="nav.feeds">订阅源</h2>
-        <button id="add-feed-btn" class="icon-btn" data-tooltip="添加订阅" data-i18n="dialogs.add_subscription">
+        <h2 class="feeds-panel-title" data-i18n="nav.feeds">Feeds</h2>
+        <button id="add-feed-btn" class="icon-btn" data-tooltip="Add Subscription" data-i18n="dialogs.add_subscription">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
           </svg>
@@ -56,7 +56,7 @@
       </div>
       <div id="feeds-list" class="feeds-list"></div>
       <div class="panel-footer">
-        <button id="settings-btn" class="icon-btn" data-tooltip="设置" data-i18n="nav.settings">
+        <button id="settings-btn" class="icon-btn" data-tooltip="Settings" data-i18n="nav.settings">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
             <path
               d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.64-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
@@ -64,40 +64,40 @@
         </button>
       </div>
     </aside>
-    <div id="feeds-panel-resize-handle" class="feeds-panel-resize-handle" data-tooltip="拖拽调整宽度" aria-label="调整订阅栏宽度">
+    <div id="feeds-panel-resize-handle" class="feeds-panel-resize-handle">
     </div>
 
-    <!-- 中栏：文章列表 -->
+    <!-- Middle column: Articles list -->
     <div id="articles-panel" class="articles-panel">
       <div class="panel-header">
-        <button id="show-feeds-btn" class="icon-btn" data-tooltip="订阅源" data-i18n="nav.feeds"
+        <button id="show-feeds-btn" class="icon-btn" data-tooltip="Feeds" data-i18n="nav.feeds"
           style="margin-right: 8px;">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
             <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
           </svg>
         </button>
-        <h2 id="current-feed-title" data-i18n="nav.all">全部文章</h2>
-        <button id="articles-translate-btn" class="icon-btn" data-tooltip="翻译标题" data-i18n="ai.translate_titles"
-          style="margin-left: auto;">
+        <h2 id="current-feed-title" data-i18n="nav.all">All Articles</h2>
+        <button id="articles-translate-btn" class="icon-btn" data-tooltip="Translate Titles"
+          data-i18n="ai.translate_titles" style="margin-left: auto;">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path
               d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z" />
           </svg>
         </button>
-        <button id="articles-search-btn" class="icon-btn" data-tooltip="搜索" data-i18n="common.search">
+        <button id="articles-search-btn" class="icon-btn" data-tooltip="Search" data-i18n="common.search">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path
               d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
           </svg>
         </button>
-        <button id="articles-refresh-btn" class="icon-btn" data-tooltip="刷新" data-i18n="context.refresh_feed">
+        <button id="articles-refresh-btn" class="icon-btn" data-tooltip="Refresh" data-i18n="context.refresh_feed">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path
               d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
           </svg>
         </button>
-        <button id="articles-menu-btn" class="icon-btn" data-tooltip="菜单" data-i18n="common.menu">
+        <button id="articles-menu-btn" class="icon-btn" data-tooltip="Menu" data-i18n="common.menu">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
             <path
               d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -105,24 +105,27 @@
         </button>
       </div>
       <div id="articles-list" class="articles-list"></div>
-      <button id="scroll-to-top-btn" class="scroll-to-top-btn" data-tooltip="回到顶部">
+      <button id="scroll-to-top-btn" class="scroll-to-top-btn" data-tooltip="Back to Top"
+        data-i18n="common.back_to_top">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
           <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" />
         </svg>
       </button>
     </div>
+    <div id="articles-panel-resize-handle" class="articles-panel-resize-handle">
+    </div>
 
-    <!-- 右栏：文章内容 -->
+    <!-- Right column: Article content -->
     <main id="content-panel" class="content-panel">
       <div id="article-content" class="article-content">
         <div class="empty-content">
-          <p data-i18n="welcome">选择一篇文章开始阅读</p>
+          <p data-i18n="welcome">Select an article to start reading</p>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- 移动端底部导航 -->
+  <!-- Mobile bottom navigation -->
 
   <script src="/js/main.js" type="module"></script>
 </body>

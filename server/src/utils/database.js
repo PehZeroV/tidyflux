@@ -86,6 +86,22 @@ function _initTables(db) {
         -- 按用户查询和清理的索引
         CREATE INDEX IF NOT EXISTS idx_ai_cache_user
             ON ai_cache (user_id, timestamp);
+
+        -- ==================== AI 聊天记录表 ====================
+        CREATE TABLE IF NOT EXISTS ai_chats (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT    NOT NULL,
+            article_id  TEXT    NOT NULL,
+            messages    TEXT    NOT NULL DEFAULT '[]',
+            title       TEXT,
+            updated_at  TEXT    DEFAULT (datetime('now')),
+            created_at  TEXT    DEFAULT (datetime('now')),
+            UNIQUE(user_id, article_id)
+        );
+
+        -- 按用户 + 更新时间倒序查询的索引
+        CREATE INDEX IF NOT EXISTS idx_ai_chats_user
+            ON ai_chats (user_id, updated_at DESC);
     `);
 }
 
