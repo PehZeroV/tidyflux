@@ -6,6 +6,7 @@
 import { ViewManager } from './view-manager.js';
 import { AuthManager } from './auth-manager.js';
 import { SearchView } from './view/search-view.js';
+import { BREAKPOINTS } from '../constants.js';
 
 export const Router = {
     init() {
@@ -97,7 +98,7 @@ export const Router = {
         if (searchMatch) {
             const query = decodeURIComponent(searchMatch[1]);
             // 在移动端显示文章面板
-            if (window.innerWidth <= 1100) {
+            if (window.innerWidth <= BREAKPOINTS.DESKTOP) {
                 ViewManager.showPanel('articles');
             }
             SearchView.restoreSearch(query);
@@ -112,7 +113,7 @@ export const Router = {
 
         // 7. 订阅源列表 #/feeds
         if (hash === '#/feeds') {
-            if (window.innerWidth <= 1100) {
+            if (window.innerWidth <= BREAKPOINTS.DESKTOP) {
                 ViewManager.showPanel('feeds');
             } else {
                 // Desktop: ignore or show all
@@ -135,7 +136,7 @@ export const Router = {
         if (!hash || hash === '#/') {
             // Default to all
             ViewManager._renderFeed(null);
-            if (window.innerWidth <= 1100) {
+            if (window.innerWidth <= BREAKPOINTS.DESKTOP) {
 
                 ViewManager.showPanel('articles');
             }

@@ -388,7 +388,7 @@ export const ManagerDialogMixin = {
                 } else {
                     let errMsg = result.response || result.status;
                     if (errMsg && errMsg.length > 50) errMsg = errMsg.substring(0, 50) + '...';
-                    globalPushMsg.textContent = `✗ HTTP ${result.status}: ${escapeHtml(errMsg)}`;
+                    globalPushMsg.textContent = `✗ HTTP ${result.status}: ${errMsg}`;
                     globalPushMsg.style.color = 'var(--danger-color)';
                 }
             } catch (err) {

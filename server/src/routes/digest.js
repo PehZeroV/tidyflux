@@ -107,8 +107,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
             hours = 12,
             afterTimestamp,
             targetLang = '简体中文',
-            prompt: customPrompt,
-            aiConfig
+            prompt: customPrompt
         } = req.body;
 
         const userId = PreferenceStore.getUserId(req.user);

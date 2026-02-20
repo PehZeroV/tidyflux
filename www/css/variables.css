@@ -8,6 +8,8 @@
     --title-color: #151311;
     --accent-color: #8b2c3b;
     --meta-color: #6e665c;
+    --text-secondary: #8a8278;
+    --text-tertiary: #7e766c;
     --border-color: color-mix(in srgb, var(--bg-color), #000 4%);
     --hover-bg: rgba(255, 255, 255, 0.8);
     --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 1), inset 1px 0 0 0 rgba(255, 255, 255, 0.7);
@@ -29,6 +31,8 @@
     --title-color: #1e2620;
     --accent-color: #355F2E;
     --meta-color: #6a756e;
+    --text-secondary: #889088;
+    --text-tertiary: #7a8580;
     --border-color: color-mix(in srgb, var(--bg-color), #000 4%);
     --hover-bg: rgba(255, 255, 255, 0.8);
 }
@@ -41,6 +45,8 @@
     --title-color: #1a2530;
     --accent-color: #133E87;
     --meta-color: #6a7580;
+    --text-secondary: #889098;
+    --text-tertiary: #7a8590;
     --border-color: color-mix(in srgb, var(--bg-color), #000 4%);
     --hover-bg: rgba(255, 255, 255, 0.8);
 }
@@ -53,6 +59,8 @@
     --title-color: #26222c;
     --accent-color: #52357B;
     --meta-color: #747080;
+    --text-secondary: #908c9a;
+    --text-tertiary: #827e90;
     --border-color: color-mix(in srgb, var(--bg-color), #000 4%);
     --hover-bg: rgba(255, 255, 255, 0.8);
 }
@@ -65,6 +73,8 @@
     --title-color: #000000;
     --accent-color: #444444;
     --meta-color: #666666;
+    --text-secondary: #888888;
+    --text-tertiary: #808080;
     --border-color: color-mix(in srgb, var(--bg-color), #000 4%);
     --hover-bg: rgba(255, 255, 255, 0.8);
 }

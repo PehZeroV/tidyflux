@@ -59,3 +59,12 @@ export const STORAGE_KEYS = {
     LOCALE: 'app_language',
     AI_CONFIG: 'tidyflux_ai_config',
 };
+
+/**
+ * 响应式断点（px），与 CSS media queries 保持一致
+ */
+export const BREAKPOINTS = {
+    MOBILE: 800,   // CSS: @media (max-width: 800px)
+    TABLET: 1024,  // CSS: @media (max-width: 1024px)
+    DESKTOP: 1100, // CSS: @media (min-width: 801px) and (max-width: 1100px)
+};

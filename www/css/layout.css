@@ -182,18 +182,15 @@ body.panel-resizing .articles-panel-resize-handle {
 /* 面板头部 */
 .panel-header {
     padding: 6px 10px;
-    border-bottom: none;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     flex-shrink: 0;
-    background: transparent;
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     z-index: 10;
-    background: rgba(var(--bg-rgb), 0.85);
     background: color-mix(in srgb, var(--bg-color), transparent 15%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -366,8 +363,6 @@ body.panel-resizing .articles-panel-resize-handle {
 
 .article-title-translated {
     display: -webkit-box;
-    display: block;
-    /* Fallback */
     width: 100%;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -376,15 +371,12 @@ body.panel-resizing .articles-panel-resize-handle {
     margin-bottom: 4px;
     line-height: 1.4;
     color: var(--title-color);
-    /* Ensure visibility */
 }
 
 .article-title-original {
     display: -webkit-box;
-    display: block;
-    /* Fallback */
     width: 100%;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 0.85em;
@@ -570,23 +562,7 @@ body.panel-resizing .articles-panel-resize-handle {
     color: var(--accent-color);
 }
 
-.text-btn {
-    padding: 6px 14px;
-    font-size: 0.85em;
-    font-weight: 600;
-    background: var(--bg-color);
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    color: var(--accent-color);
-    transition: all 0.2s;
-    box-shadow: var(--card-shadow);
-}
 
-.text-btn:hover {
-    background: var(--hover-bg);
-    box-shadow: var(--card-shadow-hover);
-}
 
 /* ========================================
    响应式布局
@@ -651,10 +627,8 @@ body.panel-resizing .articles-panel-resize-handle {
     .three-column-layout {
         padding: 0;
         gap: 0;
-        padding-bottom: 0;
         position: relative;
         overflow: hidden;
-        overflow-x: hidden;
     }
 
     .panel-header {
@@ -742,10 +716,6 @@ body.panel-resizing .articles-panel-resize-handle {
 
     .articles-list {
         padding: 8px 12px;
-    }
-
-    .article-item {
-        background: var(--card-bg);
     }
 
     .article-item {

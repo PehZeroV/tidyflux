@@ -12,6 +12,7 @@
 
 import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
+import { BREAKPOINTS } from '../../constants.js';
 import { FeedManager } from '../feed-manager.js';
 import { showToast } from './utils.js';
 import { i18n } from '../i18n.js';
@@ -84,7 +85,6 @@ export const ArticleContentView = {
         }
     },
 
-    // _openImageLightbox → article-lightbox.js (ArticleLightboxMixin)
 
     /**
      * 选择文章
@@ -111,9 +111,7 @@ export const ArticleContentView = {
         }
 
         // Sync list view scroll position
-        if (typeof ArticlesView !== 'undefined') {
-            ArticlesView.scrollToArticle(articleId);
-        }
+        ArticlesView.scrollToArticle(articleId);
     },
 
     /**
@@ -179,15 +177,15 @@ export const ArticleContentView = {
 
                 // 更新标题和侧边栏状态
                 if (context?.favorites) {
-                    DOMElements.currentFeedTitle.textContent = '我的收藏';
+                    DOMElements.currentFeedTitle.textContent = i18n.t('nav.starred');
                 } else if (context?.groupId) {
                     const group = AppState.groups?.find(g => g.id == context.groupId);
-                    DOMElements.currentFeedTitle.textContent = group?.name || '分组';
+                    DOMElements.currentFeedTitle.textContent = group?.name || i18n.t('nav.group_articles');
                 } else if (context?.feedId) {
                     const feed = AppState.feeds?.find(f => f.id == context.feedId);
-                    DOMElements.currentFeedTitle.textContent = feed?.title || '订阅源';
+                    DOMElements.currentFeedTitle.textContent = feed?.title || i18n.t('nav.article_list');
                 } else {
-                    DOMElements.currentFeedTitle.textContent = '全部文章';
+                    DOMElements.currentFeedTitle.textContent = i18n.t('nav.all');
                 }
 
                 vm.updateSidebarActiveState(context);
@@ -197,8 +195,8 @@ export const ArticleContentView = {
 
         // 保存列表滚动位置
         if (DOMElements.articlesList) {
-            if (vm.useVirtualScroll && vm.virtualList) {
-                AppState.lastListViewScrollTop = vm.virtualList.getScrollTop();
+            if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                AppState.lastListViewScrollTop = ArticlesView.virtualList.getScrollTop();
             } else {
                 AppState.lastListViewScrollTop = DOMElements.articlesList.scrollTop;
             }
@@ -215,9 +213,6 @@ export const ArticleContentView = {
         if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
             ArticlesView.virtualList.updateActiveItem(articleId);
             ArticlesView.virtualList.updateItem(articleId, { is_read: 1 });
-            // Sync vm references
-            vm.virtualList = ArticlesView.virtualList;
-            vm.useVirtualScroll = ArticlesView.useVirtualScroll;
         } else {
             const prevActive = DOMElements.articlesList?.querySelector('.article-item.active');
             if (prevActive) prevActive.classList.remove('active');
@@ -249,7 +244,7 @@ export const ArticleContentView = {
         DOMElements.articleContent.scrollTop = 0;
         this.clearNavButtons();
 
-        if (window.innerWidth <= 1100) {
+        if (window.innerWidth <= BREAKPOINTS.DESKTOP) {
             vm.showPanel('content');
         }
 
@@ -297,8 +292,6 @@ export const ArticleContentView = {
         }
     },
 
-    // _processArticleRefs, _showArticlePreview, _previewAutoSummarize,
-    // _insertPreviewSummary, _previewAutoTranslate → article-preview.js (ArticlePreviewMixin)
 
     /**
      * 渲染简报内容
@@ -381,16 +374,12 @@ export const ArticleContentView = {
         this.updateNavButtons(digest.id);
     },
 
-    // bindDigestToolbarEvents → article-toolbar.js (ArticleToolbarMixin)
 
     /**
      * 渲染文章详情内容
      * @param {Object} article - 文章对象
      */
     renderArticleContent(article) {
-        // No auto-cleanup for GlobalPlayer needed, it persists. 
-
-        // document.title = article.title || 'Tidyflux';
 
         // 格式化日期（根据语言）
         let dateStr = '';
@@ -542,7 +531,6 @@ export const ArticleContentView = {
         this.updateNavButtons(article.id);
     },
 
-    // bindArticleToolbarEvents → article-toolbar.js (ArticleToolbarMixin)
 
     /**
      * 解析 Markdown
@@ -620,7 +608,6 @@ export const ArticleContentView = {
         return text;
     },
 
-    // translateBilingual, bindAIButtons → article-ai.js (ArticleAIMixin)
 
     /**
      * 取消当前文章的所有进行中 AI 请求
@@ -629,24 +616,10 @@ export const ArticleContentView = {
         const article = this._currentArticle;
         if (!article) return;
 
-        if (article._autoSummarizeController) {
-            article._autoSummarizeController.abort();
-            article._autoSummarizeController = null;
-        }
-        if (article._summarizeController) {
-            article._summarizeController.abort();
-            article._summarizeController = null;
-        }
-        if (article._translateController) {
-            article._translateController.abort();
-            article._translateController = null;
-        }
-
+        this._cancelArticleAI(article);
         this._currentArticle = null;
     },
 
-    // enhanceEmbeds, enhanceTables, enhanceCodeBlocks,
-    // _detectTableBasedCode, _removeEmptyTableCells → article-enhance.js (ArticleEnhanceMixin)
 
     /**
      * 更新本地未读计数

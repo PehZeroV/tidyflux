@@ -60,6 +60,12 @@ const AI_PROVIDERS = {
         apiUrl: 'https://openrouter.ai/api/v1',
         hasRegion: false
     },
+    ollama: {
+        name: 'Ollama',
+        apiUrl: 'http://localhost:11434/v1',
+        hasRegion: false,
+        noApiKey: true
+    },
     custom: {
         name: 'Custom',
         apiUrl: '',
@@ -77,7 +83,6 @@ export const SettingsDialogMixin = {
      * @param {boolean} forceMode - 强制模式，不可关闭，仅显示 Miniflux 配置
      */
     showSettingsDialog(forceMode = false) {
-        const vm = this.viewManager;
         const currentTheme = AppState.preferences?.theme || 'default';
         const currentColorScheme = AppState.preferences?.color_scheme || 'auto';
         const currentLang = i18n.locale;
@@ -157,6 +162,7 @@ export const SettingsDialogMixin = {
                             <option value="zhipu">${i18n.t('ai.provider_zhipu')}</option>
                             <option value="kimi">${i18n.t('ai.provider_kimi')}</option>
                             <option value="openrouter">${i18n.t('ai.provider_openrouter')}</option>
+                            <option value="ollama">${i18n.t('ai.provider_ollama')}</option>
                             <option value="custom">${i18n.t('ai.provider_custom')}</option>
                         </select>
 
@@ -475,6 +481,7 @@ export const SettingsDialogMixin = {
             if (url.includes('minimaxi.com') || url.includes('minimax.io')) return 'minimax';
             if (url.includes('bigmodel.cn') || url.includes('z.ai')) return 'zhipu';
             if (url.includes('moonshot.cn') || url.includes('moonshot.ai')) return 'kimi';
+            if (url.includes('localhost:11434') || url.includes('127.0.0.1:11434')) return 'ollama';
             if (url.includes('openai.com')) return 'openai';
             return 'custom';
         };
@@ -516,13 +523,24 @@ export const SettingsDialogMixin = {
             // Set model input placeholder
             aiModelInput.placeholder = i18n.t('ai.model_input_placeholder');
 
-            // Disable URL input for non-custom providers
-            if (provider === 'custom') {
+            // Disable URL input for non-custom providers (Ollama allows editing for custom host)
+            if (provider === 'custom' || provider === 'ollama') {
                 aiUrlInput.removeAttribute('readonly');
                 aiUrlInput.style.opacity = '1';
             } else {
                 aiUrlInput.setAttribute('readonly', 'true');
                 aiUrlInput.style.opacity = '0.7';
+            }
+
+            // Show/hide API Key based on provider
+            const aiKeyContainer = aiKeyInput?.parentElement;
+            const aiKeyLabel = aiKeyContainer?.previousElementSibling;
+            if (providerConfig.noApiKey) {
+                if (aiKeyInput) aiKeyInput.style.display = 'none';
+                if (aiKeyLabel) aiKeyLabel.style.display = 'none';
+            } else {
+                if (aiKeyInput) aiKeyInput.style.display = '';
+                if (aiKeyLabel) aiKeyLabel.style.display = '';
             }
         };
 
@@ -637,7 +655,8 @@ export const SettingsDialogMixin = {
                     targetLang: aiTargetLangSelect.value
                 };
 
-                if (!config.apiUrl || !config.apiKey || !config.model) {
+                const isNoApiKey = AI_PROVIDERS[aiProviderSelect.value]?.noApiKey;
+                if (!config.apiUrl || (!isNoApiKey && !config.apiKey) || !config.model) {
                     aiMsg.innerHTML = `<span style="color: var(--danger-color);">${i18n.t('settings.fill_all_info')}</span>`;
                     return;
                 }
@@ -849,13 +868,13 @@ export const SettingsDialogMixin = {
             </form>
         `;
 
-        this._bindMinifluxFormEvents(container, isEditing);
+        this._bindMinifluxFormEvents(container);
     },
 
     /**
      * 绑定 Miniflux 配置表单事件
      */
-    _bindMinifluxFormEvents(container, isEditing) {
+    _bindMinifluxFormEvents(container) {
         const form = container.querySelector('#miniflux-config-form');
         const testBtn = container.querySelector('#miniflux-test-btn');
         const cancelBtn = container.querySelector('#miniflux-cancel-btn');

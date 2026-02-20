@@ -9,7 +9,9 @@
         --title-color: #f7f3ee;
         --meta-color: #a89f93;
         --accent-color: #e07878;
-        --border-color: color-mix(in srgb, var(--bg-color), #fff 16%);
+        --text-secondary: #8a8278;
+        --text-tertiary: #8a8278;
+        --border-color: color-mix(in srgb, var(--bg-color), #fff 10%);
         --hover-bg: rgba(255, 255, 255, 0.04);
         --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 1px 0 0 0 rgba(255, 255, 255, 0.05);
         --card-shadow-hover: 0 3px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.15), inset 1px 0 0 0 rgba(255, 255, 255, 0.08);
@@ -22,7 +24,9 @@
         --title-color: #f0f3f1;
         --accent-color: #7aaa7a;
         --meta-color: #919a95;
-        --border-color: color-mix(in srgb, var(--bg-color), #fff 16%);
+        --text-secondary: #788078;
+        --text-tertiary: #788078;
+        --border-color: color-mix(in srgb, var(--bg-color), #fff 10%);
         --hover-bg: rgba(255, 255, 255, 0.04);
     }
 
@@ -33,7 +37,9 @@
         --title-color: #f0f2f6;
         --accent-color: #608BC1;
         --meta-color: #909aa5;
-        --border-color: color-mix(in srgb, var(--bg-color), #fff 16%);
+        --text-secondary: #788090;
+        --text-tertiary: #788090;
+        --border-color: color-mix(in srgb, var(--bg-color), #fff 10%);
         --hover-bg: rgba(255, 255, 255, 0.04);
     }
 
@@ -44,7 +50,9 @@
         --title-color: #f2f0f6;
         --accent-color: #C3ACD0;
         --meta-color: #9895a8;
-        --border-color: color-mix(in srgb, var(--bg-color), #fff 16%);
+        --text-secondary: #807c90;
+        --text-tertiary: #807c90;
+        --border-color: color-mix(in srgb, var(--bg-color), #fff 10%);
         --hover-bg: rgba(255, 255, 255, 0.04);
     }
 
@@ -55,7 +63,9 @@
         --title-color: #ffffff;
         --accent-color: #bbbbbb;
         --meta-color: #999999;
-        --border-color: color-mix(in srgb, var(--bg-color), #fff 16%);
+        --text-secondary: #808080;
+        --text-tertiary: #808080;
+        --border-color: color-mix(in srgb, var(--bg-color), #fff 10%);
         --hover-bg: rgba(255, 255, 255, 0.04);
     }
 

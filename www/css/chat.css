@@ -432,6 +432,10 @@
     margin: 6px 0;
 }
 
+.ai-chat-bubble-content .md-hr {
+    margin: 8px 0;
+}
+
 /* 手机端适配 */
 @media (max-width: 800px) {
 

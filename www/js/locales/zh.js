@@ -274,6 +274,7 @@ export default {
         provider_minimax: 'MiniMax',
         provider_zhipu: '智谱 AI',
         provider_kimi: 'Kimi',
+        provider_ollama: 'Ollama (本地)',
         provider_custom: '自定义',
         region: '站点',
         region_china: '国内站',

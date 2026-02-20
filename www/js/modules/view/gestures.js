@@ -5,6 +5,9 @@
 
 import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
+import { BREAKPOINTS } from '../../constants.js';
+import { ArticlesView } from './articles-view.js';
+import { ArticleContentView } from './article-content.js';
 
 /**
  * 手势判定常量配置
@@ -122,7 +125,7 @@ export const Gestures = {
      * 绑定滑动手势
      */
     bindSwipeGestures() {
-        if (window.innerWidth > 1024) return;
+        if (window.innerWidth > BREAKPOINTS.TABLET) return;
 
         const vm = this.viewManager;
         let startX = 0;
@@ -231,19 +234,27 @@ export const Gestures = {
             const isFromRightEdge = startX > window.innerWidth - GESTURE_CONFIG.EDGE_SIZE;
 
             if (startPanel === 'content') {
-                // 内容页右滑返回
+                // 内容页右滑
                 if (!isFromLeftEdge && isSwipeRight) {
-                    if (this.viewManager) {
-                        this.viewManager.isProgrammaticNav = true;
-                        history.back();
-                    }
+                    // 如果 AI 对话面板已打开，右滑关闭对话面板而非返回列表
+                    const chatPanel = document.querySelector('.ai-chat-panel');
+                    if (chatPanel) {
+                        ArticleContentView.closeChat();
+                        const chatBtn = document.getElementById('article-chat-btn');
+                        if (chatBtn) chatBtn.classList.remove('active');
+                    } else {
+                        if (this.viewManager) {
+                            this.viewManager.isProgrammaticNav = true;
+                            history.back();
+                        }
 
-                    // 恢复滚动位置
-                    if (AppState.ui.lastListViewScrollTop !== null) {
-                        if (vm.useVirtualScroll && vm.virtualList) {
-                            vm.virtualList.setScrollTop(AppState.ui.lastListViewScrollTop);
-                        } else if (DOMElements.articlesList) {
-                            DOMElements.articlesList.scrollTop = AppState.ui.lastListViewScrollTop;
+                        // 恢复滚动位置
+                        if (AppState.ui.lastListViewScrollTop !== null) {
+                            if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                                ArticlesView.virtualList.setScrollTop(AppState.ui.lastListViewScrollTop);
+                            } else if (DOMElements.articlesList) {
+                                DOMElements.articlesList.scrollTop = AppState.ui.lastListViewScrollTop;
+                            }
                         }
                     }
                 }
@@ -251,8 +262,8 @@ export const Gestures = {
                 if ((isFromLeftEdge && isSwipeRight) || isSwipeRight) {
                     // 保存当前列表滚动位置
                     if (DOMElements.articlesList) {
-                        if (vm?.useVirtualScroll && vm.virtualList) {
-                            AppState.ui.lastListViewScrollTop = vm.virtualList.getScrollTop();
+                        if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
+                            AppState.ui.lastListViewScrollTop = ArticlesView.virtualList.getScrollTop();
                         } else {
                             AppState.ui.lastListViewScrollTop = DOMElements.articlesList.scrollTop;
                         }

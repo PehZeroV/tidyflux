@@ -16,14 +16,73 @@ import { showToast } from './utils.js';
 import { Modal } from './components.js';
 import { AICache } from '../ai-cache.js';
 import { AIService } from '../ai-service.js';
+import { BREAKPOINTS } from '../../constants.js';
 
 export const ArticleToolbarMixin = {
+    /**
+     * 取消文章的所有进行中 AI 请求
+     * @param {Object} article - 文章对象
+     */
+    _cancelArticleAI(article) {
+        if (article._translateController) {
+            article._translateController.abort();
+            article._translateController = null;
+        }
+        if (article._summarizeController) {
+            article._summarizeController.abort();
+            article._summarizeController = null;
+        }
+        if (article._autoSummarizeController) {
+            article._autoSummarizeController.abort();
+            article._autoSummarizeController = null;
+        }
+    },
+
+    /**
+     * 重置文章的所有 AI 状态（取消请求、清除缓存、重置按钮）
+     * @param {Object} article - 文章对象
+     */
+    _resetAIState(article) {
+        // 取消进行中的 AI 请求
+        this._cancelArticleAI(article);
+
+        // 清除内存中的 AI 缓存
+        delete article._aiSummary;
+        delete article._translatedContent;
+
+        // 清除服务端 AI 缓存
+        AICache.deleteSummary(article.id).catch(() => { });
+        AICache.deleteTranslation(article.id, AIService.getTargetLang()).catch(() => { });
+
+        // 标题翻译块保留逻辑
+        const titleTransBlock = document.querySelector('.ai-title-trans-block');
+        const translateBtn = document.getElementById('article-translate-btn');
+        if (translateBtn) {
+            translateBtn.classList.remove('loading');
+            if (!titleTransBlock) {
+                translateBtn.classList.remove('active');
+                translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
+            }
+        }
+
+        // 重置摘要按钮和摘要框状态
+        const summarizeBtn = document.getElementById('article-summarize-btn');
+        const summaryBox = document.getElementById('article-ai-summary');
+        if (summarizeBtn) {
+            summarizeBtn.classList.remove('active', 'loading');
+        }
+        if (summaryBox) {
+            summaryBox.style.display = 'none';
+            const summaryContent = summaryBox.querySelector('.ai-content');
+            if (summaryContent) summaryContent.innerHTML = '';
+        }
+    },
+
     /**
      * 绑定文章工具栏事件
      * @param {Object} article - 文章对象
      */
     bindArticleToolbarEvents(article) {
-        const vm = this.viewManager;
         const backBtn = document.getElementById('article-back-btn');
         const readBtn = document.getElementById('article-toggle-read-btn');
         const favBtn = document.getElementById('article-toggle-fav-btn');
@@ -149,53 +208,8 @@ export const ArticleToolbarMixin = {
 
                 // 切换回原始内容
                 if (article._originalContent) {
-                    // 取消进行中的 AI 请求
-                    if (article._translateController) {
-                        article._translateController.abort();
-                        article._translateController = null;
-                    }
-                    if (article._summarizeController) {
-                        article._summarizeController.abort();
-                        article._summarizeController = null;
-                    }
-                    if (article._autoSummarizeController) {
-                        article._autoSummarizeController.abort();
-                        article._autoSummarizeController = null;
-                    }
-
-                    // 清除内存中的 AI 缓存
-                    delete article._aiSummary;
-                    delete article._translatedContent;
-
-                    // 清除服务端 AI 缓存
-                    AICache.deleteSummary(article.id).catch(() => { });
-                    const aiConfig = AIService.getConfig();
-                    const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
-                    AICache.deleteTranslation(article.id, lang).catch(() => { });
-
-                    // 标题未变化，保留标题翻译块
-                    // 翻译按钮状态：如果标题翻译块存在则保持 active（标题仍然是翻译的）
-                    const titleTransBlock = document.querySelector('.ai-title-trans-block');
-                    const translateBtn = document.getElementById('article-translate-btn');
-                    if (translateBtn) {
-                        translateBtn.classList.remove('loading');
-                        if (!titleTransBlock) {
-                            translateBtn.classList.remove('active');
-                            translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
-                        }
-                    }
-
-                    // 重置摘要按钮和摘要框状态
-                    const summarizeBtn = document.getElementById('article-summarize-btn');
-                    const summaryBox = document.getElementById('article-ai-summary');
-                    if (summarizeBtn) {
-                        summarizeBtn.classList.remove('active', 'loading');
-                    }
-                    if (summaryBox) {
-                        summaryBox.style.display = 'none';
-                        const summaryContent = summaryBox.querySelector('.ai-content');
-                        if (summaryContent) summaryContent.innerHTML = '';
-                    }
+                    // 重置所有 AI 状态（取消请求、清除缓存、重置按钮）
+                    this._resetAIState(article);
 
                     const bodyEl = document.querySelector('.article-body');
                     if (bodyEl) bodyEl.innerHTML = article._originalContent;
@@ -234,54 +248,8 @@ export const ArticleToolbarMixin = {
 
                     article._originalContent = originalContent;
 
-                    // --- 清除所有 AI 相关状态（全文内容已变更，旧缓存失效）---
-                    // 取消进行中的 AI 请求
-                    if (article._translateController) {
-                        article._translateController.abort();
-                        article._translateController = null;
-                    }
-                    if (article._summarizeController) {
-                        article._summarizeController.abort();
-                        article._summarizeController = null;
-                    }
-                    if (article._autoSummarizeController) {
-                        article._autoSummarizeController.abort();
-                        article._autoSummarizeController = null;
-                    }
-
-                    // 清除内存中的 AI 摘要缓存
-                    delete article._aiSummary;
-                    delete article._translatedContent;
-
-                    // 清除服务端该文章的 AI 缓存
-                    AICache.deleteSummary(article.id).catch(() => { });
-                    const aiConfig = AIService.getConfig();
-                    const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
-                    AICache.deleteTranslation(article.id, lang).catch(() => { });
-
-                    // 标题未变化，保留标题翻译块
-                    const titleTransBlock = document.querySelector('.ai-title-trans-block');
-                    const translateBtn = document.getElementById('article-translate-btn');
-                    if (translateBtn) {
-                        translateBtn.classList.remove('loading');
-                        if (!titleTransBlock) {
-                            translateBtn.classList.remove('active');
-                            translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
-                        }
-                    }
-
-                    // 重置摘要按钮和摘要框状态
-                    const summarizeBtn = document.getElementById('article-summarize-btn');
-                    const summaryBox = document.getElementById('article-ai-summary');
-                    if (summarizeBtn) {
-                        summarizeBtn.classList.remove('active', 'loading');
-                    }
-                    if (summaryBox) {
-                        summaryBox.style.display = 'none';
-                        const summaryContent = summaryBox.querySelector('.ai-content');
-                        if (summaryContent) summaryContent.innerHTML = '';
-                    }
-                    // --- 清除 AI 状态结束 ---
+                    // 重置所有 AI 状态（全文内容已变更，旧缓存失效）
+                    this._resetAIState(article);
 
                     const bodyEl = document.querySelector('.article-body');
                     if (bodyEl) {
@@ -521,26 +489,36 @@ export const ArticleToolbarMixin = {
                         setTimeout(() => document.addEventListener('click', subCloseHandler, true), 0);
                     });
                 }
+                // Slider reset helper
+                const articleContent = document.getElementById('article-content');
+                const resetSlider = (slider, defaultVal, cssProp, unit, prefKey, label, formatLabel) => {
+                    slider.value = defaultVal;
+                    if (articleContent) {
+                        articleContent.style.setProperty(cssProp, defaultVal + unit);
+                    }
+                    if (label) {
+                        label.textContent = formatLabel(defaultVal);
+                    }
+                    AppState.preferences = AppState.preferences || {};
+                    AppState.preferences[prefKey] = defaultVal;
+                    FeedManager.setPreference(prefKey, defaultVal).catch(err => {
+                        console.error('Save pref error:', err);
+                    });
+                };
+
                 // Page width slider events
                 const widthSlider = menu.querySelector('.width-slider');
                 if (widthSlider) {
-                    const articleContent = document.getElementById('article-content');
-
                     const widthValueLabel = menu.querySelector('.page-width-value');
+                    const widthFormat = v => v * 2;
 
-                    // Live update as user drags
                     widthSlider.addEventListener('input', (e) => {
                         e.stopPropagation();
                         const val = e.target.value;
-                        if (articleContent) {
-                            articleContent.style.setProperty('--article-half-width', val + 'px');
-                        }
-                        if (widthValueLabel) {
-                            widthValueLabel.textContent = val * 2;
-                        }
+                        if (articleContent) articleContent.style.setProperty('--article-half-width', val + 'px');
+                        if (widthValueLabel) widthValueLabel.textContent = val * 2;
                     });
 
-                    // Save on release
                     widthSlider.addEventListener('change', (e) => {
                         e.stopPropagation();
                         const val = parseInt(e.target.value, 10);
@@ -551,43 +529,18 @@ export const ArticleToolbarMixin = {
                         });
                     });
 
-                    // Prevent slider interaction from closing the menu
                     widthSlider.addEventListener('mousedown', (e) => e.stopPropagation());
                     widthSlider.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 
-                    // Double-click to reset to default (360px = 720px content width)
                     widthSlider.addEventListener('dblclick', (e) => {
                         e.stopPropagation();
-                        const defaultVal = 360;
-                        widthSlider.value = defaultVal;
-                        if (articleContent) {
-                            articleContent.style.setProperty('--article-half-width', defaultVal + 'px');
-                        }
-                        if (widthValueLabel) {
-                            widthValueLabel.textContent = defaultVal * 2;
-                        }
-                        AppState.preferences = AppState.preferences || {};
-                        AppState.preferences.article_width = defaultVal;
-                        FeedManager.setPreference('article_width', defaultVal).catch(err => {
-                            console.error('Save pref error:', err);
-                        });
+                        resetSlider(widthSlider, 360, '--article-half-width', 'px', 'article_width', widthValueLabel, widthFormat);
                     });
 
-                    // Click value label to reset
                     if (widthValueLabel) {
                         widthValueLabel.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const defaultVal = 360;
-                            widthSlider.value = defaultVal;
-                            if (articleContent) {
-                                articleContent.style.setProperty('--article-half-width', defaultVal + 'px');
-                            }
-                            widthValueLabel.textContent = defaultVal * 2;
-                            AppState.preferences = AppState.preferences || {};
-                            AppState.preferences.article_width = defaultVal;
-                            FeedManager.setPreference('article_width', defaultVal).catch(err => {
-                                console.error('Save pref error:', err);
-                            });
+                            resetSlider(widthSlider, 360, '--article-half-width', 'px', 'article_width', widthValueLabel, widthFormat);
                         });
                     }
                 }
@@ -595,18 +548,14 @@ export const ArticleToolbarMixin = {
                 // Font size slider events
                 const fontSlider = menu.querySelector('.font-size-slider');
                 if (fontSlider) {
-                    const articleContent = document.getElementById('article-content');
                     const fontValueLabel = menu.querySelector('.font-size-value');
+                    const fontFormat = v => v + 'em';
 
                     fontSlider.addEventListener('input', (e) => {
                         e.stopPropagation();
                         const val = e.target.value;
-                        if (articleContent) {
-                            articleContent.style.setProperty('--article-font-size', val + 'em');
-                        }
-                        if (fontValueLabel) {
-                            fontValueLabel.textContent = val + 'em';
-                        }
+                        if (articleContent) articleContent.style.setProperty('--article-font-size', val + 'em');
+                        if (fontValueLabel) fontValueLabel.textContent = val + 'em';
                     });
 
                     fontSlider.addEventListener('change', (e) => {
@@ -624,36 +573,13 @@ export const ArticleToolbarMixin = {
 
                     fontSlider.addEventListener('dblclick', (e) => {
                         e.stopPropagation();
-                        const defaultVal = 1.1;
-                        fontSlider.value = defaultVal;
-                        if (articleContent) {
-                            articleContent.style.setProperty('--article-font-size', defaultVal + 'em');
-                        }
-                        if (fontValueLabel) {
-                            fontValueLabel.textContent = defaultVal + 'em';
-                        }
-                        AppState.preferences = AppState.preferences || {};
-                        AppState.preferences.article_font_size = defaultVal;
-                        FeedManager.setPreference('article_font_size', defaultVal).catch(err => {
-                            console.error('Save pref error:', err);
-                        });
+                        resetSlider(fontSlider, 1.1, '--article-font-size', 'em', 'article_font_size', fontValueLabel, fontFormat);
                     });
 
-                    // Click value label to reset
                     if (fontValueLabel) {
                         fontValueLabel.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const defaultVal = 1.1;
-                            fontSlider.value = defaultVal;
-                            if (articleContent) {
-                                articleContent.style.setProperty('--article-font-size', defaultVal + 'em');
-                            }
-                            fontValueLabel.textContent = defaultVal + 'em';
-                            AppState.preferences = AppState.preferences || {};
-                            AppState.preferences.article_font_size = defaultVal;
-                            FeedManager.setPreference('article_font_size', defaultVal).catch(err => {
-                                console.error('Save pref error:', err);
-                            });
+                            resetSlider(fontSlider, 1.1, '--article-font-size', 'em', 'article_font_size', fontValueLabel, fontFormat);
                         });
                     }
                 }
@@ -745,7 +671,7 @@ export const ArticleToolbarMixin = {
         if (backBtn) {
             backBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (window.innerWidth <= 800) {
+                if (window.innerWidth <= BREAKPOINTS.MOBILE) {
                     requestAnimationFrame(() => {
                         vm.isProgrammaticNav = true;
                         history.back();
@@ -784,7 +710,7 @@ export const ArticleToolbarMixin = {
                         showToast(i18n.t('common.success'), 2000, false);
 
                         // 导航回列表
-                        if (window.innerWidth <= 800) {
+                        if (window.innerWidth <= BREAKPOINTS.MOBILE) {
                             vm.isProgrammaticNav = true;
                             history.back();
                         } else {

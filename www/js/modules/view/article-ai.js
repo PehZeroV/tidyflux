@@ -14,6 +14,128 @@ import { i18n } from '../i18n.js';
 import { showToast } from './utils.js';
 import { Dialogs } from './dialogs.js';
 
+// 块级标签集合（模块级常量，避免每次调用时重复创建）
+const BLOCK_TAGS = new Set([
+    'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CANVAS', 'DD', 'DIV', 'DL', 'DT',
+    'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5',
+    'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'NOSCRIPT', 'OL', 'P', 'SECTION',
+    'TABLE', 'TFOOT', 'UL', 'VIDEO'
+]);
+const SKIP_TAGS = ['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'];
+const CONTAINER_TAGS = ['MATH', 'PRE', 'TABLE'];
+const SKIP_CLASSES = ['ai-trans-block', 'article-toolbar', 'preview-summary-box'];
+
+/**
+ * 判断文本是否包含有意义的语义字符（非纯标点/数字/符号）
+ */
+function isMeaningfulText(text) {
+    const cleanText = text.replace(/[\p{P}\p{S}\p{Z}\p{N}]+/gu, '').trim();
+    return cleanText.length >= 1;
+}
+
+/**
+ * 从文章 body 和 title 中收集可翻译的文本块
+ * @param {HTMLElement} bodyEl
+ * @param {HTMLElement|null} titleEl
+ * @returns {Array<{el: Node, text: string, isTitle?: boolean}>}
+ */
+function collectTranslatableBlocks(bodyEl, titleEl) {
+    const blocks = [];
+    if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
+
+    let pendingInlineNodes = [];
+
+    const flushInlineBlock = () => {
+        if (pendingInlineNodes.length === 0) return;
+        let textContent = '';
+        pendingInlineNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                textContent += node.tagName === 'BR' ? '\n' : (node.textContent || '');
+            } else {
+                textContent += node.textContent || '';
+            }
+        });
+        const trimmedText = textContent.trim();
+        if (trimmedText.length >= 2 && isMeaningfulText(trimmedText)) {
+            blocks.push({ el: pendingInlineNodes[pendingInlineNodes.length - 1], text: trimmedText });
+        }
+        pendingInlineNodes = [];
+    };
+
+    if (bodyEl.childNodes.length > 0) {
+        Array.from(bodyEl.childNodes).forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tag = node.tagName.toUpperCase();
+                if (SKIP_TAGS.includes(tag)) return;
+                if (CONTAINER_TAGS.includes(tag)) { flushInlineBlock(); return; }
+                if (SKIP_CLASSES.some(c => node.classList.contains(c))) return;
+                if (BLOCK_TAGS.has(tag)) {
+                    flushInlineBlock();
+                    if (node.querySelector('math, pre, table')) return;
+                    const text = node.textContent ? node.textContent.trim() : '';
+                    if (text.length >= 2 && isMeaningfulText(text)) {
+                        blocks.push({ el: node, text });
+                    }
+                    return;
+                }
+            }
+            if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim() && pendingInlineNodes.length === 0) return;
+            pendingInlineNodes.push(node);
+        });
+        flushInlineBlock();
+    } else if (bodyEl.textContent.trim().length > 0) {
+        const text = bodyEl.textContent.trim();
+        if (text.length >= 2 && isMeaningfulText(text)) {
+            blocks.push({ el: bodyEl, text });
+        }
+    }
+
+    return blocks;
+}
+
+/**
+ * 创建并插入翻译元素
+ * @param {Object} block - 文本块对象 { el, text, isTitle }
+ * @param {string} [innerHTML] - 初始内容 HTML，默认显示翻译中占位符
+ * @returns {HTMLElement} 创建的翻译元素
+ */
+function insertTransElement(block, innerHTML = null) {
+    const transEl = document.createElement('div');
+    transEl.className = block.isTitle ? 'ai-title-trans-block' : 'ai-trans-block';
+
+    if (block.isTitle) {
+        const computedStyle = window.getComputedStyle(block.el);
+        transEl.style.fontFamily = computedStyle.fontFamily;
+        transEl.style.fontSize = computedStyle.fontSize;
+        transEl.style.fontWeight = computedStyle.fontWeight;
+        transEl.style.lineHeight = computedStyle.lineHeight;
+        transEl.style.color = computedStyle.color;
+        transEl.style.letterSpacing = computedStyle.letterSpacing;
+        transEl.style.textTransform = computedStyle.textTransform;
+        transEl.style.marginTop = '8px';
+        transEl.style.marginBottom = '4px';
+        transEl.innerHTML = innerHTML || `<span style="opacity:0.6; font-size: 0.6em; font-weight: normal;">... ${i18n.t('ai.translating')} ...</span>`;
+        const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
+        parent.insertAdjacentElement('afterend', transEl);
+    } else {
+        transEl.style.color = 'var(--text-color)';
+        transEl.style.fontSize = '0.95em';
+        transEl.style.marginTop = '6px';
+        transEl.style.marginBottom = '20px';
+        transEl.style.padding = '8px 12px';
+        transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 94%)';
+        transEl.style.borderRadius = 'var(--radius)';
+        transEl.innerHTML = innerHTML || `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
+        if (block.el.nodeType === Node.ELEMENT_NODE) {
+            block.el.insertAdjacentElement('afterend', transEl);
+        } else if (block.el.parentNode) {
+            block.el.parentNode.insertBefore(transEl, block.el.nextSibling);
+        }
+    }
+
+    return transEl;
+}
+
 export const ArticleAIMixin = {
     /**
      * 双语段落翻译
@@ -24,137 +146,11 @@ export const ArticleAIMixin = {
      */
     async translateBilingual(bodyEl, titleEl, signal = null, entryId = null) {
         // 1. 识别需要翻译的块
-        const blocks = [];
-        if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
-
-        const blockTags = new Set([
-            'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CANVAS', 'DD', 'DIV', 'DL', 'DT',
-            'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5',
-            'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'NOSCRIPT', 'OL', 'P', 'SECTION',
-            'TABLE', 'TFOOT', 'UL', 'VIDEO'
-        ]);
-
-        const isMeaningfulText = (text) => {
-            // 移除常见的干扰字符 (Emoji, 标点, 空白, 数字)
-            // \p{P}: Punctuation, \p{S}: Symbols (including Emojis), \p{Z}: Separators, \p{N}: Numbers
-            // 保留一点余地：如果文本包含至少一个字母或 CJK 字符等连续语义字符
-            const cleanText = text.replace(/[\p{P}\p{S}\p{Z}\p{N}]+/gu, '').trim();
-            return cleanText.length >= 1;
-        };
-
-        let pendingInlineNodes = [];
-
-        const flushInlineBlock = () => {
-            if (pendingInlineNodes.length === 0) return;
-
-            let textContent = '';
-            pendingInlineNodes.forEach(node => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'BR') {
-                        textContent += '\n';
-                    } else {
-                        textContent += node.textContent || '';
-                    }
-                } else {
-                    textContent += node.textContent || '';
-                }
-            });
-
-            const trimmedText = textContent.trim();
-            if (trimmedText.length >= 2 && isMeaningfulText(trimmedText)) {
-                blocks.push({
-                    el: pendingInlineNodes[pendingInlineNodes.length - 1],
-                    text: trimmedText
-                });
-            }
-            pendingInlineNodes = [];
-        };
-
-        if (bodyEl.childNodes.length > 0) {
-            Array.from(bodyEl.childNodes).forEach(node => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const tag = node.tagName.toUpperCase();
-                    if (['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'].includes(tag)) return;
-
-                    // 容器类标签 (代码块、公式、表格)：中断当前行内累积，且不参与翻译
-                    if (['MATH', 'PRE', 'TABLE'].includes(tag)) {
-                        flushInlineBlock();
-                        return;
-                    }
-
-                    if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar') || node.classList.contains('preview-summary-box')) return;
-
-                    if (blockTags.has(tag)) {
-                        flushInlineBlock();
-
-                        // 如果块级元素内部包含不需要翻译的特殊标签，直接跳过整个块的翻译
-                        if (node.querySelector('math, pre, table')) {
-                            return;
-                        }
-
-                        const text = node.textContent ? node.textContent.trim() : '';
-                        if (text.length >= 2 && isMeaningfulText(text)) {
-                            blocks.push({ el: node, text: text });
-                        }
-                        return;
-                    }
-                }
-
-                if (node.nodeType === Node.TEXT_NODE) {
-                    if (!node.textContent.trim() && pendingInlineNodes.length === 0) return;
-                }
-
-                pendingInlineNodes.push(node);
-            });
-            flushInlineBlock();
-        } else if (bodyEl.textContent.trim().length > 0) {
-            const text = bodyEl.textContent.trim();
-            if (text.length >= 2 && isMeaningfulText(text)) {
-                blocks.push({ el: bodyEl, text: text });
-            }
-        }
+        const blocks = collectTranslatableBlocks(bodyEl, titleEl);
 
         // 2. 插入占位符
         blocks.forEach(block => {
-            const transEl = document.createElement('div');
-            transEl.className = block.isTitle ? 'ai-title-trans-block' : 'ai-trans-block';
-
-            block.transEl = transEl;
-
-            if (block.isTitle) {
-                const computedStyle = window.getComputedStyle(block.el);
-
-                transEl.style.fontFamily = computedStyle.fontFamily;
-                transEl.style.fontSize = computedStyle.fontSize;
-                transEl.style.fontWeight = computedStyle.fontWeight;
-                transEl.style.lineHeight = computedStyle.lineHeight;
-                transEl.style.color = computedStyle.color;
-                transEl.style.letterSpacing = computedStyle.letterSpacing;
-                transEl.style.textTransform = computedStyle.textTransform;
-
-                transEl.style.marginTop = '8px';
-                transEl.style.marginBottom = '4px';
-
-                transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.6em; font-weight: normal;">... ${i18n.t('ai.translating')} ...</span>`;
-
-                const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
-                parent.insertAdjacentElement('afterend', transEl);
-            } else {
-                transEl.style.color = 'var(--text-secondary)';
-                transEl.style.fontSize = '0.95em';
-                transEl.style.marginTop = '6px';
-                transEl.style.marginBottom = '20px';
-                transEl.style.padding = '8px 12px';
-                transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 94%)';
-                transEl.style.borderRadius = 'var(--radius)';
-                transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
-
-                if (block.el.nodeType === Node.ELEMENT_NODE) {
-                    block.el.insertAdjacentElement('afterend', transEl);
-                } else if (block.el.parentNode) {
-                    block.el.parentNode.insertBefore(transEl, block.el.nextSibling);
-                }
-            }
+            block.transEl = insertTransElement(block);
         });
 
         // 3. 并发翻译（由 AIService 全局信号量控制并发数）
@@ -162,8 +158,7 @@ export const ArticleAIMixin = {
             if (signal?.aborted) return;
 
             try {
-                const aiConfig = AIService.getConfig();
-                const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                const targetLang = AIService.getTargetLang();
 
                 // 标题块优先读取标题翻译缓存（列表自动翻译已缓存）
                 if (block.isTitle) {
@@ -191,8 +186,7 @@ export const ArticleAIMixin = {
         const hasFailure = blocks.some(b => b.failed);
         if (entryId && !signal?.aborted && !hasFailure) {
             try {
-                const aiConfig = AIService.getConfig();
-                const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                const lang = AIService.getTargetLang();
                 const cacheData = blocks.map(b => ({
                     text: b.text,
                     html: b.transEl.innerHTML,
@@ -227,8 +221,7 @@ export const ArticleAIMixin = {
             block.transEl.innerHTML = `<span style="opacity:0.6; font-size: 0.9em;">... ${i18n.t('ai.translating')} ...</span>`;
         });
 
-        const aiConfig = AIService.getConfig();
-        const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+        const targetLang = AIService.getTargetLang();
 
         // 并发重试
         const CONCURRENT_LIMIT = AIService.getConfig().concurrency || 5;
@@ -265,68 +258,15 @@ export const ArticleAIMixin = {
      */
     async _restoreTranslationFromCache(bodyEl, titleEl, entryId) {
         try {
-            const aiConfig = AIService.getConfig();
-            const lang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+            const lang = AIService.getTargetLang();
             const raw = await AICache.getTranslation(entryId, lang);
             if (!raw) return false;
 
             const cacheData = JSON.parse(raw);
             if (!Array.isArray(cacheData) || cacheData.length === 0) return false;
 
-            // 重新识别文本块（与 translateBilingual 相同逻辑）
-            const blocks = [];
-            if (titleEl) blocks.push({ el: titleEl, isTitle: true, text: titleEl.textContent.trim() });
-
-            const blockTags = new Set([
-                'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CANVAS', 'DD', 'DIV', 'DL', 'DT',
-                'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5',
-                'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'NOSCRIPT', 'OL', 'P', 'SECTION',
-                'TABLE', 'TFOOT', 'UL', 'VIDEO'
-            ]);
-
-            const isMeaningfulText = (text) => {
-                const cleanText = text.replace(/[\p{P}\p{S}\p{Z}\p{N}]+/gu, '').trim();
-                return cleanText.length >= 1;
-            };
-
-            let pendingInlineNodes = [];
-            const flushInlineBlock = () => {
-                if (pendingInlineNodes.length === 0) return;
-                let textContent = '';
-                pendingInlineNodes.forEach(node => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        textContent += node.tagName === 'BR' ? '\n' : (node.textContent || '');
-                    } else {
-                        textContent += node.textContent || '';
-                    }
-                });
-                const trimmedText = textContent.trim();
-                if (trimmedText.length >= 2 && isMeaningfulText(trimmedText)) {
-                    blocks.push({ el: pendingInlineNodes[pendingInlineNodes.length - 1], text: trimmedText });
-                }
-                pendingInlineNodes = [];
-            };
-
-            if (bodyEl.childNodes.length > 0) {
-                Array.from(bodyEl.childNodes).forEach(node => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const tag = node.tagName.toUpperCase();
-                        if (['SCRIPT', 'STYLE', 'SVG', 'IFRAME', 'BUTTON', 'CODE'].includes(tag)) return;
-                        if (['MATH', 'PRE', 'TABLE'].includes(tag)) { flushInlineBlock(); return; }
-                        if (node.classList.contains('ai-trans-block') || node.classList.contains('article-toolbar') || node.classList.contains('preview-summary-box')) return;
-                        if (blockTags.has(tag)) {
-                            flushInlineBlock();
-                            if (node.querySelector('math, pre, table')) return;
-                            const text = node.textContent ? node.textContent.trim() : '';
-                            if (text.length >= 2 && isMeaningfulText(text)) blocks.push({ el: node, text });
-                            return;
-                        }
-                    }
-                    if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim() && pendingInlineNodes.length === 0) return;
-                    pendingInlineNodes.push(node);
-                });
-                flushInlineBlock();
-            }
+            // 使用共享方法识别文本块
+            const blocks = collectTranslatableBlocks(bodyEl, titleEl);
 
             // 建立文本到缓存翻译的映射
             const cacheMap = new Map(cacheData.map(d => [d.text, d]));
@@ -335,42 +275,10 @@ export const ArticleAIMixin = {
             blocks.forEach(block => {
                 const cached = cacheMap.get(block.text);
                 if (!cached) return;
-
-                const transEl = document.createElement('div');
-                transEl.className = block.isTitle ? 'ai-title-trans-block' : 'ai-trans-block';
-                transEl.innerHTML = cached.html;
-
-                if (block.isTitle) {
-                    const computedStyle = window.getComputedStyle(block.el);
-                    transEl.style.fontFamily = computedStyle.fontFamily;
-                    transEl.style.fontSize = computedStyle.fontSize;
-                    transEl.style.fontWeight = computedStyle.fontWeight;
-                    transEl.style.lineHeight = computedStyle.lineHeight;
-                    transEl.style.color = computedStyle.color;
-                    transEl.style.letterSpacing = computedStyle.letterSpacing;
-                    transEl.style.textTransform = computedStyle.textTransform;
-                    transEl.style.marginTop = '8px';
-                    transEl.style.marginBottom = '4px';
-                    const parent = block.el.tagName.toLowerCase() === 'a' ? block.el.parentElement : block.el;
-                    parent.insertAdjacentElement('afterend', transEl);
-                } else {
-                    transEl.style.color = 'var(--text-secondary)';
-                    transEl.style.fontSize = '0.95em';
-                    transEl.style.marginTop = '6px';
-                    transEl.style.marginBottom = '20px';
-                    transEl.style.padding = '8px 12px';
-                    transEl.style.background = 'color-mix(in srgb, var(--accent-color), transparent 94%)';
-                    transEl.style.borderRadius = 'var(--radius)';
-                    if (block.el.nodeType === Node.ELEMENT_NODE) {
-                        block.el.insertAdjacentElement('afterend', transEl);
-                    } else if (block.el.parentNode) {
-                        block.el.parentNode.insertBefore(transEl, block.el.nextSibling);
-                    }
-                }
+                insertTransElement(block, cached.html);
                 restored++;
             });
 
-            console.debug(`[AICache] Restored ${restored}/${blocks.length} translation blocks from cache`);
             return restored > 0;
         } catch (e) {
             console.warn('[AICache] Restore translation failed:', e);
@@ -447,9 +355,7 @@ export const ArticleAIMixin = {
                     // 获取纯文本内容用于总结
                     const rawContent = AIService.extractText(article.content || '');
 
-                    // 获取配置的目标语言
-                    const aiConfig = AIService.getConfig();
-                    const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+                    const targetLang = AIService.getTargetLang();
 
                     let streamedText = '';
                     await AIService.summarize(rawContent, targetLang, (chunk) => {
@@ -464,7 +370,7 @@ export const ArticleAIMixin = {
                     summarizeBtn.classList.add('active');
                 } catch (err) {
                     if (err.name === 'AbortError') {
-                        console.log('Summarize aborted');
+                        console.debug('Summarize aborted');
                         return;
                     }
                     console.error('Summarize failed:', err);
@@ -648,8 +554,7 @@ export const ArticleAIMixin = {
             article._autoSummarizeController = new AbortController();
             const signal = article._autoSummarizeController.signal;
 
-            const aiConfig = AIService.getConfig();
-            const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+            const targetLang = AIService.getTargetLang();
 
             let streamedText = '';
             await AIService.summarize(rawContent, targetLang, (chunk) => {
@@ -666,7 +571,7 @@ export const ArticleAIMixin = {
             }
         } catch (err) {
             if (err.name === 'AbortError') {
-                console.log('[AutoSummary] 已取消');
+                console.debug('[AutoSummary] aborted');
                 return;
             }
             console.error('[AutoSummary] 失败:', err);

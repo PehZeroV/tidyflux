@@ -33,10 +33,9 @@ async function initApp() {
     // 检查 Miniflux 配置
     try {
         const minifluxConfig = await AuthManager.getMinifluxConfig();
-        console.log('Miniflux config:', minifluxConfig);
         if (!minifluxConfig.configured) {
             // 未配置 Miniflux，显示强制设置对话框
-            console.log('Miniflux not configured, showing forced settings dialog');
+            console.debug('Miniflux not configured, showing forced settings dialog');
             handleForceSettings();
             return;
         }
@@ -73,7 +72,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
         // 页面是从 BFCache 恢复的
-        console.log('Page restored from BFCache, reloading to ensure state consistency...');
+        console.debug('Page restored from BFCache, reloading...');
         window.location.reload();
     }
 });
@@ -89,7 +88,7 @@ function registerServiceWorker() {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
-                console.log('ServiceWorker registration successful');
+                console.debug('ServiceWorker registration successful');
 
                 // 立即检查更新
                 registration.update();
@@ -111,12 +110,12 @@ function registerServiceWorker() {
                 // 监听新 Service Worker 安装完成
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    console.log('New ServiceWorker installing...');
+                    console.debug('New ServiceWorker installing...');
 
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             // 新 SW 已安装，旧 SW 仍在控制页面
-                            console.log('New version available, activating...');
+                            console.debug('New SW version available, activating...');
                             // 通知新 SW 立即接管
                             newWorker.postMessage({ type: 'SKIP_WAITING' });
                         }
@@ -124,7 +123,7 @@ function registerServiceWorker() {
                 });
             })
             .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
+                console.warn('ServiceWorker registration failed:', err);
             });
     });
 
@@ -139,7 +138,7 @@ function registerServiceWorker() {
 
         if (refreshing) return;
 
-        console.log('Controller changed, reloading page...');
+        console.debug('Controller changed, reloading page...');
         refreshing = true;
         window.location.reload();
     });

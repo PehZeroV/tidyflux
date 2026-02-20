@@ -1,4 +1,5 @@
 import { i18n } from '../i18n.js';
+import { BREAKPOINTS } from '../../constants.js';
 
 /**
  * UI 常量配置
@@ -9,7 +10,6 @@ const UI_CONFIG = {
     CONTEXT_MENU_WIDTH: 180,
     CONTEXT_MENU_MARGIN: 10,
     DIALOG_TRANSITION_MS: 200,
-    SCROLL_BUFFER: 10
 };
 
 
@@ -54,6 +54,24 @@ export function formatDate(dateString) {
 }
 
 /**
+ * 获取今天午夜的 ISO 字符串（本地时间）
+ * @returns {string} ISO 日期字符串
+ */
+export function getTodayStartISO() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+}
+
+/**
+ * 获取今天午夜的时间戳（秒）
+ * @returns {number} Unix 时间戳（秒）
+ */
+export function getTodayStartTimestamp() {
+    const now = new Date();
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+}
+
+/**
  * 检测是否为 iOS Safari 浏览器
  * @returns {boolean}
  */
@@ -76,7 +94,7 @@ const MOBILE_DEVICE_REGEX = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|
 export function isMobileDevice() {
     return (
         MOBILE_DEVICE_REGEX.test(navigator.userAgent) ||
-        (window.innerWidth <= 1024)
+        (window.innerWidth <= BREAKPOINTS.TABLET)
     );
 }
 

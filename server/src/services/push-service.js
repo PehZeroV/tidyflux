@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Node 18+ has global fetch built-in
 
 /**
  * 将文本按段落/换行边界拆分为不超过 maxLen 的块
@@ -118,7 +118,7 @@ export async function sendPushNotification(pushConfig, title, content, userId) {
 
         const chunkLabel = contentChunks.length > 1 ? ` (${i + 1}/${contentChunks.length})` : '';
         console.log(`Push notification sending for user ${userId} [POST ${pushConfig.url}]${chunkLabel}: body_length=${body.length}`);
-        
+
         let resp;
         try {
             resp = await fetch(pushConfig.url, {
@@ -128,25 +128,25 @@ export async function sendPushNotification(pushConfig, title, content, userId) {
             });
 
             console.log(`Push notification sent for user ${userId} [POST ${pushConfig.url}]${chunkLabel}: ${resp.status}`);
-            
+
             if (!resp.ok) {
                 try { const errBody = await resp.text(); console.error(`Push response body:`, errBody); } catch { }
             } else {
-                 if (pushUrl.includes('discord')) {
+                if (pushUrl.includes('discord')) {
                     // Discord might return 204 No Content for success
                     if (resp.status === 204) console.log('Discord verified success (204)');
-                 }
+                }
             }
         } catch (e) {
-             console.error(`Push network error:`, e);
-             throw e;
+            console.error(`Push network error:`, e);
+            throw e;
         }
 
         // 多条之间加延迟，保证 Discord 等服务按顺序接收
         if (i < contentChunks.length - 1) {
             await new Promise(r => setTimeout(r, 500));
         }
-        
+
         // Return status of the last chunk if multiple, or the single one
         // Ideally we track all, but for UI feedback last one is usually indicative
         if (i === contentChunks.length - 1) {

@@ -111,7 +111,9 @@ export const UserStore = {
 
         const isValid = await verifyPassword(password, user.hash, user.salt);
         if (isValid) {
-            const { hash, salt, ...safeUser } = user;
+            const safeUser = { ...user };
+            delete safeUser.hash;
+            delete safeUser.salt;
             return safeUser;
         }
 

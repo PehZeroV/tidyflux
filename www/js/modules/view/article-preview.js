@@ -133,9 +133,6 @@ export const ArticlePreviewMixin = {
             const content = article.content || article.summary || '';
             const feedName = article.feed?.title || ref?.feedTitle || '';
             const titleText = article.title || previewTitle;
-            const titleHTML = article.url
-                ? `<a href="${article.url}" target="_blank" rel="noopener noreferrer">${titleText}</a>`
-                : titleText;
 
             // 构建与正常文章一致的 header HTML
             let feedSourceHTML = '';
@@ -221,8 +218,7 @@ export const ArticlePreviewMixin = {
         const summaryEl = this._insertPreviewSummary(contentEl, `<span style="opacity:0.6;">${i18n.t('ai.summarizing')}</span>`);
 
         try {
-            const aiConfig = AIService.getConfig();
-            const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+            const targetLang = AIService.getTargetLang();
             let streamedText = '';
 
             await AIService.summarize(rawContent, targetLang, (chunk) => {

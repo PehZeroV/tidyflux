@@ -187,7 +187,7 @@ async function doRefresh() {
 }
 
 // 下拉刷新
-export function setupPullToRefresh(viewManager) {
+function setupPullToRefresh(viewManager) {
     // 仅在触摸设备上启用
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (!isTouchDevice) return;
@@ -200,8 +200,7 @@ export function setupPullToRefresh(viewManager) {
 
     container.addEventListener('touchstart', (e) => {
         if (ptrState.refreshing) return;
-        // 仅在收藏夹/简报以外的列表视图 & 滚动到顶部时启用
-        if (AppState.viewingFavorites || AppState.viewingDigests) return;
+        // 所有列表视图均支持下拉刷新
         if (container.scrollTop <= 0) {
             ptrState.startY = e.touches[0].clientY;
             ptrState.active = true;
@@ -254,7 +253,7 @@ export function setupPullToRefresh(viewManager) {
 }
 
 // 滑动手势
-export function setupSwipeGesture() {
+function setupSwipeGesture() {
     let touchStartX = 0;
     let touchStartY = 0;
 

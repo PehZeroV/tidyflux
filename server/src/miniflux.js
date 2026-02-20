@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Node 18+ has global fetch built-in
 import http from 'http';
 import https from 'https';
 
@@ -75,7 +75,6 @@ export class MinifluxClient {
             timeout: options.timeout || DEFAULT_TIMEOUT
         };
 
-        let lastError;
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const response = await fetch(url, requestOptions);
@@ -102,7 +101,6 @@ export class MinifluxClient {
                 throw error;
 
             } catch (error) {
-                lastError = error;
 
                 // 认证错误不重试
                 if (error.status === 401 || error.status === 403) {

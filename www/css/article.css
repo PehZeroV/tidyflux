@@ -768,11 +768,7 @@
     animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
+
 
 .article-preview-error {
     text-align: center;
@@ -900,8 +896,6 @@
     bottom: calc(4px + env(safe-area-inset-bottom, 0px));
     left: 12px;
     right: 12px;
-    background: rgba(var(--card-bg-rgb, 255, 255, 255), 0.85);
-    /* Fallback if rgb var exists */
     background: color-mix(in srgb, var(--card-bg), transparent 15%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);

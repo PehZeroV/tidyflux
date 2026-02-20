@@ -29,6 +29,89 @@ export const AI_LANGUAGES = [
 ];
 
 /**
+ * 创建 AI 功能覆盖管理器（翻译/摘要/自动翻译共用）
+ * @param {string} prefKey - AppState.preferences 中的存储键
+ * @returns {Object} 覆盖管理器
+ */
+function createOverrideManager(prefKey) {
+    const mgr = {
+        _data: { feeds: {}, groups: {} },
+
+        load() {
+            try {
+                const prefs = AppState?.preferences || {};
+                if (prefs[prefKey]) { mgr._data = prefs[prefKey]; return; }
+            } catch { /* ignore */ }
+            mgr._data = { feeds: {}, groups: {} };
+        },
+
+        async save() {
+            try {
+                const { FeedManager } = await import('./feed-manager.js');
+                await FeedManager.setPreference(prefKey, mgr._data);
+                if (AppState?.preferences) {
+                    AppState.preferences[prefKey] = mgr._data;
+                }
+            } catch (e) {
+                console.error(`[AIService] Failed to save ${prefKey}:`, e);
+            }
+        },
+
+        getFeed(feedId) {
+            return mgr._data.feeds?.[feedId] || 'inherit';
+        },
+
+        getGroup(groupId) {
+            return mgr._data.groups?.[groupId] || 'inherit';
+        },
+
+        async setFeed(feedId, value) {
+            if (!mgr._data.feeds) mgr._data.feeds = {};
+            if (value === 'inherit') { delete mgr._data.feeds[feedId]; }
+            else { mgr._data.feeds[feedId] = value; }
+            await mgr.save();
+        },
+
+        async setGroup(groupId, value) {
+            if (!mgr._data.groups) mgr._data.groups = {};
+            if (value === 'inherit') { delete mgr._data.groups[groupId]; }
+            else { mgr._data.groups[groupId] = value; }
+            await mgr.save();
+        },
+
+        async setBatch(entries) {
+            if (!mgr._data.feeds) mgr._data.feeds = {};
+            if (!mgr._data.groups) mgr._data.groups = {};
+            for (const { type, id, value } of entries) {
+                const store = type === 'group' ? mgr._data.groups : mgr._data.feeds;
+                if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
+            }
+            await mgr.save();
+        },
+
+        /**
+         * 判断某个订阅源是否应该启用此功能
+         * 优先级：订阅源设置 > 分组设置 > 默认关闭
+         */
+        shouldApply(feedId) {
+            if (!AIService.isConfigured()) return false;
+            const feedOv = mgr.getFeed(feedId);
+            if (feedOv === 'on') return true;
+            if (feedOv === 'off') return false;
+            const feeds = AppState?.feeds || [];
+            const feed = feeds.find(f => f.id == feedId);
+            if (feed && feed.group_id) {
+                const groupOv = mgr.getGroup(feed.group_id);
+                if (groupOv === 'on') return true;
+                if (groupOv === 'off') return false;
+            }
+            return false;
+        }
+    };
+    return mgr;
+}
+
+/**
  * AI 服务
  */
 export const AIService = {
@@ -45,12 +128,10 @@ export const AIService = {
     // 全局并发控制（信号量）
     _activeRequests: 0,
     _waitingQueue: [],
-    // 标题翻译覆盖设置 { feeds: { feedId: 'on'|'off' }, groups: { groupId: 'on'|'off' } }
-    _titleTranslationOverrides: { feeds: {}, groups: {} },
-    // 自动摘要覆盖设置（同结构）
-    _autoSummaryOverrides: { feeds: {}, groups: {} },
-    // 自动翻译全文覆盖设置（同结构）
-    _autoTranslateOverrides: { feeds: {}, groups: {} },
+    // AI 功能覆盖管理器
+    _translationOM: createOverrideManager('title_translation_overrides'),
+    _summaryOM: createOverrideManager('auto_summary_overrides'),
+    _translateOM: createOverrideManager('auto_translate_overrides'),
 
     /**
      * 初始化 AI 服务
@@ -58,9 +139,9 @@ export const AIService = {
     async init() {
         await this.loadConfig();
         await this._loadTitleCache();
-        this._loadTranslationOverrides();
-        this._loadSummaryOverrides();
-        this._loadAutoTranslateOverrides();
+        this._translationOM.load();
+        this._summaryOM.load();
+        this._translateOM.load();
     },
 
     /**
@@ -89,308 +170,63 @@ export const AIService = {
         });
     },
 
-    /**
-     * 从 AppState.preferences 加载翻译覆盖设置
-     */
-    _loadTranslationOverrides() {
-        try {
-            // 尝试从 AppState.preferences 读取（服务端同步的数据）
-            const prefs = AppState?.preferences || {};
-            if (prefs.title_translation_overrides) {
-                this._titleTranslationOverrides = prefs.title_translation_overrides;
-                return;
-            }
-        } catch (e) { /* ignore */ }
-        this._titleTranslationOverrides = { feeds: {}, groups: {} };
-    },
+    // ==================== 覆盖设置（标题翻译 / 自动摘要 / 自动翻译全文）====================
+    // 公共 API 保持不变，内部委托给 OverrideManager
+
+    getFeedTranslationOverride(feedId) { return this._translationOM.getFeed(feedId); },
+    getGroupTranslationOverride(groupId) { return this._translationOM.getGroup(groupId); },
+    setFeedTranslationOverride(feedId, value) { return this._translationOM.setFeed(feedId, value); },
+    setGroupTranslationOverride(groupId, value) { return this._translationOM.setGroup(groupId, value); },
+    setBatchTranslationOverrides(entries) { return this._translationOM.setBatch(entries); },
+    shouldTranslateFeed(feedId) { return this._translationOM.shouldApply(feedId); },
+
+    getFeedSummaryOverride(feedId) { return this._summaryOM.getFeed(feedId); },
+    getGroupSummaryOverride(groupId) { return this._summaryOM.getGroup(groupId); },
+    setFeedSummaryOverride(feedId, value) { return this._summaryOM.setFeed(feedId, value); },
+    setGroupSummaryOverride(groupId, value) { return this._summaryOM.setGroup(groupId, value); },
+    setBatchSummaryOverrides(entries) { return this._summaryOM.setBatch(entries); },
+    shouldAutoSummarize(feedId) { return this._summaryOM.shouldApply(feedId); },
+
+    getFeedAutoTranslateOverride(feedId) { return this._translateOM.getFeed(feedId); },
+    getGroupAutoTranslateOverride(groupId) { return this._translateOM.getGroup(groupId); },
+    setFeedAutoTranslateOverride(feedId, value) { return this._translateOM.setFeed(feedId, value); },
+    setGroupAutoTranslateOverride(groupId, value) { return this._translateOM.setGroup(groupId, value); },
+    setBatchAutoTranslateOverrides(entries) { return this._translateOM.setBatch(entries); },
+    shouldAutoTranslate(feedId) { return this._translateOM.shouldApply(feedId); },
 
     /**
-     * 保存翻译覆盖设置到服务端
+     * 获取指定 AI 功能模式的统一访问器对象
+     * @param {'translation'|'translate'|'summary'} mode
+     * @returns {{getFeed, getGroup, setFeed, setGroup, shouldFeed, setBatch}}
      */
-    async _saveTranslationOverrides() {
-        try {
-            // 引入时避免循环依赖，动态获取 FeedManager
-            const { FeedManager } = await import('./feed-manager.js');
-            await FeedManager.setPreference('title_translation_overrides', this._titleTranslationOverrides);
-            // 同步到 AppState
-            if (AppState?.preferences) {
-                AppState.preferences.title_translation_overrides = this._titleTranslationOverrides;
-            }
-        } catch (e) {
-            console.error('[AIService] Failed to save translation overrides:', e);
-        }
-    },
-
-    /**
-     * 获取订阅源的翻译覆盖状态
-     * @param {string|number} feedId
-     * @returns {'on'|'off'|'inherit'}
-     */
-    getFeedTranslationOverride(feedId) {
-        return this._titleTranslationOverrides.feeds?.[feedId] || 'inherit';
-    },
-
-    /**
-     * 获取分组的翻译覆盖状态
-     * @param {string|number} groupId
-     * @returns {'on'|'off'|'inherit'}
-     */
-    getGroupTranslationOverride(groupId) {
-        return this._titleTranslationOverrides.groups?.[groupId] || 'inherit';
-    },
-
-    /**
-     * 设置订阅源的翻译覆盖
-     * @param {string|number} feedId
-     * @param {'on'|'off'|'inherit'} value
-     */
-    async setFeedTranslationOverride(feedId, value) {
-        if (!this._titleTranslationOverrides.feeds) this._titleTranslationOverrides.feeds = {};
-        if (value === 'inherit') {
-            delete this._titleTranslationOverrides.feeds[feedId];
-        } else {
-            this._titleTranslationOverrides.feeds[feedId] = value;
-        }
-        await this._saveTranslationOverrides();
-    },
-
-    /**
-     * 设置分组的翻译覆盖
-     * @param {string|number} groupId
-     * @param {'on'|'off'|'inherit'} value
-     */
-    async setGroupTranslationOverride(groupId, value) {
-        if (!this._titleTranslationOverrides.groups) this._titleTranslationOverrides.groups = {};
-        if (value === 'inherit') {
-            delete this._titleTranslationOverrides.groups[groupId];
-        } else {
-            this._titleTranslationOverrides.groups[groupId] = value;
-        }
-        await this._saveTranslationOverrides();
-    },
-
-    /**
-     * 批量设置翻译覆盖（仅保存一次）
-     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
-     */
-    async setBatchTranslationOverrides(entries) {
-        if (!this._titleTranslationOverrides.feeds) this._titleTranslationOverrides.feeds = {};
-        if (!this._titleTranslationOverrides.groups) this._titleTranslationOverrides.groups = {};
-        for (const { type, id, value } of entries) {
-            const store = type === 'group' ? this._titleTranslationOverrides.groups : this._titleTranslationOverrides.feeds;
-            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
-        }
-        await this._saveTranslationOverrides();
-    },
-
-    /**
-     * 判断某个订阅源是否应该翻译标题
-     * 优先级：订阅源设置 > 分组设置 > 默认关闭
-     * @param {string|number} feedId
-     * @returns {boolean}
-     */
-    shouldTranslateFeed(feedId) {
-        // AI 未配置时直接返回 false
-        if (!AIService.isConfigured()) return false;
-
-        // 1. 检查订阅源级别设置
-        const feedOverride = this.getFeedTranslationOverride(feedId);
-        if (feedOverride === 'on') return true;
-        if (feedOverride === 'off') return false;
-
-        // 2. 检查分组级别设置
-        const feeds = AppState?.feeds || [];
-        const feed = feeds.find(f => f.id == feedId);
-        if (feed && feed.group_id) {
-            const groupOverride = this.getGroupTranslationOverride(feed.group_id);
-            if (groupOverride === 'on') return true;
-            if (groupOverride === 'off') return false;
-        }
-
-        // 3. 默认不翻译
-        return false;
-    },
-
-    // ==================== 自动摘要覆盖 ====================
-
-    _loadSummaryOverrides() {
-        try {
-            const prefs = AppState?.preferences || {};
-            if (prefs.auto_summary_overrides) {
-                this._autoSummaryOverrides = prefs.auto_summary_overrides;
-                return;
-            }
-        } catch (e) { /* ignore */ }
-        this._autoSummaryOverrides = { feeds: {}, groups: {} };
-    },
-
-    async _saveSummaryOverrides() {
-        try {
-            const { FeedManager } = await import('./feed-manager.js');
-            await FeedManager.setPreference('auto_summary_overrides', this._autoSummaryOverrides);
-            if (AppState?.preferences) {
-                AppState.preferences.auto_summary_overrides = this._autoSummaryOverrides;
-            }
-        } catch (e) {
-            console.error('[AIService] Failed to save summary overrides:', e);
-        }
-    },
-
-    getFeedSummaryOverride(feedId) {
-        return this._autoSummaryOverrides.feeds?.[feedId] || 'inherit';
-    },
-
-    getGroupSummaryOverride(groupId) {
-        return this._autoSummaryOverrides.groups?.[groupId] || 'inherit';
-    },
-
-    async setFeedSummaryOverride(feedId, value) {
-        if (!this._autoSummaryOverrides.feeds) this._autoSummaryOverrides.feeds = {};
-        if (value === 'inherit') {
-            delete this._autoSummaryOverrides.feeds[feedId];
-        } else {
-            this._autoSummaryOverrides.feeds[feedId] = value;
-        }
-        await this._saveSummaryOverrides();
-    },
-
-    async setGroupSummaryOverride(groupId, value) {
-        if (!this._autoSummaryOverrides.groups) this._autoSummaryOverrides.groups = {};
-        if (value === 'inherit') {
-            delete this._autoSummaryOverrides.groups[groupId];
-        } else {
-            this._autoSummaryOverrides.groups[groupId] = value;
-        }
-        await this._saveSummaryOverrides();
-    },
-
-    /**
-     * 批量设置摘要覆盖（仅保存一次）
-     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
-     */
-    async setBatchSummaryOverrides(entries) {
-        if (!this._autoSummaryOverrides.feeds) this._autoSummaryOverrides.feeds = {};
-        if (!this._autoSummaryOverrides.groups) this._autoSummaryOverrides.groups = {};
-        for (const { type, id, value } of entries) {
-            const store = type === 'group' ? this._autoSummaryOverrides.groups : this._autoSummaryOverrides.feeds;
-            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
-        }
-        await this._saveSummaryOverrides();
-    },
-
-    /**
-     * 判断某个订阅源是否应该自动摘要
-     * 优先级：订阅源设置 > 分组设置 > 默认关闭
-     * @param {string|number} feedId
-     * @returns {boolean}
-     */
-    shouldAutoSummarize(feedId) {
-        if (!AIService.isConfigured()) return false;
-
-        const feedOverride = this.getFeedSummaryOverride(feedId);
-        if (feedOverride === 'on') return true;
-        if (feedOverride === 'off') return false;
-
-        const feeds = AppState?.feeds || [];
-        const feed = feeds.find(f => f.id == feedId);
-        if (feed && feed.group_id) {
-            const groupOverride = this.getGroupSummaryOverride(feed.group_id);
-            if (groupOverride === 'on') return true;
-            if (groupOverride === 'off') return false;
-        }
-
-        return false;
-    },
-
-    // ==================== 自动翻译全文覆盖 ====================
-
-    _loadAutoTranslateOverrides() {
-        try {
-            const prefs = AppState?.preferences || {};
-            if (prefs.auto_translate_overrides) {
-                this._autoTranslateOverrides = prefs.auto_translate_overrides;
-                return;
-            }
-        } catch (e) { /* ignore */ }
-        this._autoTranslateOverrides = { feeds: {}, groups: {} };
-    },
-
-    async _saveAutoTranslateOverrides() {
-        try {
-            const { FeedManager } = await import('./feed-manager.js');
-            await FeedManager.setPreference('auto_translate_overrides', this._autoTranslateOverrides);
-            if (AppState?.preferences) {
-                AppState.preferences.auto_translate_overrides = this._autoTranslateOverrides;
-            }
-        } catch (e) {
-            console.error('[AIService] Failed to save auto-translate overrides:', e);
-        }
-    },
-
-    getFeedAutoTranslateOverride(feedId) {
-        return this._autoTranslateOverrides.feeds?.[feedId] || 'inherit';
-    },
-
-    getGroupAutoTranslateOverride(groupId) {
-        return this._autoTranslateOverrides.groups?.[groupId] || 'inherit';
-    },
-
-    async setFeedAutoTranslateOverride(feedId, value) {
-        if (!this._autoTranslateOverrides.feeds) this._autoTranslateOverrides.feeds = {};
-        if (value === 'inherit') {
-            delete this._autoTranslateOverrides.feeds[feedId];
-        } else {
-            this._autoTranslateOverrides.feeds[feedId] = value;
-        }
-        await this._saveAutoTranslateOverrides();
-    },
-
-    async setGroupAutoTranslateOverride(groupId, value) {
-        if (!this._autoTranslateOverrides.groups) this._autoTranslateOverrides.groups = {};
-        if (value === 'inherit') {
-            delete this._autoTranslateOverrides.groups[groupId];
-        } else {
-            this._autoTranslateOverrides.groups[groupId] = value;
-        }
-        await this._saveAutoTranslateOverrides();
-    },
-
-    /**
-     * 批量设置自动翻译全文覆盖（仅保存一次）
-     * @param {Array<{type: 'feed'|'group', id: string|number, value: 'on'|'off'|'inherit'}>} entries
-     */
-    async setBatchAutoTranslateOverrides(entries) {
-        if (!this._autoTranslateOverrides.feeds) this._autoTranslateOverrides.feeds = {};
-        if (!this._autoTranslateOverrides.groups) this._autoTranslateOverrides.groups = {};
-        for (const { type, id, value } of entries) {
-            const store = type === 'group' ? this._autoTranslateOverrides.groups : this._autoTranslateOverrides.feeds;
-            if (value === 'inherit') { delete store[id]; } else { store[id] = value; }
-        }
-        await this._saveAutoTranslateOverrides();
-    },
-
-    /**
-     * 判断某个订阅源是否应该自动翻译全文
-     * 优先级：订阅源设置 > 分组设置 > 默认关闭
-     * @param {string|number} feedId
-     * @returns {boolean}
-     */
-    shouldAutoTranslate(feedId) {
-        if (!AIService.isConfigured()) return false;
-
-        const feedOverride = this.getFeedAutoTranslateOverride(feedId);
-        if (feedOverride === 'on') return true;
-        if (feedOverride === 'off') return false;
-
-        const feeds = AppState?.feeds || [];
-        const feed = feeds.find(f => f.id == feedId);
-        if (feed && feed.group_id) {
-            const groupOverride = this.getGroupAutoTranslateOverride(feed.group_id);
-            if (groupOverride === 'on') return true;
-            if (groupOverride === 'off') return false;
-        }
-
-        return false;
+    getOverrideAccessors(mode) {
+        const map = {
+            translation: {
+                getFeed: (id) => this.getFeedTranslationOverride(id),
+                getGroup: (id) => this.getGroupTranslationOverride(id),
+                setFeed: (id, v) => this.setFeedTranslationOverride(id, v),
+                setGroup: (id, v) => this.setGroupTranslationOverride(id, v),
+                shouldFeed: (id) => this.shouldTranslateFeed(id),
+                setBatch: (entries) => this.setBatchTranslationOverrides(entries),
+            },
+            translate: {
+                getFeed: (id) => this.getFeedAutoTranslateOverride(id),
+                getGroup: (id) => this.getGroupAutoTranslateOverride(id),
+                setFeed: (id, v) => this.setFeedAutoTranslateOverride(id, v),
+                setGroup: (id, v) => this.setGroupAutoTranslateOverride(id, v),
+                shouldFeed: (id) => this.shouldAutoTranslate(id),
+                setBatch: (entries) => this.setBatchAutoTranslateOverrides(entries),
+            },
+            summary: {
+                getFeed: (id) => this.getFeedSummaryOverride(id),
+                getGroup: (id) => this.getGroupSummaryOverride(id),
+                setFeed: (id, v) => this.setFeedSummaryOverride(id, v),
+                setGroup: (id, v) => this.setGroupSummaryOverride(id, v),
+                shouldFeed: (id) => this.shouldAutoSummarize(id),
+                setBatch: (entries) => this.setBatchSummaryOverrides(entries),
+            },
+        };
+        return map[mode];
     },
 
     /**
@@ -459,6 +295,15 @@ export const AIService = {
     },
 
     /**
+     * 获取目标翻译语言（集中管理回退逻辑）
+     * @returns {string} 语言代码，如 'zh-CN'、'en'
+     */
+    getTargetLang() {
+        const config = this.getConfig();
+        return config.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+    },
+
+    /**
      * 自动修复/清理配置项（如补全缺失的占位符）
      * @param {Object} config 
      * @returns {Object}
@@ -494,7 +339,7 @@ export const AIService = {
     async saveConfig(config) {
         this._configCache = config;
         localStorage.setItem(STORAGE_KEYS.AI_CONFIG, JSON.stringify(config));
-        console.log('[AIService] Local saved. Syncing to remote...');
+        console.debug('[AIService] Local saved. Syncing to remote...');
 
         if (AuthManager.isLoggedIn()) {
             try {
@@ -509,7 +354,7 @@ export const AIService = {
                     })
                 });
                 if (response.ok) {
-                    console.log('[AIService] Remote sync success');
+                    console.debug('[AIService] Remote sync success');
                 } else {
                     console.error('[AIService] Remote sync failed:', response.status, await response.text());
                 }
@@ -527,6 +372,7 @@ export const AIService = {
      */
     isConfigured() {
         const config = this.getConfig();
+        if (config.provider === 'ollama') return !!config.apiUrl;
         return !!(config.apiUrl && config.apiKey);
     },
 
@@ -630,7 +476,7 @@ export const AIService = {
     async _doCallAPI(prompt, onChunk = null, signal = null, timeout = 120000) {
         const config = this.getConfig();
 
-        if (!config.apiUrl || !config.apiKey) {
+        if (!config.apiUrl || (config.provider !== 'ollama' && !config.apiKey)) {
             throw new Error(i18n.t('ai.not_configured'));
         }
 

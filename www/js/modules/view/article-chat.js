@@ -17,6 +17,7 @@
  */
 
 import { AIService } from '../ai-service.js';
+import { escapeHtml } from './utils.js';
 import { AuthManager } from '../auth-manager.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { i18n } from '../i18n.js';
@@ -386,8 +387,10 @@ export const ArticleChatMixin = {
 
         this._chatPanel = panel;
 
-        // 聚焦输入框
-        requestAnimationFrame(() => input.focus());
+        // 桌面端自动聚焦输入框，移动端不自动聚焦以避免键盘弹出
+        if (window.innerWidth > 800) {
+            requestAnimationFrame(() => input.focus());
+        }
     },
 
     /**
@@ -452,12 +455,24 @@ export const ArticleChatMixin = {
             this._chatController = new AbortController();
             const signal = this._chatController.signal;
 
+            // 跟踪用户是否正在手动浏览上方内容，如果是则不自动滚到底部
+            let userScrolled = false;
+            const scrollHandler = () => {
+                const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
+                userScrolled = distanceFromBottom > 50;
+            };
+            messagesContainer.addEventListener('scroll', scrollHandler);
+
             let streamedText = '';
             await AIService.callAPI(prompt, (chunk) => {
                 streamedText += chunk;
                 contentEl.innerHTML = this._renderChatMarkdown(streamedText);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                if (!userScrolled) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
             }, signal);
+
+            messagesContainer.removeEventListener('scroll', scrollHandler);
 
             // 保存 AI 回复
             this._chatMessages.push({ role: 'assistant', content: streamedText });
@@ -489,7 +504,9 @@ export const ArticleChatMixin = {
             if (this._chatPanel) {
                 input.disabled = false;
                 sendBtn.disabled = !input.value.trim();
-                input.focus();
+                if (window.innerWidth > 800) {
+                    input.focus();
+                }
             }
         }
     },
@@ -511,7 +528,7 @@ export const ArticleChatMixin = {
 
         let renderedContent;
         if (role === 'user') {
-            renderedContent = this._escapeHtml(content);
+            renderedContent = escapeHtml(content);
         } else if (renderMarkdown && content) {
             renderedContent = this._renderChatMarkdown(content);
         } else {
@@ -568,8 +585,7 @@ export const ArticleChatMixin = {
      * @returns {string}
      */
     _buildConversationPrompt(articleContext, messages) {
-        const aiConfig = AIService.getConfig();
-        const targetLang = aiConfig.targetLang || (i18n.locale === 'zh' ? 'zh-CN' : 'en');
+        const targetLang = AIService.getTargetLang();
         const langName = AIService.getLanguageName(targetLang);
 
         let prompt = `You are a helpful AI assistant. The user is reading an article and wants to discuss it with you. Please respond in ${langName}.\n\n`;
@@ -618,17 +634,4 @@ export const ArticleChatMixin = {
             .replace(/\n/g, '<br>');
     },
 
-    /**
-     * HTML 转义
-     * @param {string} str
-     * @returns {string}
-     */
-    _escapeHtml(str) {
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    },
 };

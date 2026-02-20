@@ -172,7 +172,7 @@ export const Dialogs = {
                     if (feeds && feeds.length > 1) {
                         // Multiple feeds found, show selection
                         discoveredFeeds = feeds;
-                        this._renderDiscoverResults(discoverArea, feeds, confirmBtn);
+                        this._renderDiscoverResults(discoverArea, feeds);
                         confirmBtn.textContent = i18n.t('dialogs.subscribe_selected');
                         confirmBtn.disabled = false;
                         return;
@@ -287,7 +287,7 @@ export const Dialogs = {
     /**
      * 渲染 feed 发现结果列表
      */
-    _renderDiscoverResults(container, feeds, confirmBtn) {
+    _renderDiscoverResults(container, feeds) {
         const getFeedTypeLabel = (type) => {
             if (!type) return '';
             const t = type.toLowerCase();
@@ -321,7 +321,7 @@ export const Dialogs = {
                                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${feed.title || 'Feed ' + (idx + 1)}</span>
                                     ${feed.type ? `<span style="
                                         font-size: 0.7em; padding: 1px 6px; border-radius: 4px;
-                                        background: var(--primary-color); color: white; flex-shrink: 0;
+                                        background: var(--accent-color); color: white; flex-shrink: 0;
                                         font-weight: 600; letter-spacing: 0.5px;
                                     ">${getFeedTypeLabel(feed.type)}</span>` : ''}
                                 </div>
@@ -515,7 +515,7 @@ export const Dialogs = {
             `).join('');
         };
 
-        const { dialog, close } = createDialog('settings-dialog', `
+        const { dialog } = createDialog('settings-dialog', `
             <div class="settings-dialog-content" style="position: relative;">
                 <button class="icon-btn close-dialog-btn" title="${i18n.t('settings.close')}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px;">
                     ${Icons.close}

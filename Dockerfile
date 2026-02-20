@@ -25,7 +25,7 @@ COPY --from=builder /app/docker/dist /app
 
 # 进入 server 目录安装生产依赖
 WORKDIR /app/server
-RUN npm ci --production && apk del python3 make g++
+RUN npm ci --omit=dev && apk del python3 make g++
 
 # 设置环境变量端口
 ENV PORT=8812

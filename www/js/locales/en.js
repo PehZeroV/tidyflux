@@ -274,6 +274,7 @@ export default {
         provider_minimax: 'MiniMax',
         provider_zhipu: 'ZhiPu AI',
         provider_kimi: 'Kimi',
+        provider_ollama: 'Ollama (Local)',
         provider_custom: 'Custom',
         region: 'Region',
         region_china: 'China',

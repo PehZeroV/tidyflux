@@ -6,7 +6,7 @@
 import { AppState } from '../../state.js';
 import { DOMElements } from '../../dom.js';
 import { FeedManager } from '../feed-manager.js';
-import { showToast, createContextMenu } from './utils.js';
+import { showToast, createContextMenu, getTodayStartISO, getTodayStartTimestamp } from './utils.js';
 import { i18n } from '../i18n.js';
 import { Modal } from './components.js';
 import { Icons } from '../icons.js';
@@ -207,8 +207,6 @@ export const ContextMenu = {
             </div>
 `;
 
-        const html = itemsHtml;
-
 
         // 使用按钮位置定位
         const btn = event.currentTarget;
@@ -223,7 +221,7 @@ export const ContextMenu = {
 
         const menu = document.createElement('div');
         menu.className = 'context-menu';
-        menu.innerHTML = html;
+        menu.innerHTML = itemsHtml;
         document.body.appendChild(menu);
 
         const actualWidth = menu.offsetWidth;
@@ -490,9 +488,7 @@ export const ContextMenu = {
                 }
                 if (AppState.viewingToday) {
                     // 今天模式：传精确的午夜时间戳，和前端"今天"视图一致
-                    const now = new Date();
-                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const afterTimestamp = Math.floor(todayStart.getTime() / 1000);
+                    const afterTimestamp = getTodayStartTimestamp();
                     this.viewManager.generateDigest('today', null, null, null, afterTimestamp);
                 } else if (AppState.currentFeedId) {
                     this.viewManager.generateDigestForFeed(AppState.currentFeedId);
@@ -510,9 +506,7 @@ export const ContextMenu = {
                 if (await Modal.confirm(i18n.t('context.confirm_mark_all_read'))) {
                     let afterPublishedAt = null;
                     if (AppState.viewingToday) {
-                        const now = new Date();
-                        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                        afterPublishedAt = todayStart.toISOString();
+                        afterPublishedAt = getTodayStartISO();
                     }
                     await FeedManager.markAllAsRead(AppState.currentFeedId, AppState.currentGroupId, afterPublishedAt);
                     await Promise.all([
@@ -613,10 +607,26 @@ export const ContextMenu = {
                         ArticleContentView.updateLocalUnreadCount(article.feed_id, -1);
                     }
 
-                    // 如果虚拟列表正在使用，刷新可见项
-                    if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
-                        ArticlesView.virtualList.refreshVisibleItems();
+                    // 同步更新文章工具栏的已读/未读按钮（如果当前正在显示该文章）
+                    if (AppState.currentArticleId == articleId) {
+                        const readBtn = document.getElementById('article-toggle-read-btn');
+                        if (readBtn) {
+                            if (article.is_read) {
+                                readBtn.classList.add('is-read');
+                                readBtn.classList.remove('active');
+                                readBtn.innerHTML = Icons.mark_read;
+                                readBtn.setAttribute('data-tooltip', i18n.t('article.mark_unread'));
+                            } else {
+                                readBtn.classList.remove('is-read');
+                                readBtn.classList.add('active');
+                                readBtn.innerHTML = Icons.mark_unread;
+                                readBtn.setAttribute('data-tooltip', i18n.t('article.mark_read'));
+                            }
+                        }
                     }
+
+                    // 如果虚拟列表正在使用，刷新可见项
+                    ArticlesView.refreshIfVirtual();
                 } catch (err) {
                     console.error('Toggle read status failed', err);
                 }
@@ -645,10 +655,24 @@ export const ContextMenu = {
                         }
                     }
 
-                    // 如果虚拟列表正在使用，刷新可见项
-                    if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
-                        ArticlesView.virtualList.refreshVisibleItems();
+                    // 同步更新文章工具栏的收藏按钮（如果当前正在显示该文章）
+                    if (AppState.currentArticleId == articleId) {
+                        const favBtn = document.getElementById('article-toggle-fav-btn');
+                        if (favBtn) {
+                            if (article.is_favorited) {
+                                favBtn.classList.add('active');
+                                favBtn.innerHTML = Icons.star;
+                                favBtn.setAttribute('data-tooltip', i18n.t('article.unstar'));
+                            } else {
+                                favBtn.classList.remove('active');
+                                favBtn.innerHTML = Icons.star_border;
+                                favBtn.setAttribute('data-tooltip', i18n.t('article.star'));
+                            }
+                        }
                     }
+
+                    // 如果虚拟列表正在使用，刷新可见项
+                    ArticlesView.refreshIfVirtual();
                 } catch (err) {
                     console.error('Toggle favorite failed', err);
                 }
@@ -663,31 +687,7 @@ export const ContextMenu = {
      * @param {string|number|null} groupId - Current group ID (if viewing a group)
      */
     async _toggleAIOverride(mode, feedId, groupId) {
-        const overrideMap = {
-            translation: {
-                getFeed: (id) => AIService.getFeedTranslationOverride(id),
-                getGroup: (id) => AIService.getGroupTranslationOverride(id),
-                setFeed: (id, v) => AIService.setFeedTranslationOverride(id, v),
-                shouldFeed: (id) => AIService.shouldTranslateFeed(id),
-                setBatch: (entries) => AIService.setBatchTranslationOverrides(entries),
-            },
-            translate: {
-                getFeed: (id) => AIService.getFeedAutoTranslateOverride(id),
-                getGroup: (id) => AIService.getGroupAutoTranslateOverride(id),
-                setFeed: (id, v) => AIService.setFeedAutoTranslateOverride(id, v),
-                shouldFeed: (id) => AIService.shouldAutoTranslate(id),
-                setBatch: (entries) => AIService.setBatchAutoTranslateOverrides(entries),
-            },
-            summary: {
-                getFeed: (id) => AIService.getFeedSummaryOverride(id),
-                getGroup: (id) => AIService.getGroupSummaryOverride(id),
-                setFeed: (id, v) => AIService.setFeedSummaryOverride(id, v),
-                shouldFeed: (id) => AIService.shouldAutoSummarize(id),
-                setBatch: (entries) => AIService.setBatchSummaryOverrides(entries),
-            },
-        };
-
-        const { getFeed, getGroup, setFeed, shouldFeed, setBatch } = overrideMap[mode];
+        const { getFeed, getGroup, setFeed, shouldFeed, setBatch } = AIService.getOverrideAccessors(mode);
 
         if (feedId) {
             // Toggle for specific feed — single item, no batch needed

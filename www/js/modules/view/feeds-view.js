@@ -93,9 +93,9 @@ export const FeedsView = {
             KeyboardShortcuts.syncFromPreferences();
 
             // 重新加载 AI 覆盖设置（init 时 preferences 可能尚未就绪）
-            AIService._loadTranslationOverrides();
-            AIService._loadSummaryOverrides();
-            AIService._loadAutoTranslateOverrides();
+            AIService._translationOM.load();
+            AIService._summaryOM.load();
+            AIService._translateOM.load();
 
             // 应用文章页面宽度设置
             if (AppState.preferences.article_width) {
@@ -504,21 +504,25 @@ export const FeedsView = {
     },
 
     /**
-     * 选择订阅源
-     * @param {string|null} feedId - 订阅源 ID
+     * 导航到指定 hash 路由
+     * @param {string} hash - 目标 hash
      */
-    selectFeed(feedId) {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = feedId ? `#/feed/${feedId}` : '#/all';
-        // 强制触发路由，即使 hash 相同也重新加载
+    _navigateTo(hash) {
+        this.viewManager.isProgrammaticNav = true;
+        this.viewManager.forceRefreshList = true;
         if (window.location.hash === hash) {
             window.dispatchEvent(new HashChangeEvent('hashchange'));
         } else {
             window.location.hash = hash;
         }
+    },
+
+    /**
+     * 选择订阅源
+     * @param {string|null} feedId - 订阅源 ID
+     */
+    selectFeed(feedId) {
+        this._navigateTo(feedId ? `#/feed/${feedId}` : '#/all');
     },
 
     /**
@@ -526,82 +530,35 @@ export const FeedsView = {
      * @param {string|number} groupId - 分组 ID
      */
     selectGroup(groupId) {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = `#/group/${groupId}`;
-        // 强制触发路由，即使 hash 相同也重新加载
-        if (window.location.hash === hash) {
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-            window.location.hash = hash;
-        }
+        this._navigateTo(`#/group/${groupId}`);
     },
 
     /**
      * 选择收藏
      */
     selectFavorites() {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = '#/favorites';
-        // 强制触发路由，即使 hash 相同也重新加载
-        if (window.location.hash === hash) {
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-            window.location.hash = hash;
-        }
+        this._navigateTo('#/favorites');
     },
 
     /**
      * Select Briefings
      */
     selectDigests() {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = '#/digests';
-        if (window.location.hash === hash) {
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-            window.location.hash = hash;
-        }
+        this._navigateTo('#/digests');
     },
 
     /**
      * 选择今天
      */
     selectToday() {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = '#/today';
-        if (window.location.hash === hash) {
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-            window.location.hash = hash;
-        }
+        this._navigateTo('#/today');
     },
 
     /**
      * 选择历史记录
      */
     selectHistory() {
-        const vm = this.viewManager;
-        vm.isProgrammaticNav = true;
-        vm.forceRefreshList = true;
-
-        const hash = '#/history';
-        if (window.location.hash === hash) {
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-            window.location.hash = hash;
-        }
+        this._navigateTo('#/history');
     },
 
     /**

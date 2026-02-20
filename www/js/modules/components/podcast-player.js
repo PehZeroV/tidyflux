@@ -1,5 +1,6 @@
 import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
+import { BREAKPOINTS } from '../../constants.js';
 
 class PodcastPlayer {
     constructor() {
@@ -83,7 +84,7 @@ class PodcastPlayer {
         // On desktop, append to content-panel for proper alignment
         // On mobile, append to body
         const contentPanel = document.getElementById('content-panel');
-        if (contentPanel && window.innerWidth >= 1024) {
+        if (contentPanel && window.innerWidth >= BREAKPOINTS.TABLET) {
             contentPanel.appendChild(this.container);
         } else {
             document.body.appendChild(this.container);

@@ -22,13 +22,13 @@ export const TranslationDialogMixin = {
     showTranslationDialog(activeTab = 'translation') {
         // 每次打开时从 AppState.preferences 重新加载覆盖数据，
         // 避免因 init 时 preferences 尚未加载导致显示不正确
-        AIService._loadTranslationOverrides();
-        AIService._loadSummaryOverrides();
-        AIService._loadAutoTranslateOverrides();
+        AIService._translationOM.load();
+        AIService._summaryOM.load();
+        AIService._translateOM.load();
 
         const aiConfig = AIService.getConfig();
 
-        const { dialog, close } = createDialog('settings-dialog', `
+        const { dialog } = createDialog('settings-dialog', `
             <div class="settings-dialog-content" style="position: relative; max-width: 500px;">
                 <button class="icon-btn close-dialog-btn" title="${i18n.t('common.close')}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; z-index: 10;">
                     ${Icons.close}
@@ -62,11 +62,11 @@ export const TranslationDialogMixin = {
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                             <label class="miniflux-input-label" style="font-size: 0.85em; margin: 0; white-space: nowrap;">${i18n.t('ai.title_translation_mode')}</label>
                             <div style="display: flex; gap: 10px;">
-                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-primary);">
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
                                     <input type="radio" name="trans-mode" value="bilingual" style="accent-color: var(--accent-color); cursor: pointer;">
                                     ${i18n.t('ai.title_translation_bilingual')}
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-primary);">
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
                                     <input type="radio" name="trans-mode" value="translated" style="accent-color: var(--accent-color); cursor: pointer;">
                                     ${i18n.t('ai.title_translation_translated')}
                                 </label>
@@ -166,27 +166,7 @@ export const TranslationDialogMixin = {
         const feeds = AppState.feeds || [];
 
         // Getter/Setter helpers based on mode
-        const overrideMap = {
-            translation: {
-                getGroup: (id) => AIService.getGroupTranslationOverride(id),
-                getFeed: (id) => AIService.getFeedTranslationOverride(id),
-                setGroup: (id, v) => AIService.setGroupTranslationOverride(id, v),
-                setFeed: (id, v) => AIService.setFeedTranslationOverride(id, v),
-            },
-            summary: {
-                getGroup: (id) => AIService.getGroupSummaryOverride(id),
-                getFeed: (id) => AIService.getFeedSummaryOverride(id),
-                setGroup: (id, v) => AIService.setGroupSummaryOverride(id, v),
-                setFeed: (id, v) => AIService.setFeedSummaryOverride(id, v),
-            },
-            translate: {
-                getGroup: (id) => AIService.getGroupAutoTranslateOverride(id),
-                getFeed: (id) => AIService.getFeedAutoTranslateOverride(id),
-                setGroup: (id, v) => AIService.setGroupAutoTranslateOverride(id, v),
-                setFeed: (id, v) => AIService.setFeedAutoTranslateOverride(id, v),
-            },
-        };
-        const { getGroup: getGroupOverride, getFeed: getFeedOverride, setGroup: setGroupOverride, setFeed: setFeedOverride } = overrideMap[mode];
+        const { getGroup: getGroupOverride, getFeed: getFeedOverride, setFeed: setFeedOverride } = AIService.getOverrideAccessors(mode);
 
         const prefix = mode; // CSS class prefix
 
@@ -205,7 +185,7 @@ export const TranslationDialogMixin = {
         let html = '';
 
         // Compute "select all" state
-        const allFeedIds = feeds.map(f => f.id);
+
         const allGroupIds = groups.filter(g => {
             return feeds.some(f => f.group_id == g.id);
         }).map(g => g.id);
@@ -233,7 +213,7 @@ export const TranslationDialogMixin = {
                 ${selectAllChecked ? 'checked' : ''}
                 data-indeterminate="${selectAllIndeterminate}"
                 style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
-            <span style="font-size: 0.9em; font-weight: 600; color: var(--text-primary);">${i18n.t('common.select_all')}</span>
+            <span style="font-size: 0.9em; font-weight: 600; color: var(--text-color);">${i18n.t('common.select_all')}</span>
         </div>`;
 
         for (const [groupId, group] of groupMap) {
@@ -269,7 +249,7 @@ export const TranslationDialogMixin = {
                         data-indeterminate="${indeterminate}"
                         ${groupChecked ? 'checked' : ''}
                         style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
-                    <span style="font-size: 0.9em; font-weight: 600; color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${group.name || group.title || i18n.t('common.unnamed')}</span>
+                    <span style="font-size: 0.9em; font-weight: 600; color: var(--text-color); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${group.name || group.title || i18n.t('common.unnamed')}</span>
                     <span style="
                         font-size: 0.7em; color: var(--meta-color);
                         background: var(--card-bg); padding: 2px 8px;

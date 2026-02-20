@@ -1,5 +1,5 @@
 import express from 'express';
-import fetch from 'node-fetch';
+// Node 18+ has global fetch built-in
 import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { t, getLang } from '../utils/i18n.js';
@@ -24,8 +24,9 @@ router.post('/chat', authenticateToken, async (req, res) => {
         const userId = PreferenceStore.getUserId(req.user);
         const prefs = await PreferenceStore.get(userId);
         const aiConfig = prefs.ai_config || {};
+        const isOllama = aiConfig.provider === 'ollama';
 
-        if (!aiConfig.apiUrl || !aiConfig.apiKey) {
+        if (!aiConfig.apiUrl || (!isOllama && !aiConfig.apiKey)) {
             const lang = getLang(req);
             return res.status(400).json({ error: t('ai_not_configured_server', lang) });
         }
@@ -43,12 +44,12 @@ router.post('/chat', authenticateToken, async (req, res) => {
         let response;
         try {
             // 转发请求给 AI 提供商
+            const headers = { 'Content-Type': 'application/json' };
+            if (aiConfig.apiKey) headers['Authorization'] = `Bearer ${aiConfig.apiKey}`;
+
             response = await fetch(apiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${aiConfig.apiKey}`
-                },
+                headers,
                 body: JSON.stringify({
                     model: model || aiConfig.model || 'gpt-4.1-mini',
                     temperature: temperature ?? aiConfig.temperature ?? 1,
@@ -136,19 +137,21 @@ router.post('/test', authenticateToken, async (req, res) => {
             }
         }
 
-        if (!apiUrl || !apiKey) {
+        // For Ollama provider, apiKey is optional
+        const isOllamaTest = apiUrl && (apiUrl.includes('localhost:11434') || apiUrl.includes('127.0.0.1:11434'));
+        if (!apiUrl || (!isOllamaTest && !apiKey)) {
             return res.status(400).json({ error: t('provide_api_url_and_key', getLang(req)) });
         }
 
         const targetUrl = normalizeApiUrl(apiUrl);
 
         // 发送一个简单的测试请求
+        const testHeaders = { 'Content-Type': 'application/json' };
+        if (apiKey) testHeaders['Authorization'] = `Bearer ${apiKey}`;
+
         const response = await fetch(targetUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+            headers: testHeaders,
             body: JSON.stringify({
                 model: model || 'gpt-4.1-mini',
                 messages: [{ role: 'user', content: 'Hi' }],

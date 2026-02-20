@@ -6,6 +6,7 @@
 
 import { DOMElements } from '../dom.js';
 import { AppState } from '../state.js';
+import { BREAKPOINTS } from '../constants.js';
 import { FeedManager } from './feed-manager.js';
 import { i18n } from './i18n.js';
 import { AIService } from './ai-service.js';
@@ -25,8 +26,8 @@ import { isIOSSafari } from './view/utils.js';
 import { Modal } from './view/components.js';
 
 const STORAGE_KEY_FILTERS = 'tidyflux_list_filters';
-const BREAKPOINT_MOBILE = 800;
-const BREAKPOINT_TABLET = 1100;
+const BREAKPOINT_MOBILE = BREAKPOINTS.MOBILE;
+const BREAKPOINT_TABLET = BREAKPOINTS.DESKTOP;
 
 /**
  * ViewManager - 模块协调器
@@ -74,16 +75,7 @@ export const ViewManager = {
         DigestView.init(this);
     },
 
-    /**
-     * 同步状态到子模块
-     */
-    _syncStateToModules() {
-        // 同步虚拟列表引用
-        this.virtualList = ArticlesView.virtualList;
-        this.useVirtualScroll = ArticlesView.useVirtualScroll;
-        this.isLoadingMore = ArticlesView.isLoadingMore;
-        this.checkInterval = ArticlesView.checkInterval;
-    },
+
 
     // ==================== Auth 相关 ====================
 
@@ -213,210 +205,128 @@ export const ViewManager = {
 
     // ==================== 路由渲染方法 ====================
 
-    async _renderFeed(feedId) {
+    /**
+     * 通用视图渲染方法（所有 _render* 内部调用此方法）
+     * @param {Object} config
+     * @param {Function} config.isSame - 判断当前视图是否相同（用于跳过重复加载）
+     * @param {Object} config.state - 要设置的 AppState 属性 { currentFeedId, currentGroupId, viewing* }
+     * @param {string|null} config.filterKey - 筛选设置的 key，null 表示不从设置中读取
+     * @param {boolean} config.defaultUnread - filterKey 无保存值时的默认值
+     * @param {Object} config.sidebarState - 传给 updateSidebarActiveState 的参数
+     * @param {string} config.title - 页面标题
+     * @param {string|null} config.feedId - 传给 loadArticles 的 feedId
+     * @param {string|null} config.groupId - 传给 loadArticles 的 groupId
+     */
+    async _renderView(config) {
         await this.waitForFeedsLoaded();
 
-        // 检查是否需要跳过重复加载（滑动返回时不刷新，点击时刷新）
-        const isSame = !AppState.isSearchMode &&
-            (AppState.currentFeedId == (feedId || '') || (feedId === null && !AppState.currentFeedId)) &&
-            !AppState.currentGroupId && !AppState.viewingFavorites && !AppState.viewingDigests && !AppState.viewingToday && !AppState.viewingHistory && AppState.articles.length > 0;
-
-        if (isSame && !this.forceRefreshList) {
+        // 检查是否需要跳过重复加载
+        if (!AppState.isSearchMode && config.isSame() && AppState.articles.length > 0 && !this.forceRefreshList) {
             if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
             this._restoreScrollPosition();
             return;
         }
 
-        // 重置强制刷新标记
         this.forceRefreshList = false;
-
-        // 退出搜索模式
         AppState.isSearchMode = false;
         AppState.searchQuery = '';
 
-        AppState.currentFeedId = feedId;
-        AppState.currentGroupId = null;
-        AppState.viewingFavorites = false;
-        AppState.viewingDigests = false;
-        AppState.viewingToday = false;
-        AppState.viewingHistory = false;
+        // 设置 AppState
+        AppState.currentFeedId = config.state.currentFeedId ?? null;
+        AppState.currentGroupId = config.state.currentGroupId ?? null;
+        AppState.viewingFavorites = config.state.viewingFavorites ?? false;
+        AppState.viewingDigests = config.state.viewingDigests ?? false;
+        AppState.viewingToday = config.state.viewingToday ?? false;
+        AppState.viewingHistory = config.state.viewingHistory ?? false;
 
-        const filterKey = feedId ? `feed_${feedId}` : 'all';
-        const saved = this.loadFilterSetting(filterKey);
-        AppState.showUnreadOnly = saved !== null ? saved : true;
-
-        this.updateSidebarActiveState({ feedId });
-
-        if (feedId) {
-            const feed = AppState.feeds.find(f => f.id == feedId);
-            DOMElements.currentFeedTitle.textContent = feed?.title || i18n.t('nav.article_list');
+        // 设置筛选
+        if (config.filterKey) {
+            const saved = this.loadFilterSetting(config.filterKey);
+            AppState.showUnreadOnly = saved !== null ? saved : (config.defaultUnread ?? true);
         } else {
-            DOMElements.currentFeedTitle.textContent = i18n.t('nav.all');
+            AppState.showUnreadOnly = config.defaultUnread ?? false;
         }
 
-        // 先显示面板，让骨架屏可见
+        this.updateSidebarActiveState(config.sidebarState);
+        DOMElements.currentFeedTitle.textContent = config.title;
+
         if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(feedId, null);
+        await this.loadArticles(config.feedId ?? null, config.groupId ?? null);
+    },
+
+    async _renderFeed(feedId) {
+        const title = feedId
+            ? (AppState.feeds?.find(f => f.id == feedId)?.title || i18n.t('nav.article_list'))
+            : i18n.t('nav.all');
+
+        await this._renderView({
+            isSame: () => (AppState.currentFeedId == (feedId || '') || (feedId === null && !AppState.currentFeedId))
+                && !AppState.currentGroupId && !AppState.viewingFavorites && !AppState.viewingDigests
+                && !AppState.viewingToday && !AppState.viewingHistory,
+            state: { currentFeedId: feedId },
+            filterKey: feedId ? `feed_${feedId}` : 'all',
+            defaultUnread: true,
+            sidebarState: { feedId },
+            title,
+            feedId,
+        });
     },
 
     async _renderGroup(groupId) {
-        await this.waitForFeedsLoaded();
-
-        // 检查是否需要跳过重复加载
-        if (!AppState.isSearchMode && AppState.currentGroupId == groupId && AppState.articles.length > 0 && !this.forceRefreshList) {
-            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-            this._restoreScrollPosition();
-            return;
-        }
-
-        // 重置强制刷新标记
-        this.forceRefreshList = false;
-
-        // 退出搜索模式
-        AppState.isSearchMode = false;
-        AppState.searchQuery = '';
-
-        AppState.currentFeedId = null;
-        AppState.currentGroupId = groupId;
-        AppState.viewingFavorites = false;
-        AppState.viewingDigests = false;
-        AppState.viewingToday = false;
-        AppState.viewingHistory = false;
-
-        const saved = this.loadFilterSetting(`group_${groupId}`);
-        AppState.showUnreadOnly = saved !== null ? saved : true;
-
-        this.updateSidebarActiveState({ groupId });
-
         const group = AppState.groups?.find(g => g.id == groupId);
-        DOMElements.currentFeedTitle.textContent = group?.name || i18n.t('nav.group_articles');
-
-        // 先显示面板，让骨架屏可见
-        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(null, groupId);
+        await this._renderView({
+            isSame: () => AppState.currentGroupId == groupId,
+            state: { currentGroupId: groupId },
+            filterKey: `group_${groupId}`,
+            defaultUnread: true,
+            sidebarState: { groupId },
+            title: group?.name || i18n.t('nav.group_articles'),
+            groupId,
+        });
     },
 
     async _renderFavorites() {
-        await this.waitForFeedsLoaded();
-
-        // 检查是否需要跳过重复加载
-        if (!AppState.isSearchMode && AppState.viewingFavorites === true && AppState.articles.length > 0 && !this.forceRefreshList) {
-            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-            this._restoreScrollPosition();
-            return;
-        }
-
-        // 重置强制刷新标记
-        this.forceRefreshList = false;
-
-        // 退出搜索模式
-        AppState.isSearchMode = false;
-        AppState.searchQuery = '';
-
-        AppState.currentFeedId = null;
-        AppState.currentGroupId = null;
-        AppState.viewingFavorites = true;
-        AppState.viewingDigests = false;
-        AppState.viewingToday = false;
-        AppState.viewingHistory = false;
-        AppState.showUnreadOnly = false;
-
-        this.updateSidebarActiveState({ favorites: true });
-        DOMElements.currentFeedTitle.textContent = i18n.t('nav.starred');
-
-        // 先显示面板，让骨架屏可见
-        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(null, null);
+        await this._renderView({
+            isSame: () => AppState.viewingFavorites === true,
+            state: { viewingFavorites: true },
+            filterKey: null,
+            defaultUnread: false,
+            sidebarState: { favorites: true },
+            title: i18n.t('nav.starred'),
+        });
     },
 
     async _renderDigests() {
-        await this.waitForFeedsLoaded();
-
-        if (!AppState.isSearchMode && AppState.viewingDigests === true && AppState.articles.length > 0 && !this.forceRefreshList) {
-            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-            this._restoreScrollPosition();
-            return;
-        }
-
-        this.forceRefreshList = false;
-        AppState.isSearchMode = false;
-        AppState.searchQuery = '';
-
-        AppState.currentFeedId = null;
-        AppState.currentGroupId = null;
-        AppState.viewingFavorites = false;
-        AppState.viewingDigests = true;
-        AppState.viewingToday = false;
-        AppState.viewingHistory = false;
-        // Briefings default to unread only or all? User implies "only unread at top", suggesting we might show all but prioritize.
-        // Let's default to whatever filter logic or just show all for now.
-        AppState.showUnreadOnly = false;
-
-        this.updateSidebarActiveState({ digests: true });
-        DOMElements.currentFeedTitle.textContent = i18n.t('nav.briefings');
-
-        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(null, null);
+        await this._renderView({
+            isSame: () => AppState.viewingDigests === true,
+            state: { viewingDigests: true },
+            filterKey: null,
+            defaultUnread: false,
+            sidebarState: { digests: true },
+            title: i18n.t('nav.briefings'),
+        });
     },
 
     async _renderToday() {
-        await this.waitForFeedsLoaded();
-
-        // 检查是否需要跳过重复加载
-        if (!AppState.isSearchMode && AppState.viewingToday === true && AppState.articles.length > 0 && !this.forceRefreshList) {
-            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-            this._restoreScrollPosition();
-            return;
-        }
-
-        this.forceRefreshList = false;
-        AppState.isSearchMode = false;
-        AppState.searchQuery = '';
-
-        AppState.currentFeedId = null;
-        AppState.currentGroupId = null;
-        AppState.viewingFavorites = false;
-        AppState.viewingDigests = false;
-        AppState.viewingToday = true;
-        AppState.viewingHistory = false;
-
-        const savedToday = this.loadFilterSetting('today');
-        AppState.showUnreadOnly = savedToday !== null ? savedToday : true;
-
-        this.updateSidebarActiveState({ today: true });
-        DOMElements.currentFeedTitle.textContent = i18n.t('nav.today');
-
-        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(null, null);
+        await this._renderView({
+            isSame: () => AppState.viewingToday === true,
+            state: { viewingToday: true },
+            filterKey: 'today',
+            defaultUnread: true,
+            sidebarState: { today: true },
+            title: i18n.t('nav.today'),
+        });
     },
 
     async _renderHistory() {
-        await this.waitForFeedsLoaded();
-
-        // 检查是否需要跳过重复加载
-        if (!AppState.isSearchMode && AppState.viewingHistory === true && AppState.articles.length > 0 && !this.forceRefreshList) {
-            if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-            this._restoreScrollPosition();
-            return;
-        }
-
-        this.forceRefreshList = false;
-        AppState.isSearchMode = false;
-        AppState.searchQuery = '';
-
-        AppState.currentFeedId = null;
-        AppState.currentGroupId = null;
-        AppState.viewingFavorites = false;
-        AppState.viewingDigests = false;
-        AppState.viewingToday = false;
-        AppState.viewingHistory = true;
-        AppState.showUnreadOnly = false;
-
-        this.updateSidebarActiveState({ history: true });
-        DOMElements.currentFeedTitle.textContent = i18n.t('nav.history');
-
-        if (window.innerWidth <= BREAKPOINT_TABLET) this.showPanel('articles');
-        await this.loadArticles(null, null);
+        await this._renderView({
+            isSame: () => AppState.viewingHistory === true,
+            state: { viewingHistory: true },
+            filterKey: null,
+            defaultUnread: false,
+            sidebarState: { history: true },
+            title: i18n.t('nav.history'),
+        });
     },
 
     _restoreScrollPosition() {
@@ -426,11 +336,11 @@ export const ViewManager = {
             DOMElements.articleContent.innerHTML = '';
         }
 
-        if (this.useVirtualScroll && this.virtualList) {
+        if (ArticlesView.useVirtualScroll && ArticlesView.virtualList) {
             if (AppState.lastListViewScrollTop !== null) {
-                this.virtualList.setScrollTop(AppState.lastListViewScrollTop);
+                ArticlesView.virtualList.setScrollTop(AppState.lastListViewScrollTop);
             }
-            this.virtualList.render();
+            ArticlesView.virtualList.render();
         } else {
             const isEmpty = DOMElements.articlesList.innerHTML.trim() === '' ||
                 DOMElements.articlesList.querySelector('.loading');
@@ -447,26 +357,20 @@ export const ViewManager = {
 
     async loadArticles(feedId, groupId = null) {
         await ArticlesView.loadArticles(feedId, groupId);
-        this._syncStateToModules();
         this.refreshFeedCounts();
     },
 
     renderArticlesList(articles) {
         ArticlesView.renderArticlesList(articles);
-        this._syncStateToModules();
     },
 
     async loadMoreArticles(showButton = false) {
         await ArticlesView.loadMoreArticles(showButton);
-        this._syncStateToModules();
     },
 
     startNewArticlesPoller() {
         ArticlesView.startNewArticlesPoller();
-        this.checkInterval = ArticlesView.checkInterval;
     },
-
-
 
     async checkForNewArticles() {
         await ArticlesView.checkForNewArticles();
@@ -488,7 +392,6 @@ export const ViewManager = {
             ]);
             AppState.feeds = feeds;
             AppState.groups = groups;
-            // Store digests count/metadata if needed? No, pass it to view
             this.updateFeedUnreadCounts(digests && digests.digests ? digests.digests : null, todayUnread);
 
             await ArticlesView.checkUnreadDigestsAndShowToast(digests);
@@ -676,37 +579,40 @@ export const ViewManager = {
         }
     },
 
-    // ==================== 订阅栏宽度调节（仅桌面端） ====================
+    // ==================== 面板宽度调节（仅桌面端） ====================
 
-    initFeedsPanelResize() {
-        const panel = DOMElements.feedsPanel;
-        const handle = document.getElementById('feeds-panel-resize-handle');
+    /**
+     * 通用面板拖拽调宽初始化
+     * @param {Object} cfg
+     * @param {HTMLElement} cfg.panel - 面板元素
+     * @param {string} cfg.handleId - 拖拽手柄元素 ID
+     * @param {string} cfg.storageKey - localStorage 存储 key
+     * @param {number} cfg.minW - 最小宽度
+     * @param {number} cfg.maxW - 最大宽度
+     * @param {string} cfg.draggingClass - 拖拽时添加到 handle 的 CSS class
+     * @param {boolean} cfg.bodyResizingClass - 是否给 body 添加 panel-resizing class
+     */
+    _initPanelResize({ panel, handleId, storageKey, minW, maxW, draggingClass, bodyResizingClass = false }) {
+        const handle = document.getElementById(handleId);
         if (!panel || !handle) return;
 
-        const STORAGE_WIDTH = 'tidyflux_feedsPanelWidth';
-        const MIN_W = 160;
-        const MAX_W = 400;
-        const HOVER_DELAY = 300; // ms, matches CSS transition-delay
+        const HOVER_DELAY = 300;
 
         const applyWidth = (w) => {
-            const px = Math.round(Math.max(MIN_W, Math.min(MAX_W, w))) + 'px';
+            const px = Math.round(Math.max(minW, Math.min(maxW, w))) + 'px';
             panel.style.width = px;
             panel.style.minWidth = px;
             panel.style.maxWidth = px;
         };
 
         try {
-            const savedW = parseInt(localStorage.getItem(STORAGE_WIDTH), 10);
+            const savedW = parseInt(localStorage.getItem(storageKey), 10);
             if (!isNaN(savedW)) applyWidth(savedW);
         } catch (_) { }
 
-        // Delay cursor change to match CSS transition-delay,
-        // so quick mouse pass-through won't flash col-resize cursor
         let cursorTimer = null;
         handle.addEventListener('mouseenter', () => {
-            cursorTimer = setTimeout(() => {
-                handle.style.cursor = 'col-resize';
-            }, HOVER_DELAY);
+            cursorTimer = setTimeout(() => { handle.style.cursor = 'col-resize'; }, HOVER_DELAY);
         });
         handle.addEventListener('mouseleave', () => {
             clearTimeout(cursorTimer);
@@ -716,91 +622,46 @@ export const ViewManager = {
         let startX = 0, startW = 0;
         handle.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            // Immediately show col-resize on drag start
             clearTimeout(cursorTimer);
             handle.style.cursor = 'col-resize';
             startX = e.clientX;
             startW = panel.offsetWidth;
-            handle.classList.add('feeds-panel-resize-handle--dragging');
+            handle.classList.add(draggingClass);
+            if (bodyResizingClass) document.body.classList.add('panel-resizing');
             const onMove = (e2) => {
                 const dx = e2.clientX - startX;
                 applyWidth(startW + dx);
             };
             const onUp = () => {
-                handle.classList.remove('feeds-panel-resize-handle--dragging');
+                handle.classList.remove(draggingClass);
+                if (bodyResizingClass) document.body.classList.remove('panel-resizing');
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
-                try {
-                    localStorage.setItem(STORAGE_WIDTH, String(panel.offsetWidth));
-                } catch (_) { }
+                try { localStorage.setItem(storageKey, String(panel.offsetWidth)); } catch (_) { }
             };
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         });
     },
 
-    // ==================== 列表栏宽度调节（仅桌面端） ====================
+    initFeedsPanelResize() {
+        this._initPanelResize({
+            panel: DOMElements.feedsPanel,
+            handleId: 'feeds-panel-resize-handle',
+            storageKey: 'tidyflux_feedsPanelWidth',
+            minW: 160, maxW: 400,
+            draggingClass: 'feeds-panel-resize-handle--dragging',
+        });
+    },
 
     initArticlesPanelResize() {
-        const panel = DOMElements.articlesPanel;
-        const handle = document.getElementById('articles-panel-resize-handle');
-        if (!panel || !handle) return;
-
-        const STORAGE_WIDTH = 'tidyflux_articlesPanelWidth';
-        const MIN_W = 280;
-        const MAX_W = 600;
-        const HOVER_DELAY = 300; // ms, matches CSS transition-delay
-
-        const applyWidth = (w) => {
-            const px = Math.round(Math.max(MIN_W, Math.min(MAX_W, w))) + 'px';
-            panel.style.width = px;
-            panel.style.minWidth = px;
-            panel.style.maxWidth = px;
-        };
-
-        try {
-            const savedW = parseInt(localStorage.getItem(STORAGE_WIDTH), 10);
-            if (!isNaN(savedW)) applyWidth(savedW);
-        } catch (_) { }
-
-        // Delay cursor change to match CSS transition-delay,
-        // so quick mouse pass-through won't flash col-resize cursor
-        let cursorTimer = null;
-        handle.addEventListener('mouseenter', () => {
-            cursorTimer = setTimeout(() => {
-                handle.style.cursor = 'col-resize';
-            }, HOVER_DELAY);
-        });
-        handle.addEventListener('mouseleave', () => {
-            clearTimeout(cursorTimer);
-            handle.style.cursor = '';
-        });
-
-        let startX = 0, startW = 0;
-        handle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            // Immediately show col-resize on drag start
-            clearTimeout(cursorTimer);
-            handle.style.cursor = 'col-resize';
-            startX = e.clientX;
-            startW = panel.offsetWidth;
-            handle.classList.add('articles-panel-resize-handle--dragging');
-            document.body.classList.add('panel-resizing');
-            const onMove = (e2) => {
-                const dx = e2.clientX - startX;
-                applyWidth(startW + dx);
-            };
-            const onUp = () => {
-                handle.classList.remove('articles-panel-resize-handle--dragging');
-                document.body.classList.remove('panel-resizing');
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-                try {
-                    localStorage.setItem(STORAGE_WIDTH, String(panel.offsetWidth));
-                } catch (_) { }
-            };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
+        this._initPanelResize({
+            panel: DOMElements.articlesPanel,
+            handleId: 'articles-panel-resize-handle',
+            storageKey: 'tidyflux_articlesPanelWidth',
+            minW: 280, maxW: 600,
+            draggingClass: 'articles-panel-resize-handle--dragging',
+            bodyResizingClass: true,
         });
     },
 
@@ -847,8 +708,6 @@ export const ViewManager = {
             // 3. 强制刷新当前列表
             this.forceRefreshList = true;
 
-            // 显示加载状态（可选，也可以依赖 loadArticles 的处理）
-            // DOMElements.articlesList.innerHTML = `<div class="loading">${i18n.t('common.loading')}</div>`;
 
             if (AppState.viewingToday) {
                 await this._renderToday();

@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Node 18+ has global fetch built-in
 import { DigestStore } from '../utils/digest-store.js';
 import { t } from '../utils/i18n.js';
 

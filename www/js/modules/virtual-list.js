@@ -112,9 +112,7 @@ export class VirtualList {
                 if (this._recalcTimeout) cancelAnimationFrame(this._recalcTimeout);
                 this._recalcTimeout = requestAnimationFrame(() => {
                     this._recalcTimeout = null;
-                    const oldTotalHeight = this.getTotalHeight();
                     this.calculatePositions();
-                    const newTotalHeight = this.getTotalHeight();
 
                     // 如果总高度变化，可能需要调整滚动位置（如果在上方变化）
                     if (this.containerHeight > 0) {
@@ -147,7 +145,6 @@ export class VirtualList {
 
         this.scrollRAF = requestAnimationFrame(() => {
             this.scrollRAF = null;
-            const prevScrollTop = this.scrollTop;
             this.scrollTop = this.container.scrollTop;
             this.render();
             this.checkLoadMore();

@@ -2,7 +2,7 @@ import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
 import { FeedManager } from '../feed-manager.js';
 import { VirtualList } from '../virtual-list.js';
-import { formatDate, isMobileDevice, showToast, escapeHtml } from './utils.js';
+import { formatDate, isMobileDevice, showToast, escapeHtml, getTodayStartISO } from './utils.js';
 import { i18n } from '../i18n.js';
 import { ArticlesTitleTranslation } from './articles-title-translation.js';
 
@@ -61,6 +61,16 @@ export const ArticlesView = {
     init(viewManager) {
         this.viewManager = viewManager;
         ArticlesTitleTranslation.init(this);
+    },
+
+    /**
+     * 如果正在使用虚拟列表，刷新可见项
+     * 封装重复的 useVirtualScroll && virtualList 检查（原本在 7 处重复）
+     */
+    refreshIfVirtual() {
+        if (this.useVirtualScroll && this.virtualList) {
+            this.virtualList.refreshVisibleItems();
+        }
     },
 
     /**
@@ -170,9 +180,7 @@ export const ArticlesView = {
      */
     _getTodayFilter() {
         if (!AppState.viewingToday) return null;
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        return todayStart.toISOString();
+        return getTodayStartISO();
     },
 
     /**
@@ -295,22 +303,17 @@ export const ArticlesView = {
     },
 
     /**
-     * 生成单个文章的 HTML（用于虚拟列表）
+     * 生成文章列表项的内部 HTML（共享方法）
      * @param {Object} article - 文章对象
-     * @returns {string} HTML 字符串
+     * @param {boolean} showThumbnails - 是否显示缩略图
+     * @returns {{innerHtml: string, hasImage: boolean}}
      */
-    generateSingleArticleHTML(article) {
-        // 检查是否是简报
-        if (article.type === 'digest') {
-            return this.generateDigestItemHTML(article, true);
-        }
-
+    _buildArticleItemInner(article, showThumbnails) {
         const date = formatDate(article.published_at);
         const isFavorited = article.is_favorited;
-        const showThumbnails = AppState.preferences?.show_thumbnails !== false;
         const thumbnail = (showThumbnails && article.thumbnail_url) ? article.thumbnail_url : null;
-
         const hasImage = !!thumbnail;
+
         let thumbnailHtml = '';
         if (hasImage) {
             thumbnailHtml = `<div class="article-item-image">
@@ -318,11 +321,10 @@ export const ArticlesView = {
                 </div>`;
         }
 
-        // 生成标题 HTML（支持翻译）
         const titleHtml = ArticlesTitleTranslation.buildTitleHtml(article);
         const hasTranslation = titleHtml.includes('article-title-translated');
 
-        return `
+        const innerHtml = `
             <div class="article-item-content">
                 <div class="article-item-title ${hasTranslation ? 'has-translation' : ''}" data-article-id="${article.id}">${titleHtml}</div>
                 <div class="article-item-meta">
@@ -333,6 +335,21 @@ export const ArticlesView = {
             </div>
             ${thumbnailHtml}
         `;
+
+        return { innerHtml, hasImage };
+    },
+
+    /**
+     * 生成单个文章的 HTML（用于虚拟列表，仅返回内部内容）
+     * @param {Object} article - 文章对象
+     * @returns {string} HTML 字符串
+     */
+    generateSingleArticleHTML(article) {
+        if (article.type === 'digest') {
+            return this.generateDigestItemHTML(article, true);
+        }
+        const showThumbnails = AppState.preferences?.show_thumbnails !== false;
+        return this._buildArticleItemInner(article, showThumbnails).innerHtml;
     },
 
     /**
@@ -377,40 +394,16 @@ export const ArticlesView = {
     generateArticlesHTML(articles) {
         const showThumbnails = AppState.preferences?.show_thumbnails !== false;
         return articles.map(article => {
-            // 检查是否是简报
             if (article.type === 'digest') {
                 return this.generateDigestItemHTML(article, false);
             }
 
-            const date = formatDate(article.published_at);
+            const { innerHtml, hasImage } = this._buildArticleItemInner(article, showThumbnails);
             const unreadClass = article.is_read ? '' : 'unread';
-            const thumbnail = (showThumbnails && article.thumbnail_url) ? article.thumbnail_url : null;
-
-            const hasImage = !!thumbnail;
-            const isFavorited = article.is_favorited;
-
-            let thumbnailHtml = '';
-            if (hasImage) {
-                thumbnailHtml = `<div class="article-item-image">
-                        <img src="${thumbnail}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none';">
-                    </div>`;
-            }
-
-            // 生成标题 HTML（支持翻译）
-            const titleHtml = ArticlesTitleTranslation.buildTitleHtml(article);
-            const hasTranslation = titleHtml.includes('article-title-translated');
 
             return `
                 <div class="article-item ${unreadClass} ${hasImage ? 'has-image' : ''} ${AppState.currentArticleId == article.id ? 'active' : ''}" data-id="${article.id}">
-                    <div class="article-item-content">
-                        <div class="article-item-title ${hasTranslation ? 'has-translation' : ''}" data-article-id="${article.id}">${titleHtml}</div>
-                        <div class="article-item-meta">
-                            ${isFavorited ? '<span class="favorited-icon">★</span>' : ''}
-                            <span class="feed-title">${escapeHtml(article.feed_title || '')}</span>
-                            <span class="article-date">${date}</span>
-                        </div>
-                    </div>
-                    ${thumbnailHtml}
+                    ${innerHtml}
                 </div>
             `;
         }).join('');
@@ -453,6 +446,40 @@ export const ArticlesView = {
     },
 
     /**
+     * 获取指定页码的文章数据（loadMoreArticles 和 preloadNextPage 共用）
+     * @param {number} page
+     * @returns {Promise<Object>} FeedManager.getArticles/searchArticles 的结果
+     */
+    async _fetchArticlesPage(page) {
+        if (AppState.isSearchMode && AppState.searchQuery) {
+            return FeedManager.searchArticles(AppState.searchQuery, page);
+        }
+
+        let cursor = null;
+        if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
+            const lastArticle = AppState.articles[AppState.articles.length - 1];
+            if (lastArticle?.published_at && lastArticle?.id) {
+                cursor = {
+                    publishedAt: lastArticle.published_at,
+                    id: lastArticle.id,
+                    isAfter: false
+                };
+            }
+        }
+
+        return FeedManager.getArticles({
+            page,
+            feedId: AppState.currentFeedId,
+            groupId: AppState.currentGroupId,
+            unreadOnly: AppState.showUnreadOnly,
+            readOnly: AppState.viewingHistory,
+            favorites: AppState.viewingFavorites,
+            cursor,
+            afterPublishedAt: this._getTodayFilter()
+        });
+    },
+
+    /**
      * 加载更多文章
      */
     async loadMoreArticles() {
@@ -461,13 +488,9 @@ export const ArticlesView = {
 
         // 如果有缓存的下一页数据，直接使用
         if (this.nextPageCache && this.nextPageCache.page === AppState.pagination.page + 1) {
-            console.debug('Using preloaded next page:', this.nextPageCache.page);
             const cached = this.nextPageCache;
-            this.nextPageCache = null; // 消费缓存
-
-            // 模拟网络延迟的异步行为，确保 UI 渲染不卡顿
+            this.nextPageCache = null;
             await Promise.resolve();
-
             this.processMoreArticles(cached.data);
             return;
         }
@@ -477,34 +500,7 @@ export const ArticlesView = {
 
         try {
             const nextPage = AppState.pagination.page + 1;
-            let result;
-
-            if (AppState.isSearchMode && AppState.searchQuery) {
-                result = await FeedManager.searchArticles(AppState.searchQuery, nextPage);
-            } else {
-                let cursor = null;
-                if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
-                    const lastArticle = AppState.articles[AppState.articles.length - 1];
-                    if (lastArticle && lastArticle.published_at && lastArticle.id) {
-                        cursor = {
-                            publishedAt: lastArticle.published_at,
-                            id: lastArticle.id,
-                            isAfter: false  // false 表示 "before"，即获取更早的文章
-                        };
-                    }
-                }
-
-                result = await FeedManager.getArticles({
-                    page: nextPage,
-                    feedId: AppState.currentFeedId,
-                    groupId: AppState.currentGroupId,
-                    unreadOnly: AppState.showUnreadOnly,
-                    readOnly: AppState.viewingHistory,
-                    favorites: AppState.viewingFavorites,
-                    cursor,
-                    afterPublishedAt: this._getTodayFilter()
-                });
-            }
+            const result = await this._fetchArticlesPage(nextPage);
 
             if (this.currentRequestId !== requestId) return;
 
@@ -550,7 +546,6 @@ export const ArticlesView = {
      */
     async preloadNextPage() {
         if (this.isPreloading || !AppState.pagination || !AppState.pagination.hasMore) return;
-        // 如果已经缓存了下一页，就不重复预加载
         if (this.nextPageCache && this.nextPageCache.page === AppState.pagination.page + 1) return;
 
         this.isPreloading = true;
@@ -558,44 +553,10 @@ export const ArticlesView = {
         const requestId = this.currentRequestId;
 
         try {
-            console.debug('Preloading page:', nextPage);
-            let result;
-            if (AppState.isSearchMode && AppState.searchQuery) {
-                result = await FeedManager.searchArticles(AppState.searchQuery, nextPage);
-            } else {
-                // 构建游标：在 unreadOnly 或 今天 模式下，使用最后一篇文章的信息作为游标
-                // 注意：历史记录模式不能用游标，因为排序字段是 changed_at 而非 published_at
-                let cursor = null;
-                if ((AppState.showUnreadOnly || AppState.viewingToday) && !AppState.viewingHistory && AppState.articles.length > 0) {
-                    const lastArticle = AppState.articles[AppState.articles.length - 1];
-                    if (lastArticle && lastArticle.published_at && lastArticle.id) {
-                        cursor = {
-                            publishedAt: lastArticle.published_at,
-                            id: lastArticle.id,
-                            isAfter: false  // false 表示 "before"，即获取更早的文章
-                        };
-                    }
-                }
+            const result = await this._fetchArticlesPage(nextPage);
 
-                result = await FeedManager.getArticles({
-                    page: nextPage,
-                    feedId: AppState.currentFeedId,
-                    groupId: AppState.currentGroupId,
-                    unreadOnly: AppState.showUnreadOnly,
-                    readOnly: AppState.viewingHistory,
-                    favorites: AppState.viewingFavorites,
-                    cursor,
-                    afterPublishedAt: this._getTodayFilter()
-                });
-            }
-
-            // 只有当请求 ID 没变（用户没切换页面），且页码仍然匹配时才缓存
             if (this.currentRequestId === requestId && AppState.pagination.page + 1 === nextPage) {
-                this.nextPageCache = {
-                    page: nextPage,
-                    data: result
-                };
-                console.debug('Preloaded page', nextPage, 'cached');
+                this.nextPageCache = { page: nextPage, data: result };
             }
         } catch (err) {
             console.warn('Preload failed (silent):', err);

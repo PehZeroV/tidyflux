@@ -5,6 +5,7 @@
 
 import { AuthManager } from './auth-manager.js';
 import { i18n } from './i18n.js';
+import { getTodayStartISO } from './view/utils.js';
 
 export const FeedManager = {
     async getFeeds() {
@@ -460,13 +461,11 @@ export const FeedManager = {
      * 获取今日未读文章数量（轻量级请求）
      */
     async getTodayUnreadCount() {
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const params = new URLSearchParams({
             page: '1',
             limit: '1',
             unread_only: 'true',
-            after_published_at: todayStart.toISOString()
+            after_published_at: getTodayStartISO()
         });
 
         const response = await AuthManager.fetchWithAuth(`/api/articles?${params.toString()}`);

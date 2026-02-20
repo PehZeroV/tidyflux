@@ -10,14 +10,6 @@
         font-size: 1.0625em;
     }
 
-    .article-list-item a {
-        transition: color 0.2s ease;
-    }
-
-    .article-list-item a:hover {
-        transform: none;
-    }
-
     #article-back-btn {
         display: none;
     }
