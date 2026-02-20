@@ -182,7 +182,8 @@ ${articlesList}`;
 
 // 调用 AI API 生成简报
 async function callAIForDigest(prompt, aiConfig, lang = 'zh') {
-    if (!aiConfig || !aiConfig.apiUrl || !aiConfig.apiKey) {
+    const isOllama = aiConfig?.provider === 'ollama';
+    if (!aiConfig || !aiConfig.apiUrl || (!isOllama && !aiConfig.apiKey)) {
         throw new Error(t('ai_not_configured', lang));
     }
 
@@ -202,13 +203,13 @@ async function callAIForDigest(prompt, aiConfig, lang = 'zh') {
         controller.abort();
     }, 600000); // 10 minutes timeout
 
+    const headers = { 'Content-Type': 'application/json' };
+    if (aiConfig.apiKey) headers['Authorization'] = `Bearer ${aiConfig.apiKey}`;
+
     try {
         const response = await fetch(apiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${aiConfig.apiKey}`
-            },
+            headers,
             body: JSON.stringify({
                 model: aiConfig.model || 'gpt-4.1-mini',
                 temperature: aiConfig.temperature ?? 1,

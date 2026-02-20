@@ -7,7 +7,8 @@ const DEFAULT_TIMEOUT = 30000;
 const RETRY_DELAY_BASE = 500;
 const MAX_RETRIES = 3;
 
-// 禁用 Keep-Alive 以避免某些代理服务器下的 Premature close 错误
+// 原生 fetch 不支持 agent 选项，keepAlive 通过 dispatcher 控制（undici）
+// 此处保留 agent 创建以备将来使用 node-fetch 时切换
 const httpAgent = new http.Agent({ keepAlive: false });
 const httpsAgent = new https.Agent({ keepAlive: false });
 
@@ -71,8 +72,8 @@ export class MinifluxClient {
                 ...options.headers
             },
             body: options.body,
-            agent,
-            timeout: options.timeout || DEFAULT_TIMEOUT
+            // 原生 fetch 不支持 agent/timeout，使用 AbortSignal.timeout() 实现超时控制
+            signal: AbortSignal.timeout(options.timeout || DEFAULT_TIMEOUT)
         };
 
         for (let attempt = 0; attempt <= retries; attempt++) {

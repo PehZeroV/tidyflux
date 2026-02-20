@@ -114,7 +114,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
         const prefs = await PreferenceStore.get(userId);
         const storedAiConfig = prefs.ai_config || {};
 
-        if (!storedAiConfig.apiKey) {
+        const isOllama = storedAiConfig.provider === 'ollama';
+        if (!storedAiConfig.apiUrl || (!isOllama && !storedAiConfig.apiKey)) {
             const error = { error: 'AI service not configured' };
             if (useStream) {
                 sendEvent({ type: 'error', data: error });
