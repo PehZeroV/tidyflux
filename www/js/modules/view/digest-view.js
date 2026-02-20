@@ -148,20 +148,13 @@ export const DigestView = {
      * 为订阅源生成简报
      */
     generateForFeed(feedId) {
-        this.generate('feed', feedId, null);
+        return this.generate('feed', feedId, null);
     },
 
     /**
      * 为分组生成简报
      */
     generateForGroup(groupId) {
-        this.generate('group', null, groupId);
+        return this.generate('group', null, groupId);
     },
-
-    /**
-     * 生成全部简报
-     */
-    generateAll() {
-        this.generate('all', null, null);
-    }
 };

@@ -201,7 +201,7 @@ export const Dialogs = {
             });
 
             urlInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') confirmBtn.click();
+                if (e.key === 'Enter' && !e.isComposing) confirmBtn.click();
                 if (e.key === 'Escape') close();
             });
 
@@ -560,7 +560,7 @@ export const Dialogs = {
         });
 
         nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') addBtn.click();
+            if (e.key === 'Enter' && !e.isComposing) addBtn.click();
         });
 
         groupList.addEventListener('click', async (e) => {

@@ -1188,7 +1188,7 @@ body.player-active .article-content {
 }
 
 /* 移动端还需要抬高 feeds-panel 和 articles-panel */
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
 
     body.player-active #feeds-panel,
     body.player-active #articles-panel {

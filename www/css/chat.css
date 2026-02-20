@@ -26,14 +26,7 @@
 }
 
 /*
- * 宽屏模式：文章文字宽度不变，整体左移（左右空白缩小）
- *
- * 原始 padding 公式: max(40px, calc(50% - 360px))  → 居中 720px 文字
- * 打开对话框后，可用宽度变为 (100% - 400px)，在这个空间内重新居中：
- *   左 padding = max(40px, calc(50% - 560px))      （即 50% - 200px - 360px）
- *   右 padding = max(40px, calc(50% - 560px)) + 400px
- *
- * 文字宽度保持不变，只是中心点从 50% 移到 (50% - 200px)
+ * 宽屏模式：文章文字宽度不变，整体左移
  */
 .content-panel.chat-docked-layout .article-content {
     padding-left: max(40px, calc(50% - 560px));
@@ -90,12 +83,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.ai-chat-icon {
-    color: var(--accent-color);
-    font-size: 1.1em;
-    line-height: 1;
 }
 
 .ai-chat-title {

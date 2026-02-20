@@ -151,7 +151,7 @@ export class Modal {
                 cancelBtn.addEventListener('click', () => finalize(null));
 
                 dialog.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') finalize(input.value);
+                    if (e.key === 'Enter' && !e.isComposing) finalize(input.value);
                 });
 
                 const escHandler = (e) => {

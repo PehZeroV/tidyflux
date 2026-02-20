@@ -358,6 +358,7 @@ body.panel-resizing .articles-panel-resize-handle {
     display: block !important;
     height: auto !important;
     -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
     margin-bottom: 8px;
 }
 
@@ -365,6 +366,7 @@ body.panel-resizing .articles-panel-resize-handle {
     display: -webkit-box;
     width: 100%;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-weight: 700;
@@ -377,6 +379,7 @@ body.panel-resizing .articles-panel-resize-handle {
     display: -webkit-box;
     width: 100%;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 0.85em;
@@ -740,115 +743,6 @@ body.panel-resizing .articles-panel-resize-handle {
 
 }
 
-/* ========================================
-   添加订阅对话框 - 卡片风格
-   ======================================== */
-
-.add-feed-dialog {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.2s;
-}
-
-.add-feed-dialog.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.add-feed-dialog-content {
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    padding: 24px;
-    width: 90%;
-    max-width: 420px;
-    box-shadow: var(--card-shadow);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-}
-
-@media (max-width: 800px) {
-    .add-feed-dialog-content {
-        max-height: 70vh;
-        overflow-y: auto;
-        width: 75%;
-        padding: 20px;
-    }
-}
-
-.add-feed-dialog h3 {
-    margin: 0 0 20px 0;
-    font-size: 1.2em;
-    color: var(--title-color);
-}
-
-.add-feed-dialog input {
-    width: 100%;
-    padding: 14px 16px;
-    border: none;
-    border-radius: var(--radius);
-    font-size: 0.95em;
-    margin-bottom: 20px;
-    background: var(--card-bg);
-    color: var(--text-color);
-    box-sizing: border-box;
-    transition: all 0.2s;
-    box-shadow: var(--card-shadow);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-}
-
-.add-feed-dialog input:focus {
-    outline: none;
-    box-shadow: var(--card-shadow-hover);
-}
-
-.add-feed-dialog-btns {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-}
-
-.add-feed-dialog-btns button {
-    padding: 10px 20px;
-    border-radius: var(--radius);
-    font-size: 0.9em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.add-feed-dialog-btns .cancel-btn {
-    background: var(--bg-color);
-    border: none;
-    color: var(--text-color);
-    box-shadow: var(--card-shadow);
-}
-
-.add-feed-dialog-btns .cancel-btn:hover {
-    background: var(--hover-bg);
-}
-
-.add-feed-dialog-btns .confirm-btn {
-    background: var(--accent-color);
-    border: none;
-    color: #fff;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-color), transparent 70%);
-}
-
-.add-feed-dialog-btns .confirm-btn:hover {
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color), transparent 60%);
-}
-
 /* 弹窗打开时模糊背景 */
 body.dialog-open #app-container {
     filter: blur(5px);
@@ -1210,7 +1104,7 @@ body.dialog-open #app-container {
 }
 
 /* 播放器激活时抬高 */
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
     body.player-active .filter-toggle-toast {
         bottom: calc(20px + env(safe-area-inset-bottom) + 60px);
     }
@@ -1276,7 +1170,7 @@ body.dialog-open #app-container {
 }
 
 /* 移动端抬高 60px */
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
     body.player-active .scroll-to-top-btn {
         bottom: calc(20px + env(safe-area-inset-bottom) + 60px);
     }

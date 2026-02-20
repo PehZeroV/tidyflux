@@ -39,16 +39,6 @@ const BREAKPOINT_TABLET = BREAKPOINTS.DESKTOP;
  * 4. 维护跨模块状态
  */
 export const ViewManager = {
-    /** 是否正在加载更多 */
-    isLoadingMore: false,
-    /** 轮询定时器 */
-    checkInterval: null,
-    /** 虚拟列表引用 */
-    virtualList: null,
-    /** 是否使用虚拟滚动 */
-    useVirtualScroll: false,
-    /** 虚拟滚动阈值 */
-    virtualScrollThreshold: 100,
     /** 订阅源是否已加载 */
     feedsLoaded: false,
     /** 订阅源加载 Promise */

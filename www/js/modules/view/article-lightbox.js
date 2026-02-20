@@ -161,6 +161,8 @@ export const ArticleLightboxMixin = {
             clearTimeout(zoomIndicatorTimer);
             setTimeout(() => overlay.remove(), 250);
             document.removeEventListener('keydown', keyHandler);
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
         };
 
         // === 鼠标滚轮缩放 ===
@@ -213,7 +215,7 @@ export const ArticleLightboxMixin = {
             imgEl.style.cursor = 'grabbing';
         });
 
-        document.addEventListener('mousemove', (e) => {
+        const onMouseMove = (e) => {
             if (!isDragging) return;
             const dx = e.clientX - dragStartX;
             const dy = e.clientY - dragStartY;
@@ -225,14 +227,16 @@ export const ArticleLightboxMixin = {
             translateY = dragStartTy + dy;
             clampTranslation();
             applyTransform();
-        });
+        };
+        document.addEventListener('mousemove', onMouseMove);
 
-        document.addEventListener('mouseup', () => {
+        const onMouseUp = () => {
             if (isDragging) {
                 isDragging = false;
                 updateCursor();
             }
-        });
+        };
+        document.addEventListener('mouseup', onMouseUp);
 
         // 点击遮罩或关闭按钮关闭（仅在非缩放且非拖拽状态）
         overlay.addEventListener('click', (e) => {

@@ -16,16 +16,18 @@ RUN chmod +x build.sh && ./build.sh
 FROM node:20-alpine
 
 # better-sqlite3 需要编译原生模块
-RUN apk add --no-cache python3 make g++
+RUN apk add python3 make g++
 
 WORKDIR /app
 
 # 从 builder 阶段复制构建产物
 COPY --from=builder /app/docker/dist /app
 
-# 进入 server 目录安装生产依赖
+# 进入 server 目录安装生产依赖，然后清理构建工具和缓存
 WORKDIR /app/server
-RUN npm ci --omit=dev && apk del python3 make g++
+RUN npm ci --omit=dev --no-update-notifier \
+    && apk del python3 make g++ \
+    && rm -rf /var/cache/apk/*
 
 # 设置环境变量端口
 ENV PORT=8812

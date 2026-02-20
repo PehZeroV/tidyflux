@@ -90,11 +90,15 @@ export const ArticlePreviewMixin = {
         // 用于取消 AI 请求
         const previewAbortController = new AbortController();
 
+        // 前置声明，让 closePreview 可以引用 escHandler
+        let escHandler;
+
         // 关闭逻辑
         const closePreview = () => {
             previewAbortController.abort();
             overlay.classList.remove('active');
             document.body.classList.remove('dialog-open');
+            document.removeEventListener('keydown', escHandler);
             setTimeout(() => overlay.remove(), 300);
         };
 
@@ -104,8 +108,8 @@ export const ArticlePreviewMixin = {
             closePreview();
             window.location.hash = `#/article/${articleId}`;
         });
-        const escHandler = (e) => {
-            if (e.key === 'Escape') { closePreview(); document.removeEventListener('keydown', escHandler); }
+        escHandler = (e) => {
+            if (e.key === 'Escape') closePreview();
         };
         document.addEventListener('keydown', escHandler);
 

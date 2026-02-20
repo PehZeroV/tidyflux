@@ -1,4 +1,5 @@
 import express from 'express';
+import { Readable } from 'node:stream';
 // Node 18+ has global fetch built-in
 import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
@@ -84,26 +85,26 @@ router.post('/chat', authenticateToken, async (req, res) => {
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
 
-            // 创建用于中止上游请求的 controller
-            const streamController = new AbortController();
+            // Node 18+ 原生 fetch 的 response.body 是 Web Streams ReadableStream，
+            // 需要用 Readable.fromWeb() 转为 Node.js Readable 才能 pipe
+            const nodeStream = Readable.fromWeb(response.body);
 
-            // 监听客户端断开连接，及时中止上游请求
+            // 监听客户端断开连接，及时销毁流
             req.on('close', () => {
                 if (!res.writableEnded) {
-                    streamController.abort();
-                    response.body?.destroy?.();
+                    nodeStream.destroy();
                 }
             });
 
             // 将 AI 响应流直接通过管道传输给客户端
-            response.body.pipe(res);
+            nodeStream.pipe(res);
 
             // 监听错误
-            response.body.on('error', (err) => {
+            nodeStream.on('error', (err) => {
                 if (err.name !== 'AbortError') {
                     console.error('Stream error:', err);
                 }
-                res.end();
+                if (!res.writableEnded) res.end();
             });
         } else {
             const data = await response.json();

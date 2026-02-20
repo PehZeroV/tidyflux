@@ -14,6 +14,7 @@
     --hover-bg: rgba(255, 255, 255, 0.8);
     --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 1), inset 1px 0 0 0 rgba(255, 255, 255, 0.7);
     --card-shadow-hover: 0 3px 8px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1), inset 1px 0 0 0 rgba(255, 255, 255, 0.8);
+    --danger-color: #c0392b;
 }
 
 [data-color-scheme="light"][data-theme="forest"] {
@@ -75,7 +76,6 @@
     border-left-color: var(--accent-color);
 }
 
-[data-color-scheme="light"] .add-feed-dialog-content,
 [data-color-scheme="light"] .settings-dialog-content,
 [data-color-scheme="light"] .custom-modal-content,
 [data-color-scheme="light"] .context-menu {

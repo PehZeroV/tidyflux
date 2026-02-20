@@ -139,9 +139,13 @@ export const TranslationDialogMixin = {
 
         dialog.querySelectorAll('input[name="trans-mode"]').forEach(radio => {
             radio.addEventListener('change', async () => {
-                const config = AIService.getConfig();
-                config.titleTranslationMode = radio.value;
-                await AIService.saveConfig(config);
+                try {
+                    const config = AIService.getConfig();
+                    config.titleTranslationMode = radio.value;
+                    await AIService.saveConfig(config);
+                } catch (err) {
+                    console.error('[AI Auto] Failed to save translation mode:', err);
+                }
             });
         });
 
@@ -337,41 +341,45 @@ export const TranslationDialogMixin = {
         const selectAllCb = container.querySelector(`.${prefix}-select-all-checkbox`);
         if (selectAllCb) {
             selectAllCb.addEventListener('change', async () => {
-                const value = selectAllCb.checked ? 'on' : 'off';
-                selectAllCb.indeterminate = false;
+                try {
+                    const value = selectAllCb.checked ? 'on' : 'off';
+                    selectAllCb.indeterminate = false;
 
-                const batchEntries = [];
+                    const batchEntries = [];
 
-                // Toggle all groups
-                const groupCbs = container.querySelectorAll(`.${prefix}-group-checkbox`);
-                for (const gcb of groupCbs) {
-                    const groupId = gcb.dataset.groupId;
-                    gcb.checked = selectAllCb.checked;
-                    gcb.indeterminate = false;
-                    batchEntries.push({ type: 'group', id: groupId, value });
+                    // Toggle all groups
+                    const groupCbs = container.querySelectorAll(`.${prefix}-group-checkbox`);
+                    for (const gcb of groupCbs) {
+                        const groupId = gcb.dataset.groupId;
+                        gcb.checked = selectAllCb.checked;
+                        gcb.indeterminate = false;
+                        batchEntries.push({ type: 'group', id: groupId, value });
 
-                    // Reset child feeds to inherit
-                    const group = gcb.closest(`.${prefix}-group`);
-                    const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
-                    for (const fcb of feedCbs) {
-                        batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value: 'inherit' });
-                        fcb.checked = selectAllCb.checked;
+                        // Reset child feeds to inherit
+                        const group = gcb.closest(`.${prefix}-group`);
+                        const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
+                        for (const fcb of feedCbs) {
+                            batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value: 'inherit' });
+                            fcb.checked = selectAllCb.checked;
+                        }
                     }
-                }
 
-                // Toggle ungrouped feeds
-                const ungroupedFeedCbs = container.querySelectorAll(`.${prefix}-feed-checkbox:not([data-group-id])`);
-                for (const fcb of ungroupedFeedCbs) {
-                    fcb.checked = selectAllCb.checked;
-                    batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value });
-                }
+                    // Toggle ungrouped feeds
+                    const ungroupedFeedCbs = container.querySelectorAll(`.${prefix}-feed-checkbox:not([data-group-id])`);
+                    for (const fcb of ungroupedFeedCbs) {
+                        fcb.checked = selectAllCb.checked;
+                        batchEntries.push({ type: 'feed', id: fcb.dataset.feedId, value });
+                    }
 
-                // Single save to server
-                await batchSetterMap[mode](batchEntries);
+                    // Single save to server
+                    await batchSetterMap[mode](batchEntries);
 
-                // 标题翻译模式：立即触发当前列表的标题翻译
-                if (mode === 'translation') {
-                    ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    // 标题翻译模式：立即触发当前列表的标题翻译
+                    if (mode === 'translation') {
+                        ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    }
+                } catch (err) {
+                    console.error('[AI Auto] Failed to save select-all override:', err);
                 }
             });
         }
@@ -392,26 +400,30 @@ export const TranslationDialogMixin = {
         // Group checkbox → toggle all feeds
         container.querySelectorAll(`.${prefix}-group-checkbox`).forEach(cb => {
             cb.addEventListener('change', async () => {
-                const groupId = cb.dataset.groupId;
-                const value = cb.checked ? 'on' : 'off';
-                cb.indeterminate = false;
+                try {
+                    const groupId = cb.dataset.groupId;
+                    const value = cb.checked ? 'on' : 'off';
+                    cb.indeterminate = false;
 
-                const batchEntries = [{ type: 'group', id: groupId, value }];
+                    const batchEntries = [{ type: 'group', id: groupId, value }];
 
-                // Reset all child feeds to inherit
-                const group = cb.closest(`.${prefix}-group`);
-                const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
-                for (const feedCb of feedCbs) {
-                    batchEntries.push({ type: 'feed', id: feedCb.dataset.feedId, value: 'inherit' });
-                    feedCb.checked = cb.checked;
-                }
+                    // Reset all child feeds to inherit
+                    const group = cb.closest(`.${prefix}-group`);
+                    const feedCbs = group.querySelectorAll(`.${prefix}-feed-checkbox`);
+                    for (const feedCb of feedCbs) {
+                        batchEntries.push({ type: 'feed', id: feedCb.dataset.feedId, value: 'inherit' });
+                        feedCb.checked = cb.checked;
+                    }
 
-                await batchSetterMap[mode](batchEntries);
-                updateSelectAllState();
+                    await batchSetterMap[mode](batchEntries);
+                    updateSelectAllState();
 
-                // 标题翻译模式：立即触发当前列表的标题翻译
-                if (mode === 'translation') {
-                    ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    // 标题翻译模式：立即触发当前列表的标题翻译
+                    if (mode === 'translation') {
+                        ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    }
+                } catch (err) {
+                    console.error('[AI Auto] Failed to save group override:', err);
                 }
             });
         });
@@ -419,27 +431,31 @@ export const TranslationDialogMixin = {
         // Individual feed checkbox
         container.querySelectorAll(`.${prefix}-feed-checkbox`).forEach(cb => {
             cb.addEventListener('change', async () => {
-                const feedId = cb.dataset.feedId;
-                const value = cb.checked ? 'on' : 'off';
-                await setFeedOverride(feedId, value);
+                try {
+                    const feedId = cb.dataset.feedId;
+                    const value = cb.checked ? 'on' : 'off';
+                    await setFeedOverride(feedId, value);
 
-                // Update parent group checkbox state
-                const groupId = cb.dataset.groupId;
-                if (groupId) {
-                    const group = cb.closest(`.${prefix}-group`);
-                    const feedCheckboxes = group.querySelectorAll(`.${prefix}-feed-checkbox`);
-                    const allChecked = Array.from(feedCheckboxes).every(fc => fc.checked);
-                    const noneChecked = Array.from(feedCheckboxes).every(fc => !fc.checked);
-                    const groupCb = group.querySelector(`.${prefix}-group-checkbox`);
-                    groupCb.checked = allChecked;
-                    groupCb.indeterminate = !allChecked && !noneChecked;
-                }
+                    // Update parent group checkbox state
+                    const groupId = cb.dataset.groupId;
+                    if (groupId) {
+                        const group = cb.closest(`.${prefix}-group`);
+                        const feedCheckboxes = group.querySelectorAll(`.${prefix}-feed-checkbox`);
+                        const allChecked = Array.from(feedCheckboxes).every(fc => fc.checked);
+                        const noneChecked = Array.from(feedCheckboxes).every(fc => !fc.checked);
+                        const groupCb = group.querySelector(`.${prefix}-group-checkbox`);
+                        groupCb.checked = allChecked;
+                        groupCb.indeterminate = !allChecked && !noneChecked;
+                    }
 
-                updateSelectAllState();
+                    updateSelectAllState();
 
-                // 标题翻译模式：立即触发当前列表的标题翻译
-                if (mode === 'translation') {
-                    ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    // 标题翻译模式：立即触发当前列表的标题翻译
+                    if (mode === 'translation') {
+                        ArticlesTitleTranslation.triggerTitleTranslations(AppState.articles);
+                    }
+                } catch (err) {
+                    console.error('[AI Auto] Failed to save feed override:', err);
                 }
             });
         });

@@ -145,13 +145,6 @@
     border-radius: 10px;
 }
 
-.pin-icon {
-    margin-left: 4px;
-    color: var(--accent-color);
-    opacity: 0.8;
-    flex-shrink: 0;
-}
-
 .feed-group-items {
     padding-left: 8px;
 }
