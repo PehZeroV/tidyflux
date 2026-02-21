@@ -458,44 +458,104 @@ export const ContextMenu = {
             } else if (action === 'manage-scheduled-digests') {
                 Dialogs.showDigestManagerDialog();
             } else if (action === 'generate-digest') {
-                const skipKey = 'tidyflux_skip_digest_confirm';
-                if (!localStorage.getItem(skipKey)) {
-                    const confirmMsg = AppState.viewingToday
-                        ? i18n.t('digest.confirm_generate_today')
-                        : i18n.t('digest.confirm_generate');
-                    const confirmed = await Modal._renderDialog({
-                        body: `<p>${confirmMsg}</p>
-                            <label style="display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 0.85em; color: var(--meta-color); cursor: pointer;">
-                                <input type="checkbox" id="digest-dont-show-again" style="cursor: pointer;">
-                                ${i18n.t('common.dont_show_again')}
-                            </label>`,
-                        footer: `
-                            <button class="appearance-mode-btn cancel-btn">${i18n.t('common.cancel')}</button>
-                            <button class="appearance-mode-btn active confirm-btn">${i18n.t('common.confirm')}</button>
-                        `,
-                        onReady: (dialog, finalize) => {
-                            dialog.querySelector('.confirm-btn').addEventListener('click', () => {
-                                if (dialog.querySelector('#digest-dont-show-again').checked) {
-                                    localStorage.setItem(skipKey, '1');
-                                }
-                                finalize(true);
-                            });
-                            dialog.querySelector('.cancel-btn').addEventListener('click', () => finalize(false));
-                            dialog.addEventListener('click', (e) => { if (e.target === dialog) finalize(false); });
-                        }
-                    });
-                    if (!confirmed) return;
+                // Show digest generation dialog with time range and read/unread options
+                const isToday = AppState.viewingToday;
+
+                const timeOptions = [
+                    { value: 12, label: i18n.t('digest.hours_12') },
+                    { value: 24, label: i18n.t('digest.hours_24') },
+                    { value: 48, label: i18n.t('digest.days_2') },
+                    { value: 72, label: i18n.t('digest.days_3') },
+                    { value: 168, label: i18n.t('digest.days_7') },
+                ];
+
+                let bodyHtml = '';
+
+                // Time range section (hidden for "Today" view)
+                if (!isToday) {
+                    bodyHtml += `
+                        <div style="margin-bottom: 18px;">
+                            <div class="settings-item-label">${i18n.t('digest.time_range')}</div>
+                            <div id="digest-time-pills" class="appearance-mode-group">
+                                ${timeOptions.map(opt => `
+                                    <button class="appearance-mode-btn${opt.value === 12 ? ' active' : ''}" data-value="${opt.value}">${opt.label}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
                 }
-                if (AppState.viewingToday) {
-                    // 今天模式：传精确的午夜时间戳，和前端"今天"视图一致
+
+                // Read/Unread filter section
+                bodyHtml += `
+                    <div style="margin-bottom: 8px;">
+                        <div class="settings-item-label">${i18n.t('digest.read_filter')}</div>
+                        <div id="digest-read-pills" class="appearance-mode-group">
+                            <button class="appearance-mode-btn active" data-value="unread">${i18n.t('digest.unread_only')}</button>
+                            <button class="appearance-mode-btn" data-value="all">${i18n.t('digest.include_read')}</button>
+                        </div>
+                        <div id="digest-read-warning" style="font-size: 0.78em; color: var(--meta-color); margin-top: 8px; display: none;">
+                            ⚠️ ${i18n.t('digest.include_read_warning')}
+                        </div>
+                    </div>
+                `;
+
+                const confirmed = await Modal._renderDialog({
+                    title: i18n.t('digest.generate_dialog_title'),
+                    body: bodyHtml,
+                    footer: `
+                        <button class="appearance-mode-btn cancel-btn">${i18n.t('common.cancel')}</button>
+                        <button class="appearance-mode-btn active confirm-btn">${i18n.t('digest.generate_btn')}</button>
+                    `,
+                    onReady: (dialog, finalize) => {
+                        // Pill click handlers using appearance-mode-btn pattern
+                        const setupPillGroup = (containerId) => {
+                            const container = dialog.querySelector(`#${containerId}`);
+                            if (!container) return;
+                            container.addEventListener('click', (e) => {
+                                const btn = e.target.closest('.appearance-mode-btn');
+                                if (!btn) return;
+                                container.querySelectorAll('.appearance-mode-btn').forEach(b => b.classList.remove('active'));
+                                btn.classList.add('active');
+
+                                // Show/hide warning for include-read
+                                if (containerId === 'digest-read-pills') {
+                                    const warning = dialog.querySelector('#digest-read-warning');
+                                    if (warning) {
+                                        warning.style.display = btn.dataset.value === 'all' ? 'block' : 'none';
+                                    }
+                                }
+                            });
+                        };
+
+                        setupPillGroup('digest-time-pills');
+                        setupPillGroup('digest-read-pills');
+
+                        dialog.querySelector('.confirm-btn').addEventListener('click', () => {
+                            const timePill = dialog.querySelector('#digest-time-pills .appearance-mode-btn.active');
+                            const readPill = dialog.querySelector('#digest-read-pills .appearance-mode-btn.active');
+                            finalize({
+                                hours: timePill ? parseInt(timePill.dataset.value) : 12,
+                                unreadOnly: readPill ? readPill.dataset.value === 'unread' : true
+                            });
+                        });
+                        dialog.querySelector('.cancel-btn').addEventListener('click', () => finalize(null));
+                        dialog.addEventListener('click', (e) => { if (e.target === dialog) finalize(null); });
+                    }
+                });
+
+                if (!confirmed) return;
+
+                const { hours, unreadOnly } = confirmed;
+
+                if (isToday) {
                     const afterTimestamp = getTodayStartTimestamp();
-                    this.viewManager.generateDigest('today', null, null, null, afterTimestamp);
+                    this.viewManager.generateDigest('today', null, null, null, afterTimestamp, unreadOnly);
                 } else if (AppState.currentFeedId) {
-                    this.viewManager.generateDigestForFeed(AppState.currentFeedId);
+                    this.viewManager.generateDigest('feed', AppState.currentFeedId, null, hours, null, unreadOnly);
                 } else if (AppState.currentGroupId) {
-                    this.viewManager.generateDigestForGroup(AppState.currentGroupId);
+                    this.viewManager.generateDigest('group', null, AppState.currentGroupId, hours, null, unreadOnly);
                 } else {
-                    this.viewManager.generateDigest('all');
+                    this.viewManager.generateDigest('all', null, null, hours, null, unreadOnly);
                 }
             } else if (action === 'schedule-digest') {
                 this.viewManager.showDigestScheduleDialog({

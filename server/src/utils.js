@@ -129,9 +129,10 @@ export function extractFirstImage(htmlContent) {
 }
 
 /**
- * 将原始图片 URL 转换为压缩后的缩略图 URL
+ * 验证图片 URL 是否适合作为缩略图
+ * 过滤掉 data URI 和 SVG 图片
  * @param {string} originalUrl - 原始图片 URL
- * @returns {string|null} - 缩略图 URL 或 null
+ * @returns {string|null} - 有效的图片 URL 或 null
  */
 export function getThumbnailUrl(originalUrl) {
     if (!originalUrl || originalUrl.startsWith('data:')) return null;

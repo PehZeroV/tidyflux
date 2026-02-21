@@ -107,7 +107,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
             hours = 12,
             afterTimestamp,
             targetLang = '简体中文',
-            prompt: customPrompt
+            prompt: customPrompt,
+            unreadOnly = true
         } = req.body;
 
         const userId = PreferenceStore.getUserId(req.user);
@@ -130,7 +131,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
             targetLang,
             prompt: customPrompt,
             aiConfig: storedAiConfig,
-            timezone: prefs.digest_timezone || ''
+            timezone: prefs.digest_timezone || '',
+            unreadOnly: unreadOnly !== false
         };
 
         if (afterTimestamp) options.afterTimestamp = parseInt(afterTimestamp);

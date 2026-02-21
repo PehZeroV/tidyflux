@@ -1,16 +1,9 @@
 // Node 18+ has global fetch built-in
-import http from 'http';
-import https from 'https';
 
 // --- 常量定义 ---
-const DEFAULT_TIMEOUT = 30000;
+const DEFAULT_TIMEOUT = 10000;
 const RETRY_DELAY_BASE = 500;
 const MAX_RETRIES = 3;
-
-// 原生 fetch 不支持 agent 选项，keepAlive 通过 dispatcher 控制（undici）
-// 此处保留 agent 创建以备将来使用 node-fetch 时切换
-const httpAgent = new http.Agent({ keepAlive: false });
-const httpsAgent = new https.Agent({ keepAlive: false });
 
 /**
  * Miniflux API 客户端
@@ -21,18 +14,13 @@ export class MinifluxClient {
      * @param {string} username - 用户名 (Basic Auth)
      * @param {string} password - 密码 (Basic Auth)
      * @param {string} apiKey - API Token (优先使用)
-     * @param {Object} options - 自定义选项
      */
-    constructor(baseUrl, username, password, apiKey = null, options = {}) {
+    constructor(baseUrl, username, password, apiKey = null) {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.username = username;
         this.password = password;
         this.apiKey = apiKey;
         this.token = null;
-
-        // 允许注入自定义 agent 或使用默认禁用 keep-alive 的 agent
-        this.httpAgent = options.httpAgent || httpAgent;
-        this.httpsAgent = options.httpsAgent || httpsAgent;
     }
 
     /**
@@ -63,7 +51,6 @@ export class MinifluxClient {
      */
     async request(endpoint, options = {}, retries = MAX_RETRIES) {
         const url = `${this.baseUrl}/v1${endpoint}`;
-        const agent = url.startsWith('https') ? this.httpsAgent : this.httpAgent;
 
         const requestOptions = {
             method: options.method || 'GET',

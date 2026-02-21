@@ -31,7 +31,7 @@ export const DigestView = {
      * @param {number} feedId - 订阅源 ID
      * @param {number} groupId - 分组 ID
      */
-    async generate(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null) {
+    async generate(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null, unreadOnly = true) {
         // 检查 AI 配置
         if (!AIService.isConfigured()) {
             await Modal.alertWithSettings(i18n.t('digest.ai_not_configured'), i18n.t('common.go_to_settings'), () => Dialogs.showSettingsDialog(false));
@@ -50,7 +50,8 @@ export const DigestView = {
                 groupId,
                 hours: hours || 12,
                 targetLang: AIService.getLanguageName(aiConfig.targetLang || 'zh-CN'),
-                prompt: aiConfig.digestPrompt
+                prompt: aiConfig.digestPrompt,
+                unreadOnly
             };
             if (afterTimestamp) body.afterTimestamp = afterTimestamp;
 

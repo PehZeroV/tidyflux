@@ -82,7 +82,6 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete group
-// Note: Miniflux might not allow deleting header/default category easily, or deleting non-empty categories without flag
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;

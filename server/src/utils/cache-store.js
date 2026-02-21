@@ -1,7 +1,6 @@
 /**
  * Cache Store - AI 翻译/摘要缓存 (SQLite)
  *
- * 替代前端 IndexedDB 的 AICache，所有缓存统一存储在服务端。
  * 支持：翻译缓存、摘要缓存、标题翻译批量缓存。
  */
 

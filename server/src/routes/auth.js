@@ -151,7 +151,6 @@ router.get('/miniflux-status', authenticateToken, async (req, res) => {
 });
 
 // Save Miniflux manual config
-// Save Miniflux manual config
 router.post('/miniflux-config', authenticateToken, async (req, res) => {
     try {
         const lang = getLang(req);

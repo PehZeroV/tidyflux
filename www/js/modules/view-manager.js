@@ -448,8 +448,8 @@ export const ViewManager = {
 
     // ==================== Digest 相关 ====================
 
-    generateDigest(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null) {
-        DigestView.generate(scope, feedId, groupId, hours, afterTimestamp);
+    generateDigest(scope = 'all', feedId = null, groupId = null, hours = null, afterTimestamp = null, unreadOnly = true) {
+        DigestView.generate(scope, feedId, groupId, hours, afterTimestamp, unreadOnly);
     },
 
     generateDigestForFeed(feedId) {
