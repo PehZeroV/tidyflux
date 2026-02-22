@@ -11,7 +11,6 @@ import { AIService } from '../ai-service.js';
 import { AICache } from '../ai-cache.js';
 import { Modal } from './components.js';
 import { i18n } from '../i18n.js';
-import { showToast } from './utils.js';
 import { Dialogs } from './dialogs.js';
 
 // 块级标签集合（模块级常量，避免每次调用时重复创建）
@@ -417,7 +416,6 @@ export const ArticleAIMixin = {
                         translateBtn.classList.remove('active');
                         translateBtn.setAttribute('data-tooltip', i18n.t('ai.translate_btn'));
 
-                        showToast(i18n.t('ai.translate_cancelled'));
                     }
                     return;
                 }

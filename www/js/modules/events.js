@@ -176,7 +176,7 @@ async function doRefresh() {
         }
     } catch (err) {
         console.error('Pull-to-refresh error:', err);
-        showToast(err.message || i18n.t('common.refresh_failed'), 2000, true);
+        showToast(err.message || i18n.t('common.refresh_failed'), 2000, false);
     } finally {
         // 短暂延迟让用户看到完成状态
         setTimeout(() => {

@@ -370,13 +370,16 @@ input:checked+.slider:before {
 .app-toast {
     position: fixed;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 16px;
+    right: 16px;
+    margin-left: auto;
+    margin-right: auto;
     background: var(--card-bg);
     backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     color: var(--text-color);
     padding: 8px 16px;
+    box-sizing: border-box;
     border-radius: var(--radius);
     box-shadow: var(--card-shadow);
     z-index: 9000;
@@ -388,8 +391,18 @@ input:checked+.slider:before {
     display: flex;
     align-items: center;
     gap: 6px;
-    white-space: nowrap;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    overflow-wrap: break-word;
+    text-align: center;
+    line-height: 1.4;
 }
+
+.app-toast>span {
+    min-width: 0;
+}
+
+
 
 /* ========================================
    Custom Tooltip (toast-like style)

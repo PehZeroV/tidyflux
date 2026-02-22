@@ -14,7 +14,8 @@ import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
 import { BREAKPOINTS } from '../../constants.js';
 import { FeedManager } from '../feed-manager.js';
-import { showToast } from './utils.js';
+
+
 import { i18n } from '../i18n.js';
 import { Icons } from '../icons.js';
 import { AIService } from '../ai-service.js';
@@ -787,7 +788,6 @@ export const ArticleContentView = {
                             // Failed to find next article or still at end? Restore button
                             btn.innerHTML = originalHtml;
                             btn.style.pointerEvents = 'auto';
-                            showToast(i18n.t('article.no_more_articles'));
                         }
                     } catch (err) {
                         console.error('Auto load next failed:', err);

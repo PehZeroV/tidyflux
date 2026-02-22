@@ -719,11 +719,11 @@ export const ArticleToolbarMixin = {
                             AppState.currentArticleId = null;
                         }
                     } else {
-                        showToast(i18n.t('digest.delete_failed'), 2000, true);
+                        showToast(i18n.t('digest.delete_failed'), 2000, false);
                     }
                 } catch (err) {
                     console.error('Delete digest error:', err);
-                    showToast(i18n.t('digest.delete_failed'), 2000, true);
+                    showToast(i18n.t('digest.delete_failed'), 2000, false);
                 }
             });
         }

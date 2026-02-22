@@ -126,7 +126,7 @@ export default {
         push_test: 'Test Push',
         push_test_success: 'Push test succeeded',
         push_test_failed: 'Push test failed',
-        push_section_hint: 'Supports DingTalk, WeCom, Feishu, Slack, Discord webhooks. Use {{title}} and {{digest_content}} in POST body.',
+        push_section_hint: 'Compatible with Slack, Discord, DingTalk, WeCom, Feishu and other webhooks. Use {{title}} and {{digest_content}} as variables in the POST body.',
         timezone: 'Timezone',
         timezone_system_default: 'System Default / Env Variable',
         timezone_current_time: 'Current time',
@@ -421,6 +421,7 @@ export default {
         save_third_party: 'Save to third-party',
         translate_article: 'Translate article',
         summarize_article: 'Summarize article',
+        ai_chat: 'AI Chat',
         go_back: 'Go back',
         show_help: 'Shortcuts help'
     }

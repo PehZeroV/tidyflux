@@ -451,7 +451,7 @@ export const ContextMenu = {
                     }
                     articlesList.removeEventListener('scroll', onScroll);
                 } catch (err) {
-                    showToast(i18n.t('common.refresh_failed'));
+                    showToast(i18n.t('common.refresh_failed'), 3000, false);
                 } finally {
                     isManualRefreshing = false;
                 }

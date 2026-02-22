@@ -903,7 +903,7 @@ export const ArticlesView = {
                 if (count > lastShown) {
                     showToast(
                         i18n.t('digest.unread_toast', { count }),
-                        3000,
+                        5000,
                         false,
                         () => this.viewManager.selectDigests()
                     );

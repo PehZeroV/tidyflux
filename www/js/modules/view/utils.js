@@ -105,8 +105,74 @@ export function isMobileDevice() {
  * @param {boolean} showLoadingIcon - 是否显示加载图标
  */
 let toastTimeout = null;
+let toastSwipeCleanup = null;
+
+function dismissToast(toast) {
+    toast.style.opacity = '0';
+    toast.style.pointerEvents = 'none';
+    if (toastTimeout) { clearTimeout(toastTimeout); toastTimeout = null; }
+}
+
+function setupToastSwipe(toast) {
+    // 清理旧的事件监听
+    if (toastSwipeCleanup) { toastSwipeCleanup(); toastSwipeCleanup = null; }
+
+    let startY = 0;
+    let currentY = 0;
+    let dragging = false;
+
+    const onTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        dragging = true;
+        toast.style.transition = 'none';
+    };
+
+    const onTouchMove = (e) => {
+        if (!dragging) return;
+        currentY = e.touches[0].clientY;
+        const dy = currentY - startY;
+        // 只允许上滑（dy < 0）
+        if (dy < 0) {
+            e.preventDefault();
+            toast.style.transform = `translateY(${dy}px)`;
+            toast.style.opacity = String(Math.max(0, 1 + dy / 80));
+        }
+    };
+
+    const onTouchEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        const dy = currentY - startY;
+        toast.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        if (dy < -30) {
+            // 上滑超过 30px，关闭
+            toast.style.transform = 'translateY(-100px)';
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                toast.style.transform = '';
+                toast.style.pointerEvents = 'none';
+            }, 200);
+            if (toastTimeout) { clearTimeout(toastTimeout); toastTimeout = null; }
+        } else {
+            // 回弹
+            toast.style.transform = '';
+            toast.style.opacity = '1';
+        }
+    };
+
+    toast.addEventListener('touchstart', onTouchStart, { passive: true });
+    toast.addEventListener('touchmove', onTouchMove, { passive: false });
+    toast.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    toastSwipeCleanup = () => {
+        toast.removeEventListener('touchstart', onTouchStart);
+        toast.removeEventListener('touchmove', onTouchMove);
+        toast.removeEventListener('touchend', onTouchEnd);
+    };
+}
+
 export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showLoadingIcon = true, onClick = null, relativeTo = null) {
-    const articlesPanel = document.getElementById('articles-panel');
     let toast = document.getElementById('app-toast');
 
     if (!toast) {
@@ -116,50 +182,59 @@ export function showToast(message, duration = UI_CONFIG.TOAST_DURATION_MS, showL
         document.body.appendChild(toast);
     }
 
-    let leftPos = '50%';
-    if (relativeTo && relativeTo.getBoundingClientRect) {
-        const rect = relativeTo.getBoundingClientRect();
-        leftPos = `${rect.left + rect.width / 2}px`;
-    } else if (articlesPanel) {
-        const rect = articlesPanel.getBoundingClientRect();
-        leftPos = `${rect.left + rect.width / 2}px`;
+    // 定位：居中于目标面板或屏幕（通过 left/right + margin:auto）
+    let panelLeft = 16;
+    let panelRight = 16;
+    let panelWidth = 0;
+    const targetEl = relativeTo && relativeTo.getBoundingClientRect
+        ? relativeTo
+        : document.getElementById('articles-panel');
+    if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        // 仅当面板在可视区域内时使用其位置（移动端面板可能被 translateX 移出屏幕）
+        const isVisible = rect.right > 0 && rect.left < window.innerWidth;
+        if (isVisible) {
+            panelLeft = rect.left + 16;
+            panelRight = window.innerWidth - rect.right + 16;
+            panelWidth = rect.width - 32;
+        }
     }
 
-    // 仅设置动态属性，其余由 CSS 类 .app-toast 控制
-    toast.style.left = leftPos;
-    toast.style.pointerEvents = onClick ? 'auto' : 'none';
+    toast.style.left = `${panelLeft}px`;
+    toast.style.right = `${panelRight}px`;
+    toast.style.pointerEvents = 'auto';
     toast.style.cursor = onClick ? 'pointer' : 'default';
     toast.style.opacity = '0';
+    toast.style.transform = '';
+    toast.style.transition = 'opacity 0.3s ease, box-shadow 0.2s ease';
+    toast.style.maxWidth = panelWidth > 0 ? `${panelWidth}px` : '';
 
     const iconHtml = showLoadingIcon ? `
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite; flex-shrink: 0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
         <style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
     ` : '';
 
-    toast.innerHTML = `
-        ${iconHtml}
-        ${message}
-    `;
+    toast.innerHTML = `${iconHtml}<span>${message}</span>`;
 
-    // 强制 reflow
+    // 强制 reflow 后显示
     toast.offsetWidth;
     toast.style.opacity = '1';
 
     if (onClick) {
         toast.onclick = () => {
             onClick();
-            toast.style.opacity = '0';
-            toast.style.pointerEvents = 'none';
-            if (toastTimeout) clearTimeout(toastTimeout);
+            dismissToast(toast);
         };
     } else {
         toast.onclick = null;
     }
 
+    // 上滑关闭手势
+    setupToastSwipe(toast);
+
     if (toastTimeout) clearTimeout(toastTimeout);
     toastTimeout = setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.pointerEvents = 'none';
+        dismissToast(toast);
     }, duration);
 }
 

@@ -126,7 +126,7 @@ export default {
         push_test: '测试推送',
         push_test_success: '推送测试成功',
         push_test_failed: '推送测试失败',
-        push_section_hint: '支持钉钉、企业微信、飞书、Slack、Discord 等 Webhook，POST 时可用 {{title}}、{{digest_content}} 占位。',
+        push_section_hint: '兼容 Slack、Discord、钉钉、企业微信、飞书等 Webhook。POST 请求体中可用 {{title}} 和 {{digest_content}} 作为变量。',
         timezone: '时区设置',
         timezone_system_default: '跟随系统 / 环境变量',
         timezone_current_time: '当前时间',
@@ -421,6 +421,7 @@ export default {
         save_third_party: '保存到第三方',
         translate_article: '翻译全文',
         summarize_article: 'AI 总结',
+        ai_chat: 'AI 对话',
         go_back: '返回列表',
         show_help: '快捷键帮助'
     }

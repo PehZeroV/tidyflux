@@ -37,7 +37,7 @@ import { DOMElements } from '../dom.js';
 import { AppState } from '../state.js';
 import { ArticlesView } from './view/articles-view.js';
 import { FeedManager } from './feed-manager.js';
-import { showToast, createDialog } from './view/utils.js';
+import { createDialog } from './view/utils.js';
 import { i18n } from './i18n.js';
 
 const CLASS_ARTICLE_VIEW_ACTIVE = 'article-view-active';
@@ -73,6 +73,7 @@ const DEFAULT_SHORTCUTS = {
     saveThirdParty: ['s'],
     translateArticle: ['t'],
     summarizeArticle: ['g'],
+    aiChat: ['c'],
     goBack: ['Escape'],
 
     // Global
@@ -102,6 +103,7 @@ const ACTION_META = {
     saveThirdParty: { group: 'reading', i18nKey: 'keyboard.save_third_party' },
     translateArticle: { group: 'reading', i18nKey: 'keyboard.translate_article' },
     summarizeArticle: { group: 'reading', i18nKey: 'keyboard.summarize_article' },
+    aiChat: { group: 'reading', i18nKey: 'keyboard.ai_chat' },
     goBack: { group: 'reading', i18nKey: 'keyboard.go_back' },
 
     showHelp: { group: 'global', i18nKey: 'keyboard.show_help' },
@@ -407,18 +409,43 @@ export const KeyboardShortcuts = {
     async _saveThirdParty() {
         const articleId = AppState.content.currentArticleId;
         if (!articleId) return;
+        const toolbar = document.querySelector('.article-toolbar') || DOMElements.contentPanel;
         try {
             // Check if integrations are configured first
             const status = await FeedManager.getIntegrationsStatus();
             if (!status.has_integrations) {
-                showToast(i18n.t('article.no_integrations') || 'No third-party services configured', 3000, true);
+                this._showInlineNotification(toolbar, i18n.t('article.no_integrations') || 'No third-party services configured', 3000);
                 return;
             }
             await FeedManager.saveToThirdParty(articleId);
-            showToast('✓ ' + (i18n.t('article.save_success') || 'Saved'), 2000, false);
+            this._showInlineNotification(toolbar, '✓ ' + (i18n.t('article.save_success') || 'Saved'), 2000);
         } catch (err) {
-            showToast('✕ ' + (err.message || i18n.t('article.save_failed') || 'Save failed'), 3000, true);
+            this._showInlineNotification(toolbar, '✕ ' + (err.message || i18n.t('article.save_failed') || 'Save failed'), 3000);
         }
+    },
+
+    /**
+     * 在指定容器内显示临时内联通知
+     * @param {Element} container - 通知容器元素
+     * @param {string} message - 通知消息
+     * @param {number} duration - 显示时长(毫秒)
+     */
+    _showInlineNotification(container, message, duration = 3000) {
+        if (!container) return;
+        // 移除已有的内联通知
+        document.querySelectorAll('.inline-notification').forEach(n => n.remove());
+        const el = document.createElement('div');
+        el.className = 'inline-notification';
+        el.textContent = message;
+        el.style.cssText = 'position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 8px 16px; border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--card-shadow); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); font-size: 0.85em; font-weight: 500; text-align: center; line-height: 1.4; white-space: normal; word-break: break-word; max-width: 80%; opacity: 1; transition: opacity 0.3s;';
+        // 确保容器有定位上下文
+        const pos = getComputedStyle(container).position;
+        if (pos === 'static') container.style.position = 'relative';
+        container.appendChild(el);
+        setTimeout(() => {
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 300);
+        }, duration);
     },
 
     _translateArticle() {
@@ -428,6 +455,11 @@ export const KeyboardShortcuts = {
 
     _summarizeArticle() {
         const btn = document.getElementById('article-summarize-btn');
+        if (btn) btn.click();
+    },
+
+    _aiChat() {
+        const btn = document.getElementById('article-chat-btn');
         if (btn) btn.click();
     },
 
@@ -570,6 +602,9 @@ export const KeyboardShortcuts = {
             case 'summarizeArticle':
                 if (isArticleView) { this._summarizeArticle(); return true; }
                 return false;
+            case 'aiChat':
+                if (isArticleView) { this._aiChat(); return true; }
+                return false;
             case 'goBack':
                 this._goBack();
                 return true;
@@ -709,7 +744,7 @@ export const KeyboardShortcuts = {
                                     <div class="keyboard-customize-row" data-action="${item.action}">
                                         <span class="keyboard-customize-label">${item.label}</span>
                                         <div class="keyboard-customize-key-input" tabindex="0" data-action="${item.action}">
-                                            ${item.keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join(' / ')}
+                                            ${item.keys.map(k => `<kbd>${this._formatKey(k)}</kbd>`).join('<span style="color: var(--meta-color); font-size: 0.75em; margin: 0 2px;">/</span>')}
                                         </div>
                                     </div>
                                 `).join('')}
@@ -858,8 +893,18 @@ export const KeyboardShortcuts = {
             this.shortcuts = draft;
             this._buildReverseMap();
             this._saveShortcuts();
-            close();
-            showToast(i18n.t('settings.keyboard_saved'), 2000, false);
+            // Show success message
+            const conflictMsg = dialog.querySelector('#keyboard-conflict-msg');
+            if (conflictMsg) {
+                conflictMsg.textContent = i18n.t('settings.keyboard_saved');
+                conflictMsg.style.display = 'block';
+                conflictMsg.style.opacity = '1';
+                clearTimeout(conflictMsg._hideTimer);
+                conflictMsg._hideTimer = setTimeout(() => {
+                    conflictMsg.style.opacity = '0';
+                    setTimeout(() => { conflictMsg.style.display = 'none'; }, 300);
+                }, 2000);
+            }
         });
     },
 };

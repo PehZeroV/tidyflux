@@ -54,13 +54,7 @@ export const ManagerDialogMixin = {
                             <option value="">${i18n.t('settings.timezone_system_default')}</option>
                         </select>
                     </div>
-                    <div id="manager-timezone-preview" style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 8px;"></div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                        <button type="button" id="manager-timezone-save-btn" class="appearance-mode-btn active" style="flex: 1; justify-content: center;">
-                            ${i18n.t('common.save')}
-                        </button>
-                    </div>
-                    <div id="manager-timezone-msg" style="text-align: center; font-size: 0.85em; min-height: 1.2em;"></div>
+                    <div id="manager-timezone-preview" style="font-size: 0.8em; color: var(--meta-color); margin-bottom: 0;"></div>
                 </div>
 
                 <!-- Digest Prompt Settings -->
@@ -130,8 +124,6 @@ export const ManagerDialogMixin = {
         // Timezone elements
         const timezoneSelect = dialog.querySelector('#manager-timezone-select');
         const timezonePreview = dialog.querySelector('#manager-timezone-preview');
-        const timezoneSaveBtn = dialog.querySelector('#manager-timezone-save-btn');
-        const timezoneMsg = dialog.querySelector('#manager-timezone-msg');
 
         // Common IANA timezone list
         const timezones = [
@@ -205,24 +197,9 @@ export const ManagerDialogMixin = {
             }
         };
 
-        timezoneSelect.addEventListener('change', updateTimezonePreview);
-        updateTimezonePreview();
-        timezonePreviewTimer = setInterval(updateTimezonePreview, 1000);
-
-        // Cleanup timer when dialog closes
-        const observer = new MutationObserver(() => {
-            if (!document.body.contains(dialog)) {
-                clearInterval(timezonePreviewTimer);
-                observer.disconnect();
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        // Save timezone
-        timezoneSaveBtn.addEventListener('click', async () => {
-            timezoneSaveBtn.disabled = true;
-            timezoneMsg.textContent = '...';
-            timezoneMsg.style.color = 'var(--meta-color)';
+        timezoneSelect.addEventListener('change', async () => {
+            updateTimezonePreview();
+            // Auto-save on change
             try {
                 const response = await fetch(API_ENDPOINTS.PREFERENCES.BASE, {
                     method: 'POST',
@@ -236,16 +213,23 @@ export const ManagerDialogMixin = {
                     })
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                timezoneMsg.textContent = `✓ ${i18n.t('settings.save_success')}`;
-                timezoneMsg.style.color = 'var(--accent-color)';
+                showToast(`✓ ${i18n.t('settings.save_success')}`, 1500, false);
             } catch (err) {
                 console.error('Save timezone failed:', err);
-                timezoneMsg.textContent = `✗ ${i18n.t('common.error')}`;
-                timezoneMsg.style.color = 'var(--danger-color)';
+                showToast(`✗ ${i18n.t('common.error')}`, 2000, false);
             }
-            timezoneSaveBtn.disabled = false;
-            setTimeout(() => { timezoneMsg.textContent = ''; }, 2000);
         });
+        updateTimezonePreview();
+        timezonePreviewTimer = setInterval(updateTimezonePreview, 1000);
+
+        // Cleanup timer when dialog closes
+        const observer = new MutationObserver(() => {
+            if (!document.body.contains(dialog)) {
+                clearInterval(timezonePreviewTimer);
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
 
         // Load digest prompt
         const aiConfig = AIService.getConfig();
@@ -352,7 +336,7 @@ export const ManagerDialogMixin = {
                         globalPushBody.value = bodyTemplate;
 
                         // Flash message to inform user
-                        showToast(i18n.t('settings.push_autofill_hint') || 'Auto-filled body template', 2000);
+                        showToast(i18n.t('settings.push_autofill_hint') || 'Auto-filled body template', 2000, false);
                     } else {
                         // Validate existing JSON
                         try {
@@ -661,7 +645,7 @@ export const ManagerDialogMixin = {
                             if (result.digest && (result.digest.articleCount === 0 || !result.digest.id)) {
                                 const hours = first.hours || 24;
                                 const noArticlesMsg = result.digest.content || i18n.t('digest.no_articles', { hours });
-                                showToast(noArticlesMsg, 5000, false);
+                                showToast(noArticlesMsg, 3000, false);
                                 return;
                             }
                             let msg = i18n.t('digest.manager_success');
@@ -676,7 +660,7 @@ export const ManagerDialogMixin = {
                                     msg += ` (${i18n.t('digest.push_disabled')})`;
                                 }
                             }
-                            showToast(msg, 3000, true);
+                            showToast(msg, 3000, false);
                         } else {
                             throw new Error(result.error || 'Failed');
                         }

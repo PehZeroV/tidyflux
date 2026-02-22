@@ -116,7 +116,7 @@ export const DigestView = {
                                             ? `#/article/${digest.id}?${queryString}`
                                             : `#/article/${digest.id}`;
 
-                                        showToast(i18n.t('digest.success'), 15000, false, () => {
+                                        showToast(i18n.t('digest.success'), 5000, false, () => {
                                             window.location.hash = hash;
                                         });
                                     } else {
