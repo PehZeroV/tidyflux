@@ -324,9 +324,21 @@ export const ArticlesView = {
         const titleHtml = ArticlesTitleTranslation.buildTitleHtml(article);
         const hasTranslation = titleHtml.includes('article-title-translated');
 
+        // Summary excerpt
+        let summaryHtml = '';
+        if (AppState.preferences?.show_summary && article.content) {
+            const summaryLines = AppState.preferences?.summary_lines || 2;
+            const plainText = article.content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            if (plainText) {
+                const excerpt = plainText.length > 200 ? plainText.slice(0, 200) : plainText;
+                summaryHtml = `<div class="article-item-summary" style="-webkit-line-clamp: ${summaryLines}; line-clamp: ${summaryLines};">${escapeHtml(excerpt)}</div>`;
+            }
+        }
+
         const innerHtml = `
             <div class="article-item-content">
                 <div class="article-item-title ${hasTranslation ? 'has-translation' : ''}" data-article-id="${article.id}">${titleHtml}</div>
+                ${summaryHtml}
                 <div class="article-item-meta">
                     ${isFavorited ? '<span class="favorited-icon">★</span>' : ''}
                     <span class="feed-title">${escapeHtml(article.feed_title || '')}</span>

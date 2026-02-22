@@ -205,6 +205,18 @@ export const ContextMenu = {
                     ${AppState.preferences?.show_thumbnails !== false ? Icons.checkbox_checked : Icons.checkbox_unchecked}
                 ${i18n.t('context.show_thumbnails')}
             </div>
+            <div class="context-menu-item" data-action="toggle-summary">
+                    ${AppState.preferences?.show_summary ? Icons.checkbox_checked : Icons.checkbox_unchecked}
+                ${i18n.t('context.show_summary')}
+            </div>
+            ${AppState.preferences?.show_summary ? `
+            <div class="context-menu-item" style="padding: 6px 16px;">
+                <span style="font-size: 0.85em; color: var(--meta-color); margin-right: 8px;">${i18n.t('context.summary_lines')}</span>
+                <span class="summary-lines-pills" style="display: inline-flex; gap: 4px; margin-left: auto;">
+                    ${[1, 2, 3].map(n => `<button class="appearance-mode-btn${(AppState.preferences?.summary_lines || 2) === n ? ' active' : ''}" data-action="set-summary-lines" data-lines="${n}" style="padding: 2px 10px; font-size: 0.8em; min-width: 0;">${n}</button>`).join('')}
+                </span>
+            </div>
+            ` : ''}
 `;
 
 
@@ -226,7 +238,7 @@ export const ContextMenu = {
 
         const actualWidth = menu.offsetWidth;
         let x = rect.right - actualWidth;
-        const y = rect.bottom + 10;
+        const y = rect.bottom + 4;
 
         if (x + actualWidth > window.innerWidth) {
             x = window.innerWidth - actualWidth - 10;
@@ -379,6 +391,24 @@ export const ContextMenu = {
         }
 
         menu.addEventListener('click', async (e) => {
+            // Handle summary lines pill buttons (nested buttons inside context-menu-item)
+            const lineBtn = e.target.closest('[data-action="set-summary-lines"]');
+            if (lineBtn) {
+                const lines = parseInt(lineBtn.dataset.lines || '2');
+                AppState.preferences = AppState.preferences || {};
+                AppState.preferences.summary_lines = lines;
+                // Update pill active states
+                menu.querySelectorAll('[data-action="set-summary-lines"]').forEach(b => b.classList.remove('active'));
+                lineBtn.classList.add('active');
+                try {
+                    await FeedManager.setPreference('summary_lines', lines);
+                    this.viewManager.renderArticlesList(AppState.articles);
+                } catch (err) {
+                    console.error('Save pref error:', err);
+                }
+                return; // Don't close menu
+            }
+
             const item = e.target.closest('.context-menu-item');
             if (!item || item.classList.contains('disabled')) return;
 
@@ -607,6 +637,19 @@ export const ContextMenu = {
                     await FeedManager.setPreference('show_thumbnails', newState);
                     showToast(newState ? i18n.t('context.thumbnails_on') : i18n.t('context.thumbnails_off'), 3000, false);
                     // Re-render without network request
+                    this.viewManager.renderArticlesList(AppState.articles);
+                } catch (err) {
+                    console.error('Save pref error:', err);
+                }
+            } else if (action === 'toggle-summary') {
+                const currentState = !!AppState.preferences?.show_summary;
+                const newState = !currentState;
+                AppState.preferences = AppState.preferences || {};
+                AppState.preferences.show_summary = newState;
+
+                try {
+                    await FeedManager.setPreference('show_summary', newState);
+                    showToast(newState ? i18n.t('context.summary_on') : i18n.t('context.summary_off'), 3000, false);
                     this.viewManager.renderArticlesList(AppState.articles);
                 } catch (err) {
                     console.error('Save pref error:', err);
