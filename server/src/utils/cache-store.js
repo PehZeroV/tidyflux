@@ -6,9 +6,11 @@
 
 import { getDb } from './database.js';
 
-const MAX_ENTRIES_PER_USER = 100000;
+const MAX_ENTRIES_PER_USER = 1000000;
+const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 每天最多检查一次
 
 export const CacheStore = {
+    _lastCleanupTime: 0,
     /**
      * 读取缓存
      * @param {string} userId
@@ -54,13 +56,34 @@ export const CacheStore = {
      * 批量读取（用于标题翻译缓存等批量场景）
      * @param {string} userId
      * @param {string} prefix - key 前缀
+     * @param {number} [limit] - 最大返回条数（按最近更新排序）
      * @returns {Array<{key: string, content: string}>}
      */
-    getByPrefix(userId, prefix) {
+    getByPrefix(userId, prefix, limit) {
         const db = getDb();
+        if (limit && limit > 0) {
+            return db.prepare(
+                'SELECT key, content FROM ai_cache WHERE user_id = ? AND key LIKE ? ORDER BY timestamp DESC LIMIT ?'
+            ).all(userId, prefix + '%', limit);
+        }
         return db.prepare(
             'SELECT key, content FROM ai_cache WHERE user_id = ? AND key LIKE ?'
         ).all(userId, prefix + '%');
+    },
+
+    /**
+     * 批量按 key 精确查询
+     * @param {string} userId
+     * @param {Array<string>} keys
+     * @returns {Array<{key: string, content: string}>}
+     */
+    getMany(userId, keys) {
+        if (!keys || keys.length === 0) return [];
+        const db = getDb();
+        const placeholders = keys.map(() => '?').join(',');
+        return db.prepare(
+            `SELECT key, content FROM ai_cache WHERE user_id = ? AND key IN (${placeholders})`
+        ).all(userId, ...keys);
     },
 
     /**
@@ -85,12 +108,7 @@ export const CacheStore = {
         });
 
         insertMany(entries);
-
-        this._setManyCount = (this._setManyCount || 0) + 1;
-        if (this._setManyCount >= 100) {
-            this._setManyCount = 0;
-            this.cleanup(userId);
-        }
+        this._maybeCleanup(userId);
     },
 
     /**
@@ -103,10 +121,14 @@ export const CacheStore = {
     },
 
     /**
-     * 清理超量条目（淘汰最旧的）
+     * 按时间节流触发清理（每天最多检查一次）
      * @param {string} userId
      */
-    cleanup(userId) {
+    _maybeCleanup(userId) {
+        const now = Date.now();
+        if (now - this._lastCleanupTime < CLEANUP_INTERVAL) return;
+        this._lastCleanupTime = now;
+
         const db = getDb();
         const count = db.prepare(
             'SELECT COUNT(*) as cnt FROM ai_cache WHERE user_id = ?'

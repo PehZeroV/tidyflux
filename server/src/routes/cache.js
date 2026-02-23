@@ -64,17 +64,38 @@ router.delete('/:key', authenticateToken, (req, res) => {
 router.post('/batch/get', authenticateToken, (req, res) => {
     try {
         const userId = PreferenceStore.getUserId(req.user);
-        const { prefix } = req.body;
+        const { prefix, limit } = req.body;
 
         if (!prefix) {
             return res.status(400).json({ error: 'prefix required' });
         }
 
-        const entries = CacheStore.getByPrefix(userId, prefix);
+        const entries = CacheStore.getByPrefix(userId, prefix, limit);
         res.json({ entries });
     } catch (error) {
         console.error('Cache batch get error:', error);
         res.status(500).json({ error: 'Cache batch read failed' });
+    }
+});
+
+/**
+ * POST /api/cache/batch/lookup
+ * 批量精确查询（按 key 列表）
+ */
+router.post('/batch/lookup', authenticateToken, (req, res) => {
+    try {
+        const userId = PreferenceStore.getUserId(req.user);
+        const { keys } = req.body;
+
+        if (!Array.isArray(keys) || keys.length === 0) {
+            return res.status(400).json({ error: 'keys array required' });
+        }
+
+        const entries = CacheStore.getMany(userId, keys);
+        res.json({ entries });
+    } catch (error) {
+        console.error('Cache batch lookup error:', error);
+        res.status(500).json({ error: 'Cache batch lookup failed' });
     }
 });
 

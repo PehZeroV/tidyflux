@@ -76,7 +76,7 @@ export const AICache = {
             const response = await AuthManager.fetchWithAuth(`${CACHE_API}/batch/get`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prefix: 'title:' })
+                body: JSON.stringify({ prefix: 'title:', limit: 5000 })
             });
 
             if (!response.ok) return null;
@@ -85,7 +85,6 @@ export const AICache = {
             if (data.entries && data.entries.length > 0) {
                 const map = new Map();
                 for (const entry of data.entries) {
-                    // 去掉 'title:' 前缀，还原为原始 key 格式 (e.g. "原标题||zh-CN")
                     const originalKey = entry.key.startsWith('title:') ? entry.key.slice(6) : entry.key;
                     map.set(originalKey, entry.content);
                 }
@@ -93,6 +92,39 @@ export const AICache = {
             }
         } catch (e) {
             console.warn('[AICache] Load title cache failed:', e);
+        }
+        return null;
+    },
+
+    /**
+     * 批量查询标题翻译缓存（Map 未命中时回退服务端查询）
+     * @param {Array<string>} cacheKeys - 原始 key 数组（如 "title||zh-CN"）
+     * @returns {Promise<Map<string, string>|null>} key -> content
+     */
+    async lookupTitleCacheBatch(cacheKeys) {
+        if (!cacheKeys || cacheKeys.length === 0) return null;
+        try {
+            // 服务端存储的 key 带 'title:' 前缀
+            const serverKeys = cacheKeys.map(k => `title:${k}`);
+            const response = await AuthManager.fetchWithAuth(`${CACHE_API}/batch/lookup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keys: serverKeys })
+            });
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            if (data.entries && data.entries.length > 0) {
+                const map = new Map();
+                for (const entry of data.entries) {
+                    const originalKey = entry.key.startsWith('title:') ? entry.key.slice(6) : entry.key;
+                    map.set(originalKey, entry.content);
+                }
+                return map;
+            }
+        } catch (e) {
+            console.warn('[AICache] Lookup title cache batch failed:', e);
         }
         return null;
     },

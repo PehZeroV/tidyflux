@@ -5,7 +5,6 @@
  * 自动摘要的订阅源/分组，后台自动预处理并将结果写入 ai_cache 表。
  *
  * 防 429 策略：
- * - 每次 AI 调用完成后固定等待 2 秒再发起下一次
  * - 遇到 429 时指数退避（30s → 60s → 120s → 300s）
  * - 同一用户顺序处理，不并发
  */
@@ -23,7 +22,7 @@ import {
 
 // ==================== 常量 ====================
 const SCHEDULER_INTERVAL = 5 * 60 * 1000;   // 5 分钟
-const DELAY_BETWEEN_CALLS = 2000;            // 每次 AI 调用后等待 2 秒
+
 const TITLE_BATCH_SIZE = 10;                 // 标题翻译每批最多 10 个
 const FETCH_HOURS = 24;                      // 获取最近 24 小时的未读文章
 const MAX_CONTENT_LENGTH = 50000;            // 文章内容截断长度
@@ -273,11 +272,6 @@ export const AIPretranslateScheduler = {
             } catch (err) {
                 console.error(`[AI Pretranslate] Title translation batch failed:`, err.message);
             }
-
-            // 等待间隔
-            if (i + TITLE_BATCH_SIZE < needTranslate.length) {
-                await sleep(DELAY_BETWEEN_CALLS);
-            }
         }
     },
 
@@ -320,11 +314,6 @@ export const AIPretranslateScheduler = {
                         backoffState
                     );
                     allTranslated.push(...translatedBatch);
-
-                    // 批次间等待
-                    if (i + BLOCK_BATCH_SIZE < blocks.length) {
-                        await sleep(DELAY_BETWEEN_CALLS);
-                    }
                 }
 
                 if (allTranslated.length > 0) {
@@ -336,7 +325,6 @@ export const AIPretranslateScheduler = {
                 console.error(`[AI Pretranslate] Translation failed for entry ${entry.id}:`, err.message);
             }
 
-            await sleep(DELAY_BETWEEN_CALLS);
         }
 
         if (count > 0) {
@@ -381,8 +369,6 @@ export const AIPretranslateScheduler = {
             } catch (err) {
                 console.error(`[AI Pretranslate] Summary failed for entry ${entry.id}:`, err.message);
             }
-
-            await sleep(DELAY_BETWEEN_CALLS);
         }
 
         if (count > 0) {

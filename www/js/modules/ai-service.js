@@ -122,8 +122,6 @@ export const AIService = {
     _configCache: null,
     // 标题翻译缓存 (key: title||langId, value: translated title)
     _titleCache: new Map(),
-    // 标题缓存上限
-    _TITLE_CACHE_MAX: 50000,
 
     // 全局并发控制（信号量）
     _activeRequests: 0,
@@ -614,8 +612,8 @@ export const AIService = {
         const resultMap = new Map();
         if (!items || items.length === 0) return resultMap;
 
-        // 过滤已缓存的
-        const needTranslate = items.filter(item => {
+        // 过滤已缓存的（内存 Map）
+        let needTranslate = items.filter(item => {
             const cacheKey = `${item.title}||${targetLangId}`;
             if (this._titleCache.has(cacheKey)) {
                 resultMap.set(item.id, this._titleCache.get(cacheKey));
@@ -625,6 +623,28 @@ export const AIService = {
         });
 
         if (needTranslate.length === 0) return resultMap;
+
+        // Map 未命中 → 回退服务端数据库查询
+        try {
+            const missedKeys = needTranslate.map(item => `${item.title}||${targetLangId}`);
+            const serverHits = await AICache.lookupTitleCacheBatch(missedKeys);
+            if (serverHits && serverHits.size > 0) {
+                needTranslate = needTranslate.filter(item => {
+                    const cacheKey = `${item.title}||${targetLangId}`;
+                    const cached = serverHits.get(cacheKey);
+                    if (cached) {
+                        this._titleCache.set(cacheKey, cached);
+                        resultMap.set(item.id, cached);
+                        return false;
+                    }
+                    return true;
+                });
+                if (needTranslate.length === 0) return resultMap;
+            }
+        } catch (e) {
+            // 查询失败不阻塞，继续走 AI 翻译
+            console.warn('[AIService] Server title cache lookup failed:', e);
+        }
 
         const targetLang = this.getLanguageName(targetLangId);
         // 构建批量翻译提示词
