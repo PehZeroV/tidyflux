@@ -41,6 +41,7 @@
   - 🌍 **全文自动翻译**：打开文章时自动进行双语对照翻译
   - 📝 **文章自动摘要**：打开文章时自动生成 AI 摘要
   - 💾 **智能缓存**：所有 AI 结果（标题翻译、全文翻译、摘要）自动缓存到服务端 SQLite 数据库，重复打开零消耗，多设备同步
+  - 🔄 **后台自动翻译和生成摘要**：服务端自动翻译和生成摘要，存入 SQLite 数据库，无需打开网页即可提前完成处理
   - 📅 **智能简报**：支持手动或定时生成每日内容简报，支持 Webhook 推送（钉钉、企业微信、飞书等）
   - 💬 **AI 对话**：针对任意文章与 AI 对话——提问、请求详细摘要或讨论内容。对话记录自动保存，多设备同步
   - ⚙️ **自定义 AI 接口**：支持所有兼容 OpenAI 格式的 API
@@ -64,7 +65,7 @@
 **方法 1：命令行一键启动**
 
 ```bash
-docker run -d --name tidyflux --restart unless-stopped -p 8812:8812 -e TZ=Asia/Shanghai -v tidyflux_data:/app/server/data pehzerov/tidyflux:latest
+docker run -d --name tidyflux --restart unless-stopped -p 8812:8812 -v tidyflux_data:/app/server/data pehzerov/tidyflux:latest
 ```
 
 启动后访问 `http://localhost:8812`，按提示填写你的 Miniflux 地址、用户名和密码即可。
@@ -81,9 +82,9 @@ curl -O https://raw.githubusercontent.com/PehZeroV/tidyflux/main/docker-compose.
 
 ```yaml
 environment:
-  - TZ=Asia/Shanghai
+  # - TZ=Asia/Shanghai  # 使用简报定时任务请设置正确时区
   - MINIFLUX_URL=https://你的miniflux地址
-  - MINIFLUX_API_KEY=你的miniflux_api_key # 优先推荐
+  - MINIFLUX_API_KEY=你的miniflux_api_key  # 优先推荐
   # 或者使用用户名密码：
   # - MINIFLUX_USERNAME=Miniflux用户名
   # - MINIFLUX_PASSWORD=Miniflux密码
@@ -95,7 +96,7 @@ environment:
 docker compose up -d
 ```
 
-> 💡 **提示**：如果你使用简报定时生成功能，请通过 `TZ` 环境变量设置正确的时区（默认为 `Asia/Shanghai`）。
+> 💡 **提示**：如果你使用简报定时生成功能，请添加 `TZ` 环境变量并设置正确的时区（如 `TZ=Asia/Shanghai`），否则定时任务的执行时间可能与本地时间不一致。
 
 **默认账号**：
 - 地址: `http://localhost:8812`

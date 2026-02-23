@@ -109,6 +109,25 @@ export const ManagerDialogMixin = {
                     </div>
                 </div>
 
+                <!-- Execution Log -->
+                <div class="digest-manager-section" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>${i18n.t('digest.log_title')}</span>
+                    </div>
+                    <div id="digest-log-list">
+                        <div style="text-align: center; padding: 12px; color: var(--meta-color); font-size: 0.9em;">
+                            ${i18n.t('common.loading')}
+                        </div>
+                    </div>
+                    <div id="digest-log-load-more" style="display: none; margin-top: 8px;">
+                        <div class="appearance-mode-group">
+                            <button type="button" id="digest-log-more-btn" class="appearance-mode-btn" style="justify-content: center; width: 100%;">
+                                ${i18n.t('digest.log_load_more')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         `);
 
@@ -721,5 +740,132 @@ export const ManagerDialogMixin = {
         });
 
         loadTasks();
+
+        // ==================== Execution Logs ====================
+        const logListContainer = dialog.querySelector('#digest-log-list');
+        const logLoadMoreWrapper = dialog.querySelector('#digest-log-load-more');
+        const logLoadMoreBtn = dialog.querySelector('#digest-log-more-btn');
+        let logOffset = 0;
+        let logTotal = 0;
+        const LOG_PAGE_SIZE = 20;
+
+        const formatLogTime = (isoStr) => {
+            if (!isoStr) return '';
+            try {
+                // isoStr is UTC from SQLite (e.g. "2026-02-22 12:15:10")
+                const d = new Date(isoStr + 'Z');
+                const pad = n => String(n).padStart(2, '0');
+                return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            } catch {
+                return isoStr;
+            }
+        };
+
+        const getStatusBadge = (status) => {
+            if (status === 'success') return `<span style="color: var(--accent-color); font-weight: 600;">${i18n.t('digest.log_success')}</span>`;
+            if (status === 'failed') return `<span style="color: var(--danger-color); font-weight: 600;">${i18n.t('digest.log_failed')}</span>`;
+            return `<span style="color: var(--meta-color);">${i18n.t('digest.log_skipped')}</span>`;
+        };
+
+        const getTriggerBadge = (triggeredBy) => {
+            if (triggeredBy === 'manual') return `<span style="background: var(--accent-color); color: #fff; padding: 1px 6px; border-radius: 4px; font-size: 0.75em;">${i18n.t('digest.log_manual')}</span>`;
+            return `<span style="background: var(--meta-color); color: #fff; padding: 1px 6px; border-radius: 4px; font-size: 0.75em; opacity: 0.7;">${i18n.t('digest.log_scheduler')}</span>`;
+        };
+
+        const getPushBadge = (pushStatus) => {
+            if (!pushStatus || pushStatus === 'disabled') return '';
+            if (pushStatus === 'success') return `<span style="font-size: 0.8em;">🔔 ✅</span>`;
+            if (pushStatus === 'failed') return `<span style="font-size: 0.8em;">🔔 ❌</span>`;
+            if (pushStatus === 'not_configured') return `<span style="font-size: 0.8em;">🔔 ⚠️</span>`;
+            return '';
+        };
+
+        const renderLogItem = (log) => {
+            const scopeName = log.scope_name || (log.scope === 'all' ? i18n.t('nav.all') : `#${log.scope_id || ''}`);
+            const statusBadge = getStatusBadge(log.status);
+            const triggerBadge = getTriggerBadge(log.triggered_by);
+            const pushBadge = getPushBadge(log.push_status);
+            const timeStr = formatLogTime(log.created_at);
+            const duration = log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : '';
+
+            let details = '';
+            if (log.status === 'success') {
+                details = `<span>${i18n.t('digest.log_articles', { count: log.article_count || 0 })}</span>`;
+                if (duration) details += ` <span style="opacity: 0.5;">·</span> <span>${duration}</span>`;
+                const pt = log.prompt_tokens || 0;
+                const ct = log.completion_tokens || 0;
+                if (pt > 0 || ct > 0) {
+                    const fmt = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+                    details += ` <span style="opacity: 0.5;">·</span> <span style="font-family: monospace; font-size: 0.9em;">↑${fmt(pt)} ↓${fmt(ct)}</span>`;
+                }
+            } else if (log.error) {
+                details = `<span style="color: var(--danger-color);">${log.error}</span>`;
+            }
+
+            const div = document.createElement('div');
+            div.style.cssText = 'padding: 8px 12px; border-radius: var(--radius); background: var(--card-bg); margin-bottom: 4px; font-size: 0.85em; box-shadow: var(--card-shadow);';
+            div.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1;">
+                        ${triggerBadge}
+                        <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${scopeName}</span>
+                        ${pushBadge}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        ${statusBadge}
+                    </div>
+                </div>
+                ${details ? `<div style="margin-top: 4px; color: var(--meta-color); font-size: 0.9em; display: flex; gap: 6px; align-items: center;">
+                    <span style="font-family: monospace; opacity: 0.7;">${timeStr}</span>
+                    <span style="opacity: 0.4;">·</span>
+                    ${details}
+                </div>` : `<div style="margin-top: 2px; font-family: monospace; color: var(--meta-color); font-size: 0.85em; opacity: 0.7;">${timeStr}</div>`}
+                ${log.push_error ? `<div style="margin-top: 2px; font-size: 0.8em; color: var(--danger-color);">🔔 ${log.push_error}</div>` : ''}
+            `;
+            return div;
+        };
+
+        const loadLogs = async (append = false) => {
+            try {
+                const resp = await fetch(`${API_ENDPOINTS.DIGEST.LOGS}?limit=${LOG_PAGE_SIZE}&offset=${logOffset}`, {
+                    headers: { 'Authorization': `Bearer ${AuthManager.getToken()}` }
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                logTotal = data.total || 0;
+
+                if (!append) logListContainer.innerHTML = '';
+
+                if (data.logs && data.logs.length > 0) {
+                    data.logs.forEach(log => {
+                        logListContainer.appendChild(renderLogItem(log));
+                    });
+                    logOffset += data.logs.length;
+                } else if (!append) {
+                    logListContainer.innerHTML = `
+                        <div style="text-align: center; padding: 16px; color: var(--meta-color); font-size: 0.9em;">
+                            ${i18n.t('digest.log_empty')}
+                        </div>
+                    `;
+                }
+
+                // Show/hide load more button
+                logLoadMoreWrapper.style.display = logOffset < logTotal ? '' : 'none';
+            } catch (err) {
+                console.error('Load digest logs error:', err);
+                if (!append) {
+                    logListContainer.innerHTML = `
+                        <div style="text-align: center; padding: 12px; color: var(--danger-color); font-size: 0.9em;">
+                            ${i18n.t('common.load_error')}
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        logLoadMoreBtn.addEventListener('click', () => loadLogs(true));
+
+        // Initial load of logs
+        loadLogs();
     },
 };

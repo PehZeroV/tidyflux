@@ -64,6 +64,25 @@ export const ArticlesView = {
     },
 
     /**
+     * 预计算文章内容摘要（一次性提取纯文本，避免滚动时反复正则替换）
+     * @param {Array} articles - 文章数组
+     */
+    _precomputeContentPreviews(articles) {
+        if (!AppState.preferences?.show_summary) return; // 未开启显示文章内容，跳过
+        for (const article of articles) {
+            if (article._contentPreview !== undefined) continue; // Already computed
+            if (article.content) {
+                // 只截取前 1000 字符做正则，避免对几十 KB 的完整 HTML 做全量替换
+                const raw = article.content.length > 1000 ? article.content.slice(0, 1000) : article.content;
+                const plainText = raw.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                article._contentPreview = plainText.length > 200 ? plainText.slice(0, 200) : plainText;
+            } else {
+                article._contentPreview = '';
+            }
+        }
+    },
+
+    /**
      * 如果正在使用虚拟列表，刷新可见项
      * 封装重复的 useVirtualScroll && virtualList 检查（原本在 7 处重复）
      */
@@ -164,6 +183,9 @@ export const ArticlesView = {
         const articlesResult = await FeedManager.getArticles(params);
 
         if (this.currentRequestId !== requestId) return;
+
+        // Pre-compute content previews once to avoid repeated regex during scroll
+        this._precomputeContentPreviews(articlesResult.articles);
 
         AppState.articles = articlesResult.articles;
         AppState.pagination = articlesResult.pagination;
@@ -324,15 +346,11 @@ export const ArticlesView = {
         const titleHtml = ArticlesTitleTranslation.buildTitleHtml(article);
         const hasTranslation = titleHtml.includes('article-title-translated');
 
-        // Summary excerpt
+        // Summary excerpt — uses pre-computed _contentPreview to avoid regex during scroll
         let summaryHtml = '';
-        if (AppState.preferences?.show_summary && article.content) {
+        if (AppState.preferences?.show_summary && article._contentPreview) {
             const summaryLines = AppState.preferences?.summary_lines || 2;
-            const plainText = article.content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            if (plainText) {
-                const excerpt = plainText.length > 200 ? plainText.slice(0, 200) : plainText;
-                summaryHtml = `<div class="article-item-summary" style="-webkit-line-clamp: ${summaryLines}; line-clamp: ${summaryLines};">${escapeHtml(excerpt)}</div>`;
-            }
+            summaryHtml = `<div class="article-item-summary" style="-webkit-line-clamp: ${summaryLines}; line-clamp: ${summaryLines};">${escapeHtml(article._contentPreview)}</div>`;
         }
 
         const innerHtml = `
@@ -535,6 +553,9 @@ export const ArticlesView = {
         const newArticles = result.articles.filter(a => !existingIds.has(a.id));
 
         if (newArticles.length > 0) {
+            // Pre-compute content previews for new articles
+            this._precomputeContentPreviews(newArticles);
+
             AppState.articles = [...AppState.articles, ...newArticles];
             AppState.pagination = result.pagination;
             AppState.pagination.page = nextPage;
@@ -673,7 +694,8 @@ export const ArticlesView = {
             if (newArticles.length > 0) {
                 console.debug(`Found ${newArticles.length} new articles, prepending...`);
 
-
+                // Pre-compute content previews for new articles
+                this._precomputeContentPreviews(newArticles);
 
                 AppState.articles = [...newArticles, ...AppState.articles];
 

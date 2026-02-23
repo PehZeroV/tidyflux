@@ -5,6 +5,7 @@
  * 表：
  *  - digests       简报存储
  *  - ai_cache      翻译 / 摘要 / 标题翻译缓存
+ *  - digest_logs   定时简报执行日志
  */
 
 import Database from 'better-sqlite3';
@@ -102,6 +103,33 @@ function _initTables(db) {
         -- 按用户 + 更新时间倒序查询的索引
         CREATE INDEX IF NOT EXISTS idx_ai_chats_user
             ON ai_chats (user_id, updated_at DESC);
+
+        -- ==================== 定时简报执行日志表 ====================
+        CREATE TABLE IF NOT EXISTS digest_logs (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL,
+            scope         TEXT    NOT NULL DEFAULT 'all',
+            scope_id      INTEGER,
+            scope_name    TEXT,
+            status        TEXT    NOT NULL DEFAULT 'success',
+            article_count INTEGER DEFAULT 0,
+            digest_id     TEXT,
+            error         TEXT,
+            push_status   TEXT,
+            push_error    TEXT,
+            duration_ms   INTEGER DEFAULT 0,
+            prompt_tokens     INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            triggered_by  TEXT    NOT NULL DEFAULT 'scheduler',
+            created_at    TEXT    DEFAULT (datetime('now'))
+        );
+
+        -- 按用户 + 时间倒序查询的索引
+        CREATE INDEX IF NOT EXISTS idx_digest_logs_user_time
+            ON digest_logs (user_id, created_at DESC);
+
+        -- 自动清理 30 天前的日志
+        DELETE FROM digest_logs WHERE created_at < datetime('now', '-30 days');
     `);
 }
 

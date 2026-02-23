@@ -109,7 +109,7 @@ export const DigestRunner = {
                 pushResult.reason = 'disabled';
             }
 
-            return { success: true, digest: result.digest, push: pushResult };
+            return { success: true, digest: result.digest, push: pushResult, usage: result.usage || null };
 
         } catch (err) {
             console.error(`Error in digest generation/push for user ${userId}:`, err);

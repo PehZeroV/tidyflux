@@ -41,6 +41,7 @@
   - 🌍 **Auto Full-Text Translation**: Automatically translate articles with bilingual side-by-side view when opening articles
   - 📝 **Auto Article Summarization**: Automatically generate AI summaries when opening articles
   - 💾 **Smart Cache**: All AI results (title translations, full-text translations, summaries) are cached in server-side SQLite database — zero cost on repeat visits, synced across devices
+  - 🔄 **Background Auto Translation & Summarization**: Server-side automatic translation and summary generation, stored in SQLite database — content is ready before you even open the page
   - 📅 **Smart Digest**: Support manual or scheduled generation of daily content digests, with Webhook push notifications (Slack, Discord, Telegram, etc.)
   - 💬 **AI Chat**: Chat with AI about any article — ask questions, request detailed summaries, or discuss content. Conversations are automatically saved and synced across devices
   - ⚙️ **Custom AI Interface**: Support all OpenAI-compatible APIs
@@ -64,7 +65,7 @@ You need to install [Miniflux](https://github.com/miniflux/v2) first. This proje
 **Method 1: One-line Command Start**
 
 ```bash
-docker run -d --name tidyflux --restart unless-stopped -p 8812:8812 -e TZ=Asia/Shanghai -v tidyflux_data:/app/server/data pehzerov/tidyflux:latest
+docker run -d --name tidyflux --restart unless-stopped -p 8812:8812 -v tidyflux_data:/app/server/data pehzerov/tidyflux:latest
 ```
 
 After starting, visit `http://localhost:8812` and enter your Miniflux address, username, and password as prompted.
@@ -81,9 +82,9 @@ curl -O https://raw.githubusercontent.com/PehZeroV/tidyflux/main/docker-compose.
 
 ```yaml
 environment:
-  - TZ=Asia/Shanghai
+  # - TZ=Asia/Shanghai  # Set your timezone if using scheduled digest
   - MINIFLUX_URL=https://your-miniflux-url
-  - MINIFLUX_API_KEY=your_miniflux_api_key # Recommended
+  - MINIFLUX_API_KEY=your_miniflux_api_key  # Recommended
   # Or use username/password:
   # - MINIFLUX_USERNAME=Miniflux_Username
   # - MINIFLUX_PASSWORD=Miniflux_Password
@@ -95,7 +96,7 @@ environment:
 docker compose up -d
 ```
 
-> 💡 **Tip**: If you use the scheduled digest generation feature, please set the correct timezone via the `TZ` environment variable (default is `Asia/Shanghai`).
+> 💡 **Tip**: If you use the scheduled digest generation feature, please add the `TZ` environment variable with your correct timezone (e.g. `TZ=Asia/Shanghai`), otherwise the scheduled time may not match your local time.
 
 **Default Account**:
 - Address: `http://localhost:8812`

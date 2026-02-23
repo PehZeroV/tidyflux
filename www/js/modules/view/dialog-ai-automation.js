@@ -78,6 +78,12 @@ export const TranslationDialogMixin = {
                                 ${i18n.t('common.loading')}
                             </div>
                         </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 0;">
+                            <input type="checkbox" id="pretranslate-title-toggle"
+                                ${(AppState.preferences?.ai_pretranslate_title) ? 'checked' : ''}
+                                style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+                            <span style="font-size: 0.8em; color: var(--meta-color); line-height: 1.4;">${i18n.t('ai.pretranslate_background_hint')}</span>
+                        </div>
                     </div>
 
                     <!-- Translate Tab -->
@@ -88,6 +94,12 @@ export const TranslationDialogMixin = {
                             <div style="text-align: center; padding: 20px; color: var(--meta-color);">
                                 ${i18n.t('common.loading')}
                             </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 0;">
+                            <input type="checkbox" id="pretranslate-translate-toggle"
+                                ${(AppState.preferences?.ai_pretranslate_translate) ? 'checked' : ''}
+                                style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+                            <span style="font-size: 0.8em; color: var(--meta-color); line-height: 1.4;">${i18n.t('ai.pretranslate_background_hint')}</span>
                         </div>
                     </div>
 
@@ -100,10 +112,18 @@ export const TranslationDialogMixin = {
                                 ${i18n.t('common.loading')}
                             </div>
                         </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 0;">
+                            <input type="checkbox" id="pretranslate-summary-toggle"
+                                ${(AppState.preferences?.ai_pretranslate_summary) ? 'checked' : ''}
+                                style="accent-color: var(--accent-color); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+                            <span style="font-size: 0.8em; color: var(--meta-color); line-height: 1.4;">${i18n.t('ai.pretranslate_background_hint')}</span>
+                        </div>
                     </div>
                     <div style="font-size: 0.75em; color: var(--meta-color); margin-top: 12px; line-height: 1.5; opacity: 0.8;">
                         ⚠️ ${i18n.t('ai.rate_limit_warning')}
                     </div>
+
+
                 </div>
             </div>
         `);
@@ -158,6 +178,29 @@ export const TranslationDialogMixin = {
 
         const summaryContainer = dialog.querySelector('#summary-feeds-list');
         this._renderOverrideTree(summaryContainer, 'summary');
+
+        // Background pretranslate toggles (per-feature)
+        const pretranslateToggles = [
+            { id: '#pretranslate-title-toggle', key: 'ai_pretranslate_title' },
+            { id: '#pretranslate-translate-toggle', key: 'ai_pretranslate_translate' },
+            { id: '#pretranslate-summary-toggle', key: 'ai_pretranslate_summary' },
+        ];
+        for (const { id, key } of pretranslateToggles) {
+            const cb = dialog.querySelector(id);
+            if (cb) {
+                cb.addEventListener('change', async () => {
+                    try {
+                        const { FeedManager } = await import('../feed-manager.js');
+                        await FeedManager.setPreference(key, cb.checked);
+                        if (AppState.preferences) {
+                            AppState.preferences[key] = cb.checked;
+                        }
+                    } catch (err) {
+                        console.error(`[AI Auto] Failed to save ${key}:`, err);
+                    }
+                });
+            }
+        }
     },
 
     /**

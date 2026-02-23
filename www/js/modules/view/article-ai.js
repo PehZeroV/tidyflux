@@ -270,6 +270,20 @@ export const ArticleAIMixin = {
             // 建立文本到缓存翻译的映射
             const cacheMap = new Map(cacheData.map(d => [d.text, d]));
 
+            // 先检查缓存是否能覆盖所有段落（判断是否过期）
+            let matchCount = 0;
+            blocks.forEach(block => {
+                if (cacheMap.has(block.text)) matchCount++;
+            });
+
+            // 如果缓存未能覆盖所有段落，视为过期缓存，删除后回退到重新翻译
+            if (matchCount < blocks.length) {
+                console.debug(`[AICache] Stale cache for entry ${entryId}: matched ${matchCount}/${blocks.length} blocks, deleting cache`);
+                AICache.deleteTranslation(entryId, lang).catch(() => { });
+                return false;
+            }
+
+            // 全部匹配，恢复翻译
             let restored = 0;
             blocks.forEach(block => {
                 const cached = cacheMap.get(block.text);

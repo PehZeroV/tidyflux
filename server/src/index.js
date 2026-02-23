@@ -17,6 +17,7 @@ import chatRoutes from './routes/chat.js';
 import helmet from 'helmet';
 import { UserStore } from './utils/user-store.js';
 import { DigestScheduler } from './jobs/digest-scheduler.js';
+import { AIPretranslateScheduler } from './jobs/ai-pretranslate-scheduler.js';
 import { PreferenceStore } from './utils/preference-store.js';
 import { DigestStore } from './utils/digest-store.js';
 import { getDb, closeDb } from './utils/database.js';
@@ -102,6 +103,8 @@ async function startServer() {
             console.log(`Tidyflux Adapter running on http://localhost:${PORT}`);
             // 启动简报调度器
             DigestScheduler.start();
+            // 启动 AI 预翻译/摘要调度器
+            AIPretranslateScheduler.start();
         });
     } catch (error) {
         console.error('Failed to start server:', error);

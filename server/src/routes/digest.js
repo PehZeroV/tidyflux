@@ -10,6 +10,7 @@ import { DigestStore } from '../utils/digest-store.js';
 import { DigestService, getRecentUnreadArticles } from '../services/digest-service.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { DigestRunner } from '../services/digest-runner.js';
+import { DigestLogStore } from '../utils/digest-log-store.js';
 import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
@@ -50,6 +51,29 @@ router.get('/list', authenticateToken, async (req, res) => {
         console.error('Get digest list error:', error);
         const lang = getLang(req);
         res.status(500).json({ error: t('fetch_digest_list_failed', lang) });
+    }
+});
+
+/**
+ * GET /api/digest/logs
+ * 获取定时简报执行日志
+ */
+router.get('/logs', authenticateToken, async (req, res) => {
+    try {
+        const userId = PreferenceStore.getUserId(req.user);
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = parseInt(req.query.offset) || 0;
+
+        const result = DigestLogStore.getAll(userId, { limit, offset });
+
+        res.json({
+            success: true,
+            logs: result.logs,
+            total: result.total
+        });
+    } catch (error) {
+        console.error('Get digest logs error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -161,6 +185,44 @@ router.post('/generate', authenticateToken, async (req, res) => {
             }
         }
 
+        // 解析 scope 名称用于日志
+        let scopeName = null;
+        try {
+            if (scope === 'feed' && options.feedId && req.miniflux) {
+                const feed = await req.miniflux.getFeed(options.feedId);
+                scopeName = feed?.title || null;
+            } else if (scope === 'group' && options.groupId && req.miniflux) {
+                const categories = await req.miniflux.getCategories();
+                const cat = categories?.find(c => c.id === options.groupId);
+                scopeName = cat?.title || null;
+            }
+        } catch { /* ignore */ }
+
+        const startTime = Date.now();
+
+        const logResult = (result, error) => {
+            const durationMs = Date.now() - startTime;
+            if (error) {
+                DigestLogStore.add({
+                    userId, scope, scopeId: options.feedId || options.groupId || null,
+                    scopeName, status: 'failed',
+                    error: error.message || String(error),
+                    durationMs, triggeredBy: 'manual'
+                });
+            } else if (result?.success && result.digest) {
+                DigestLogStore.add({
+                    userId, scope, scopeId: options.feedId || options.groupId || null,
+                    scopeName, status: 'success',
+                    articleCount: result.digest.articleCount || 0,
+                    digestId: result.digest.id,
+                    durationMs,
+                    promptTokens: result.usage?.prompt_tokens || 0,
+                    completionTokens: result.usage?.completion_tokens || 0,
+                    triggeredBy: 'manual'
+                });
+            }
+        };
+
         if (useStream) {
             sendEvent({ type: 'status', message: 'generating' });
 
@@ -174,25 +236,32 @@ router.post('/generate', authenticateToken, async (req, res) => {
             try {
                 const result = await DigestService.generate(req.miniflux, userId, options);
                 clearInterval(heartbeat);
+                logResult(result, null);
                 sendEvent({ type: 'result', data: result });
                 res.end();
             } catch (err) {
                 clearInterval(heartbeat);
                 console.error('Generate digest error:', err);
+                logResult(null, err);
                 const lang = getLang(req);
                 sendEvent({ type: 'error', data: { error: err.message || t('generate_digest_failed', lang) } });
                 res.end();
             }
         } else {
-            const result = await DigestService.generate(req.miniflux, userId, options);
-            res.json(result);
+            try {
+                const result = await DigestService.generate(req.miniflux, userId, options);
+                logResult(result, null);
+                res.json(result);
+            } catch (err) {
+                console.error('Generate digest error:', err);
+                logResult(null, err);
+                throw err;
+            }
         }
     } catch (error) {
         console.error('Generate digest error:', error);
         if (useStream) {
             if (!res.headersSent) {
-                // If headers not sent (shouldn't happen if useStream was true and we set headers early), 
-                // but if error logic happened before headers.
                 res.status(500);
             }
             const lang = getLang(req);
@@ -381,12 +450,72 @@ router.post('/run-task', authenticateToken, async (req, res) => {
         }
 
         const task = prefs.digest_schedules[taskIndex];
+        const startTime = Date.now();
+
+        // 解析 scope 名称
+        let scopeName = null;
+        try {
+            if (task.scope === 'feed') {
+                const fid = task.feedId || task.scopeId;
+                if (fid && req.miniflux) {
+                    const feed = await req.miniflux.getFeed(parseInt(fid));
+                    scopeName = feed?.title || null;
+                }
+            } else if (task.scope === 'group') {
+                const gid = task.groupId || task.scopeId;
+                if (gid && req.miniflux) {
+                    const categories = await req.miniflux.getCategories();
+                    const cat = categories?.find(c => c.id === parseInt(gid));
+                    scopeName = cat?.title || null;
+                }
+            }
+        } catch { /* ignore */ }
 
         const result = await DigestRunner.runTask(userId, task, prefs, { force: true });
+        const durationMs = Date.now() - startTime;
 
         if (result.success) {
-            res.json({ success: true, digest: result.digest, push: result.push });
+            // 记录手动运行成功日志
+            const pushResult = result.push || {};
+            let pushStatus = 'disabled';
+            if (pushResult.attempted) {
+                pushStatus = pushResult.success ? 'success' : 'failed';
+            } else if (pushResult.reason === 'not_configured') {
+                pushStatus = 'not_configured';
+            } else if (pushResult.reason === 'no_articles') {
+                pushStatus = 'skipped';
+            }
+
+            DigestLogStore.add({
+                userId,
+                scope: task.scope || 'all',
+                scopeId: task.feedId || task.groupId || task.scopeId,
+                scopeName,
+                status: 'success',
+                articleCount: result.digest?.articleCount || 0,
+                digestId: result.digest?.id,
+                pushStatus,
+                pushError: pushResult.error || null,
+                durationMs,
+                promptTokens: result.usage?.prompt_tokens || 0,
+                completionTokens: result.usage?.completion_tokens || 0,
+                triggeredBy: 'manual'
+            });
+
+            res.json({ success: true, digest: result.digest, push: result.push, usage: result.usage });
         } else {
+            // 记录手动运行失败日志
+            DigestLogStore.add({
+                userId,
+                scope: task.scope || 'all',
+                scopeId: task.feedId || task.groupId || task.scopeId,
+                scopeName,
+                status: 'failed',
+                error: result.error || 'Unknown error',
+                durationMs,
+                triggeredBy: 'manual'
+            });
+
             res.status(500).json({ error: result.error });
         }
     } catch (error) {

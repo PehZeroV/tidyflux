@@ -17,6 +17,7 @@
         "express": "^4.18.2",
         "helmet": "^8.1.0",
         "jsonwebtoken": "^9.0.2",
+        "linkedom": "^0.18.12",
         "sanitize-html": "^2.17.0"
     }
 }

@@ -1,5 +1,7 @@
 import { PreferenceStore } from '../utils/preference-store.js';
 import { DigestRunner } from '../services/digest-runner.js';
+import { DigestLogStore } from '../utils/digest-log-store.js';
+import { getMinifluxClient } from '../middleware/auth.js';
 
 /**
  * 获取当前时间字符串 (HH:mm)
@@ -28,6 +30,34 @@ function getCurrentTimeStr(timezone) {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
+}
+
+/**
+ * 解析 scope 的显示名称
+ */
+async function resolveScopeName(task) {
+    try {
+        const miniflux = await getMinifluxClient();
+        if (!miniflux) return null;
+
+        if (task.scope === 'feed') {
+            const feedId = task.feedId || task.scopeId;
+            if (feedId) {
+                const feed = await miniflux.getFeed(parseInt(feedId));
+                return feed?.title || null;
+            }
+        } else if (task.scope === 'group') {
+            const groupId = task.groupId || task.scopeId;
+            if (groupId) {
+                const categories = await miniflux.getCategories();
+                const cat = categories?.find(c => c.id === parseInt(groupId));
+                return cat?.title || null;
+            }
+        }
+    } catch {
+        // ignore
+    }
+    return null;
 }
 
 export const DigestScheduler = {
@@ -71,12 +101,27 @@ export const DigestScheduler = {
                     if (!task.enabled || task.time !== currentTime) continue;
 
                     console.log(`Triggering scheduled digest for user ${userId} [Scope: ${task.scope}] at ${currentTime}`);
+                    const startTime = Date.now();
 
                     try {
                         const result = await DigestRunner.runTask(userId, task, prefs);
+                        const durationMs = Date.now() - startTime;
 
                         if (!result.success) {
                             console.error(`Digest generation logic failed for user ${userId} [Task: ${task.scope}]:`, result.error);
+
+                            // 记录失败日志
+                            const scopeName = await resolveScopeName(task);
+                            DigestLogStore.add({
+                                userId,
+                                scope: task.scope || 'all',
+                                scopeId: task.feedId || task.groupId || task.scopeId,
+                                scopeName,
+                                status: 'failed',
+                                error: result.error || 'Unknown error',
+                                durationMs,
+                                triggeredBy: 'scheduler'
+                            });
 
                             // Check if we should disable the task (resource not found)
                             if (result.error === 'Feed not found' || result.error === 'Group not found') {
@@ -92,8 +137,50 @@ export const DigestScheduler = {
 
                         console.log(`Digest task completed for user ${userId} [Task ID: ${result.digest.id}]`);
 
+                        // 记录成功日志
+                        const scopeName = await resolveScopeName(task);
+                        const pushResult = result.push || {};
+                        let pushStatus = 'disabled';
+                        if (pushResult.attempted) {
+                            pushStatus = pushResult.success ? 'success' : 'failed';
+                        } else if (pushResult.reason === 'not_configured') {
+                            pushStatus = 'not_configured';
+                        } else if (pushResult.reason === 'no_articles') {
+                            pushStatus = 'skipped';
+                        }
+
+                        DigestLogStore.add({
+                            userId,
+                            scope: task.scope || 'all',
+                            scopeId: task.feedId || task.groupId || task.scopeId,
+                            scopeName,
+                            status: 'success',
+                            articleCount: result.digest.articleCount || 0,
+                            digestId: result.digest.id,
+                            pushStatus,
+                            pushError: pushResult.error || null,
+                            durationMs,
+                            promptTokens: result.usage?.prompt_tokens || 0,
+                            completionTokens: result.usage?.completion_tokens || 0,
+                            triggeredBy: 'scheduler'
+                        });
+
                     } catch (err) {
+                        const durationMs = Date.now() - startTime;
                         console.error(`Error in digest task execution for user ${userId}:`, err);
+
+                        // 记录异常日志
+                        const scopeName = await resolveScopeName(task);
+                        DigestLogStore.add({
+                            userId,
+                            scope: task.scope || 'all',
+                            scopeId: task.feedId || task.groupId || task.scopeId,
+                            scopeName,
+                            status: 'failed',
+                            error: err.message || String(err),
+                            durationMs,
+                            triggeredBy: 'scheduler'
+                        });
                     }
                 }
             } catch (error) {

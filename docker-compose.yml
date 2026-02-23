@@ -11,8 +11,8 @@ services:
       - tidyflux_data:/app/server/data
     environment:
       - PORT=8812
-      # Container timezone, ensuring scheduled digest runs at the correct time
-      - TZ=Asia/Shanghai
+      # Set your timezone if using scheduled digest
+      # - TZ=Asia/Shanghai
       # Optional: Configure Miniflux auto-login (uncomment and fill in)
       - MINIFLUX_URL=https://your-miniflux-server.com
       - MINIFLUX_API_KEY=your_miniflux_api_key

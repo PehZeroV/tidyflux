@@ -42,7 +42,8 @@ services:
         condition: service_started
     environment:
       - PORT=8812
-      - TZ=Asia/Shanghai
+      # Set your timezone if using scheduled digest
+      # - TZ=Asia/Shanghai
       # Auto-connect to the local Miniflux instance
       - MINIFLUX_URL=http://miniflux:8080
       - MINIFLUX_USERNAME=admin

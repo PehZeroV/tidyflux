@@ -1,5 +1,6 @@
 // Node 18+ has global fetch built-in
 import { DigestStore } from '../utils/digest-store.js';
+import { callAI } from '../utils/ai-helper.js';
 import { t } from '../utils/i18n.js';
 
 // 截取文本辅助函数
@@ -180,58 +181,6 @@ ${articlesList}`;
     return finalPrompt;
 }
 
-// 调用 AI API 生成简报
-async function callAIForDigest(prompt, aiConfig, lang = 'zh') {
-    const isOllama = aiConfig?.provider === 'ollama';
-    if (!aiConfig || !aiConfig.apiUrl || (!isOllama && !aiConfig.apiKey)) {
-        throw new Error(t('ai_not_configured', lang));
-    }
-
-    const normalizeApiUrl = (url) => {
-        let normalized = url.trim();
-        if (!normalized.endsWith('/')) normalized += '/';
-        if (!normalized.endsWith('chat/completions')) {
-            normalized += 'chat/completions';
-        }
-        return normalized;
-    };
-
-    const apiUrl = normalizeApiUrl(aiConfig.apiUrl);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-        controller.abort();
-    }, 600000); // 10 minutes timeout
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (aiConfig.apiKey) headers['Authorization'] = `Bearer ${aiConfig.apiKey}`;
-
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                model: aiConfig.model || 'gpt-4.1-mini',
-                temperature: aiConfig.temperature ?? 1,
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
-                stream: false
-            }),
-            signal: controller.signal
-        });
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error?.message || (t('ai_api_error', lang) + `: ${response.status}`));
-        }
-
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
-    } finally {
-        clearTimeout(timeout);
-    }
-}
 
 export const DigestService = {
     async generate(minifluxClient, userId, options) {
@@ -299,8 +248,10 @@ export const DigestService = {
             customPrompt
         });
 
-        // 调用 AI
-        const digestContent = await callAIForDigest(prompt, aiConfig, lang);
+        // 调用 AI（10 分钟超时，返回 usage）
+        const aiResult = await callAI(prompt, aiConfig, { timeoutMs: 600000, returnUsage: true });
+        const digestContent = aiResult.content;
+        const tokenUsage = aiResult.usage;
 
         // 生成本地化标题 — 使用用户设定的时区
         const now = new Date();
@@ -357,7 +308,8 @@ export const DigestService = {
 
         return {
             success: true,
-            digest: saved
+            digest: saved,
+            usage: tokenUsage
         };
     }
 };

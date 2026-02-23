@@ -650,6 +650,8 @@ export const ContextMenu = {
                 try {
                     await FeedManager.setPreference('show_summary', newState);
                     showToast(newState ? i18n.t('context.summary_on') : i18n.t('context.summary_off'), 3000, false);
+                    // 开启时为已有文章预计算摘要
+                    if (newState) ArticlesView._precomputeContentPreviews(AppState.articles);
                     this.viewManager.renderArticlesList(AppState.articles);
                 } catch (err) {
                     console.error('Save pref error:', err);
