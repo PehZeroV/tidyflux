@@ -2,6 +2,18 @@ import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { t, getLang } from '../utils/i18n.js';
+import { AIPretranslateScheduler } from '../jobs/ai-pretranslate-scheduler.js';
+
+// AI 相关的配置 key，变更时需要通知调度器重启
+const AI_CONFIG_KEYS = new Set([
+    'ai_config',
+    'ai_pretranslate_title',
+    'ai_pretranslate_translate',
+    'ai_pretranslate_summary',
+    'title_translation_overrides',
+    'auto_translate_overrides',
+    'auto_summary_overrides'
+]);
 
 const router = express.Router();
 
@@ -38,6 +50,13 @@ router.post('/', authenticateToken, async (req, res) => {
         const { success, preferences: newPrefs } = await PreferenceStore.update(userId, updates);
 
         if (success) {
+            // 检查是否涉及 AI 相关配置变更
+            const changedKeys = Object.keys(updates);
+            const aiChanged = changedKeys.some(k => AI_CONFIG_KEYS.has(k));
+            if (aiChanged) {
+                AIPretranslateScheduler.notifyConfigChanged();
+            }
+
             res.json({ success: true, preferences: maskSensitiveData(newPrefs) });
         } else {
             const lang = getLang(req);

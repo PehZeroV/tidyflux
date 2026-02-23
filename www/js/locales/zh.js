@@ -329,7 +329,7 @@ export default {
         auto_translate_article: '全文自动翻译',
         auto_translate_hint_panel: '选择需要全文自动翻译的分组或订阅源',
         ai_automation: 'AI 自动化',
-        rate_limit_warning: '快速滚动文章列表或者快速切换文章极易触发 API 速率限制，建议按需开启',
+        rate_limit_warning: '大量文章的翻译和摘要会消耗较多 Token，建议按需开启',
         pretranslate_background_hint: '后台自动预处理并缓存，加快加载速度',
         not_configured: 'AI 服务未配置，请先在设置中配置',
         auto_translate_failed: '自动翻译失败',

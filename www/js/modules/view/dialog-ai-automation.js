@@ -120,7 +120,7 @@ export const TranslationDialogMixin = {
                         </div>
                     </div>
                     <div style="font-size: 0.75em; color: var(--meta-color); margin-top: 12px; line-height: 1.5; opacity: 0.8;">
-                        ⚠️ ${i18n.t('ai.rate_limit_warning')}
+                        ❗ ${i18n.t('ai.rate_limit_warning')}
                     </div>
 
 

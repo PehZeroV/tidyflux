@@ -329,7 +329,7 @@ export default {
         auto_translate_article: 'Auto Translate Article',
         auto_translate_hint_panel: 'Select groups or feeds to auto-translate full articles when opened',
         ai_automation: 'AI Automation',
-        rate_limit_warning: 'Rapidly scrolling through the article list or quickly switching articles may easily trigger API rate limits. Enable only as needed.',
+        rate_limit_warning: 'Translating and summarizing large volumes of articles consumes significant tokens. Enable as needed.',
         pretranslate_background_hint: 'Automatically pre-process and cache in background to speed up loading',
         not_configured: 'AI service not configured, please configure in settings',
         auto_translate_failed: 'Auto translation failed',

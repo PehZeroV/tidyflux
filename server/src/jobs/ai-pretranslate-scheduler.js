@@ -91,6 +91,8 @@ async function callWithBackoff(fn, state) {
 
 export const AIPretranslateScheduler = {
     _running: false,
+    _abortController: null,   // 当前轮次的 AbortController
+    _scheduledTimer: null,    // 下一轮定时器
 
     /**
      * 启动调度器
@@ -101,36 +103,61 @@ export const AIPretranslateScheduler = {
         const run = async () => {
             if (this._running) {
                 // 上一轮还没跑完，跳过
-                setTimeout(run, SCHEDULER_INTERVAL);
+                this._scheduledTimer = setTimeout(run, SCHEDULER_INTERVAL);
                 return;
             }
             try {
                 this._running = true;
-                await this.runAll();
+                this._abortController = new AbortController();
+                await this.runAll(this._abortController.signal);
             } catch (err) {
-                console.error('[AI Pretranslate] Scheduler error:', err);
+                if (err.name === 'AbortError') {
+                    console.log('[AI Pretranslate] Round aborted due to config change, restarting...');
+                } else {
+                    console.error('[AI Pretranslate] Scheduler error:', err);
+                }
             } finally {
+                this._abortController = null;
                 this._running = false;
-                setTimeout(run, SCHEDULER_INTERVAL);
+                this._scheduledTimer = setTimeout(run, SCHEDULER_INTERVAL);
             }
         };
 
         // 首次延迟 30 秒启动（等待服务器完全就绪）
-        setTimeout(run, 30000);
+        this._scheduledTimer = setTimeout(run, 30000);
+    },
+
+    /**
+     * 通知配置变更 —— 中止当前轮次并立即重跑
+     */
+    notifyConfigChanged() {
+        if (this._abortController) {
+            console.log('[AI Pretranslate] Config changed, aborting current round...');
+            this._abortController.abort();
+        }
+        // 取消已排定的下一轮定时器，立即触发新一轮
+        if (this._scheduledTimer) {
+            clearTimeout(this._scheduledTimer);
+            this._scheduledTimer = null;
+        }
+        // 等待当前轮次结束后立即开始新一轮（稍作延迟确保 finally 块执行完）
+        setTimeout(() => this.start(), 500);
     },
 
     /**
      * 处理所有用户
      */
-    async runAll() {
+    async runAll(signal) {
         const miniflux = await getMinifluxClient();
         if (!miniflux) return;
 
         const userIds = await PreferenceStore.getAllUserIds();
         for (const userId of userIds) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
             try {
-                await this.processUser(userId, miniflux);
+                await this.processUser(userId, miniflux, signal);
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 console.error(`[AI Pretranslate] Error processing user ${userId}:`, err.message);
             }
         }
@@ -139,7 +166,7 @@ export const AIPretranslateScheduler = {
     /**
      * 处理单个用户
      */
-    async processUser(userId, miniflux) {
+    async processUser(userId, miniflux, signal) {
         const prefs = await PreferenceStore.get(userId);
 
         // 检查用户是否启用了任何后台预处理功能（默认全部关闭）
@@ -211,19 +238,22 @@ export const AIPretranslateScheduler = {
         const backoffState = { backoff: BACKOFF_INITIAL };
 
         // 1. 标题翻译（批量处理）
-        await this._processTitleTranslation(userId, relevantEntries, titleFeeds, targetLang, aiConfig, backoffState);
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        await this._processTitleTranslation(userId, relevantEntries, titleFeeds, targetLang, aiConfig, backoffState, signal);
 
         // 2. 全文翻译（逐篇处理）
-        await this._processFullTranslation(userId, relevantEntries, translateFeeds, targetLang, aiConfig, backoffState);
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        await this._processFullTranslation(userId, relevantEntries, translateFeeds, targetLang, aiConfig, backoffState, signal);
 
         // 3. 自动摘要（逐篇处理）
-        await this._processAutoSummary(userId, relevantEntries, summaryFeeds, targetLang, aiConfig, backoffState);
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        await this._processAutoSummary(userId, relevantEntries, summaryFeeds, targetLang, aiConfig, backoffState, signal);
     },
 
     /**
      * 批量标题翻译
      */
-    async _processTitleTranslation(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState) {
+    async _processTitleTranslation(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState, signal) {
         if (enabledFeeds.size === 0) return;
 
         // 筛选需要标题翻译的文章
@@ -245,6 +275,8 @@ export const AIPretranslateScheduler = {
 
         // 分批翻译
         for (let i = 0; i < needTranslate.length; i += TITLE_BATCH_SIZE) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
             const batch = needTranslate.slice(i, i + TITLE_BATCH_SIZE);
 
             try {
@@ -270,6 +302,7 @@ export const AIPretranslateScheduler = {
 
                 console.log(`[AI Pretranslate] Translated ${batch.length} titles (batch ${Math.floor(i / TITLE_BATCH_SIZE) + 1})`);
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 console.error(`[AI Pretranslate] Title translation batch failed:`, err.message);
             }
         }
@@ -278,12 +311,13 @@ export const AIPretranslateScheduler = {
     /**
      * 逐篇全文翻译（按段落分批翻译，缓存格式与前端一致）
      */
-    async _processFullTranslation(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState) {
+    async _processFullTranslation(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState, signal) {
         if (enabledFeeds.size === 0) return;
 
         const BLOCK_BATCH_SIZE = 10; // 每批最多 10 个段落
         let count = 0;
         for (const entry of entries) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
             if (!enabledFeeds.has(entry.feed_id)) continue;
 
             // 检查缓存
@@ -307,6 +341,8 @@ export const AIPretranslateScheduler = {
                 // 分批翻译，每批最多 BLOCK_BATCH_SIZE 个段落
                 const allTranslated = [];
                 for (let i = 0; i < blocks.length; i += BLOCK_BATCH_SIZE) {
+                    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
                     const batch = blocks.slice(i, i + BLOCK_BATCH_SIZE);
 
                     const translatedBatch = await callWithBackoff(
@@ -322,6 +358,7 @@ export const AIPretranslateScheduler = {
                     count++;
                 }
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 console.error(`[AI Pretranslate] Translation failed for entry ${entry.id}:`, err.message);
             }
 
@@ -335,11 +372,12 @@ export const AIPretranslateScheduler = {
     /**
      * 逐篇自动摘要
      */
-    async _processAutoSummary(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState) {
+    async _processAutoSummary(userId, entries, enabledFeeds, targetLang, aiConfig, backoffState, signal) {
         if (enabledFeeds.size === 0) return;
 
         let count = 0;
         for (const entry of entries) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
             if (!enabledFeeds.has(entry.feed_id)) continue;
 
             // 检查缓存
@@ -367,6 +405,7 @@ export const AIPretranslateScheduler = {
                     count++;
                 }
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 console.error(`[AI Pretranslate] Summary failed for entry ${entry.id}:`, err.message);
             }
         }
