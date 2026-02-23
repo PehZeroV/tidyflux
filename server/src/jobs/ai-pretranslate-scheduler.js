@@ -93,38 +93,44 @@ export const AIPretranslateScheduler = {
     _running: false,
     _abortController: null,   // 当前轮次的 AbortController
     _scheduledTimer: null,    // 下一轮定时器
+    _started: false,          // 是否已启动过（防止重复启动）
 
     /**
-     * 启动调度器
+     * 单次执行入口（内部使用）
+     */
+    async _run() {
+        if (this._running) {
+            // 上一轮还没跑完，跳过
+            this._scheduledTimer = setTimeout(() => this._run(), SCHEDULER_INTERVAL);
+            return;
+        }
+        try {
+            this._running = true;
+            this._abortController = new AbortController();
+            await this.runAll(this._abortController.signal);
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log('[AI Pretranslate] Round aborted due to config change, restarting...');
+            } else {
+                console.error('[AI Pretranslate] Scheduler error:', err);
+            }
+        } finally {
+            this._abortController = null;
+            this._running = false;
+            this._scheduledTimer = setTimeout(() => this._run(), SCHEDULER_INTERVAL);
+        }
+    },
+
+    /**
+     * 启动调度器（只能启动一次）
      */
     start() {
+        if (this._started) return; // 防止重复启动
+        this._started = true;
         console.log('[AI Pretranslate] Scheduler starting...');
 
-        const run = async () => {
-            if (this._running) {
-                // 上一轮还没跑完，跳过
-                this._scheduledTimer = setTimeout(run, SCHEDULER_INTERVAL);
-                return;
-            }
-            try {
-                this._running = true;
-                this._abortController = new AbortController();
-                await this.runAll(this._abortController.signal);
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    console.log('[AI Pretranslate] Round aborted due to config change, restarting...');
-                } else {
-                    console.error('[AI Pretranslate] Scheduler error:', err);
-                }
-            } finally {
-                this._abortController = null;
-                this._running = false;
-                this._scheduledTimer = setTimeout(run, SCHEDULER_INTERVAL);
-            }
-        };
-
         // 首次延迟 30 秒启动（等待服务器完全就绪）
-        this._scheduledTimer = setTimeout(run, 30000);
+        this._scheduledTimer = setTimeout(() => this._run(), 30000);
     },
 
     /**
@@ -141,7 +147,7 @@ export const AIPretranslateScheduler = {
             this._scheduledTimer = null;
         }
         // 等待当前轮次结束后立即开始新一轮（稍作延迟确保 finally 块执行完）
-        setTimeout(() => this.start(), 500);
+        setTimeout(() => this._run(), 500);
     },
 
     /**
@@ -356,6 +362,7 @@ export const AIPretranslateScheduler = {
                     // 存储为 JSON 数组，与前端 _restoreTranslationFromCache 格式一致
                     CacheStore.set(userId, cacheKey, JSON.stringify(allTranslated));
                     count++;
+                    console.log(`[AI Pretranslate] Translated full article ${entry.id} (${count} done)`);
                 }
             } catch (err) {
                 if (err.name === 'AbortError') throw err;
@@ -365,7 +372,7 @@ export const AIPretranslateScheduler = {
         }
 
         if (count > 0) {
-            console.log(`[AI Pretranslate] Translated ${count} full articles for user ${userId}`);
+            console.log(`[AI Pretranslate] Full translation complete: ${count} articles for user ${userId}`);
         }
     },
 
@@ -403,6 +410,7 @@ export const AIPretranslateScheduler = {
                 if (summary) {
                     CacheStore.set(userId, cacheKey, summary);
                     count++;
+                    console.log(`[AI Pretranslate] Generated summary for entry ${entry.id} (${count} done)`);
                 }
             } catch (err) {
                 if (err.name === 'AbortError') throw err;
@@ -411,7 +419,7 @@ export const AIPretranslateScheduler = {
         }
 
         if (count > 0) {
-            console.log(`[AI Pretranslate] Generated ${count} summaries for user ${userId}`);
+            console.log(`[AI Pretranslate] Summary complete: ${count} articles for user ${userId}`);
         }
     }
 };
