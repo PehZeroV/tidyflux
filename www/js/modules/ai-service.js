@@ -136,7 +136,8 @@ export const AIService = {
      */
     async init() {
         await this.loadConfig();
-        await this._loadTitleCache();
+        // 后台加载标题缓存，不阻塞页面渲染
+        this._loadTitleCache();
         this._translationOM.load();
         this._summaryOM.load();
         this._translateOM.load();
@@ -149,12 +150,17 @@ export const AIService = {
         try {
             const cached = await AICache.loadTitleCache();
             if (cached && cached.size > 0) {
-                this._titleCache = cached;
+                // 合并而非替换：先以服务端数据为底，再覆盖内存中已有的新条目
+                // 这样异步加载期间并发写入的缓存不会被覆盖
+                const merged = new Map(cached);
+                for (const [k, v] of this._titleCache) {
+                    merged.set(k, v);
+                }
+                this._titleCache = merged;
                 console.debug(`[AIService] Title cache loaded: ${this._titleCache.size} entries`);
             }
         } catch (e) {
             console.warn('[AIService] Failed to load title cache:', e);
-            this._titleCache = new Map();
         }
     },
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -50,6 +51,14 @@ async function startServer() {
             origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, '')) : '*'
         };
         app.use(cors(corsOptions));
+        app.use(compression({
+            filter: (req, res) => {
+                // SSE 流式响应不压缩，避免缓冲导致消息延迟
+                const ct = res.getHeader('Content-Type');
+                if (ct && String(ct).includes('text/event-stream')) return false;
+                return compression.filter(req, res);
+            }
+        }));
         app.use(express.json({ limit: '50mb' }));
         app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

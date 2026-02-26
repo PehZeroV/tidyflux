@@ -88,6 +88,10 @@ function _initTables(db) {
         CREATE INDEX IF NOT EXISTS idx_ai_cache_user
             ON ai_cache (user_id, timestamp);
 
+        -- 按用户+key前缀查询的索引（加速 batch/get LIKE 查询）
+        CREATE INDEX IF NOT EXISTS idx_ai_cache_user_key
+            ON ai_cache (user_id, key);
+
         -- ==================== AI 聊天记录表 ====================
         CREATE TABLE IF NOT EXISTS ai_chats (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,

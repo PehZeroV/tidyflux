@@ -76,7 +76,7 @@ export const AICache = {
             const response = await AuthManager.fetchWithAuth(`${CACHE_API}/batch/get`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prefix: 'title:', limit: 5000 })
+                body: JSON.stringify({ prefix: 'title:', limit: 1000 })
             });
 
             if (!response.ok) return null;
