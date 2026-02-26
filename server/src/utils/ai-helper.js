@@ -33,7 +33,7 @@ function getLanguageName(langId) {
 }
 
 // ==================== URL 处理 ====================
-function normalizeApiUrl(url) {
+export function normalizeApiUrl(url) {
     let normalized = url.trim();
     if (!normalized.endsWith('/')) normalized += '/';
     if (!normalized.endsWith('chat/completions')) {

@@ -12,7 +12,8 @@ export const DigestRunner = {
      */
     async runTask(userId, task, prefs, options = { force: false }) {
         const aiConfig = prefs.ai_config;
-        if (!aiConfig?.apiKey) {
+        const isOllama = aiConfig?.provider === 'ollama';
+        if (!aiConfig?.apiUrl || (!isOllama && !aiConfig?.apiKey)) {
             console.error(`Skipping digest for ${userId}: AI not configured.`);
             return { success: false, error: 'AI not configured' };
         }

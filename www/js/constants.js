@@ -38,7 +38,6 @@ export const API_ENDPOINTS = {
     DIGEST: {
         LIST: '/api/digest/list',
         GENERATE: '/api/digest/generate',
-        PREVIEW: '/api/digest/preview',
         TEST_PUSH: '/api/digest/test-push',
         RUN_TASK: '/api/digest/run-task',
         LOGS: '/api/digest/logs',

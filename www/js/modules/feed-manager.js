@@ -203,10 +203,6 @@ export const FeedManager = {
         return data;
     },
 
-    // Cache integrations status for 5 minutes
-    _integrationsCache: null,
-    _integrationsCacheTime: 0,
-
     async getIntegrationsStatus() {
         const response = await AuthManager.fetchWithAuth('/api/articles/integrations/status');
 

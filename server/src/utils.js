@@ -1,4 +1,3 @@
-import sanitizeHtml from 'sanitize-html';
 
 /**
  * 工具函数模块
@@ -150,4 +149,4 @@ export function extractThumbnailUrl(content, summary) {
     return getThumbnailUrl(imageUrl);
 }
 
-export { sanitizeHtml };
+

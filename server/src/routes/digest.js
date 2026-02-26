@@ -7,7 +7,7 @@
 import express from 'express';
 import { authenticateToken, requireMinifluxConfigured } from '../middleware/auth.js';
 import { DigestStore } from '../utils/digest-store.js';
-import { DigestService, getRecentUnreadArticles } from '../services/digest-service.js';
+import { DigestService } from '../services/digest-service.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { DigestRunner } from '../services/digest-runner.js';
 import { DigestLogStore } from '../utils/digest-log-store.js';
@@ -346,55 +346,7 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-/**
- * GET /api/digest/preview
- * 预览可用于生成简报的文章
- */
-router.get('/preview', requireMinifluxConfigured, async (req, res) => {
-    try {
-        const {
-            scope = 'all',
-            feedId,
-            groupId,
-            hours = 12
-        } = req.query;
 
-        const parsedHours = parseInt(hours);
-        const options = { hours: isNaN(parsedHours) ? 12 : parsedHours };
-
-        if (scope === 'feed' && feedId) {
-            const parsedFeedId = parseInt(feedId);
-            if (isNaN(parsedFeedId)) return res.status(400).json({ error: 'Invalid feedId' });
-            options.feedId = parsedFeedId;
-        } else if (scope === 'group' && groupId) {
-            const parsedGroupId = parseInt(groupId);
-            if (isNaN(parsedGroupId)) return res.status(400).json({ error: 'Invalid groupId' });
-            options.groupId = parsedGroupId;
-        }
-
-        const articles = await getRecentUnreadArticles(req.miniflux, options);
-
-        res.json({
-            success: true,
-            preview: {
-                articleCount: articles.length,
-                articles: articles.slice(0, 10).map(a => ({
-                    id: a.id,
-                    title: a.title,
-                    feedTitle: a.feed ? a.feed.title : '',
-                    publishedAt: a.published_at
-                })),
-                hours: parseInt(hours)
-            }
-        });
-
-    } catch (error) {
-        console.error('Preview digest error:', error);
-        res.status(500).json({
-            error: t('preview_failed', getLang(req))
-        });
-    }
-});
 
 /**
  * POST /api/digest/test-push

@@ -4,21 +4,11 @@ import { Readable } from 'node:stream';
 import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { t, getLang } from '../utils/i18n.js';
+import { normalizeApiUrl } from '../utils/ai-helper.js';
 
 const router = express.Router();
 
-/**
- * POST /api/ai/chat
- * 通用 AI 对话接口 (支持流式响应)
- */
-const normalizeApiUrl = (url) => {
-    let normalized = url.trim();
-    if (!normalized.endsWith('/')) normalized += '/';
-    if (!normalized.endsWith('chat/completions')) {
-        normalized += 'chat/completions';
-    }
-    return normalized;
-};
+
 
 router.post('/chat', authenticateToken, async (req, res) => {
     try {

@@ -9,28 +9,6 @@ import { getDb } from './database.js';
 
 export const ChatStore = {
     /**
-     * 初始化聊天表（由 database.js 统一调用）
-     */
-    ensureTable() {
-        const db = getDb();
-        db.exec(`
-            CREATE TABLE IF NOT EXISTS ai_chats (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     TEXT    NOT NULL,
-                article_id  TEXT    NOT NULL,
-                messages    TEXT    NOT NULL DEFAULT '[]',
-                title       TEXT,
-                updated_at  TEXT    DEFAULT (datetime('now')),
-                created_at  TEXT    DEFAULT (datetime('now')),
-                UNIQUE(user_id, article_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_ai_chats_user
-                ON ai_chats (user_id, updated_at DESC);
-        `);
-    },
-
-    /**
      * 获取某篇文章的聊天记录
      * @param {string} userId
      * @param {string} articleId
