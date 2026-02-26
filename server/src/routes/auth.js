@@ -108,6 +108,10 @@ router.post('/change-password', authenticateToken, async (req, res) => {
         const { newPassword } = req.body;
         const username = req.user.username;
 
+        if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+            return res.status(400).json({ error: t('fill_all_info', lang) });
+        }
+
         await UserStore.changePassword(username, newPassword);
         res.json({ success: true, message: t('password_change_success', lang) });
     } catch (error) {
@@ -275,4 +279,3 @@ router.get('/env-config', async (req, res) => {
 });
 
 export default router;
-

@@ -326,7 +326,7 @@ export default {
         title_translation_bilingual: 'Bilingual',
         title_translation_translated: 'Translated Only',
         auto_summary_hint_panel: 'Select groups or feeds to auto-generate summaries when articles are opened',
-        auto_translate_article: 'Auto Translate Article',
+        auto_translate_article: 'Auto Article Translation',
         auto_translate_hint_panel: 'Select groups or feeds to auto-translate full articles when opened',
         ai_automation: 'AI Automation',
         rate_limit_warning: 'Translating and summarizing large volumes of articles consumes significant tokens. Enable as needed.',

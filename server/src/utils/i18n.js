@@ -9,6 +9,7 @@ const messages = {
         // ===== middleware/auth =====
         not_logged_in: '未登录',
         session_expired: '登录已过期',
+        miniflux_not_configured: 'Miniflux 未配置，请先在设置中完成配置',
 
         // ===== routes/auth =====
         invalid_credentials_miniflux: '用户名或密码错误，请检查 Miniflux 登录信息',
@@ -102,6 +103,7 @@ const messages = {
         // ===== middleware/auth =====
         not_logged_in: 'Not logged in',
         session_expired: 'Session expired',
+        miniflux_not_configured: 'Miniflux is not configured. Please complete setup in settings first.',
 
         // ===== routes/auth =====
         invalid_credentials_miniflux: 'Invalid credentials, please check your Miniflux login info',

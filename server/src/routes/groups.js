@@ -1,11 +1,14 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireMinifluxConfigured } from '../middleware/auth.js';
 import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
+router.use(authenticateToken);
+router.use(requireMinifluxConfigured);
+
 // Get all groups (Miniflux Categories)
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         // Fetch both categories and feeds to calculate feed_count
         const [categories, feeds] = await Promise.all([
@@ -40,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Create group
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { name } = req.body;
         const lang = getLang(req);
@@ -60,7 +63,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Update group
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
@@ -82,7 +85,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete group
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.deleteCategory(id);

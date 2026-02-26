@@ -1,9 +1,12 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireMinifluxConfigured } from '../middleware/auth.js';
 import { extractThumbnailUrl, extractFirstImage, getThumbnailUrl } from '../utils.js';
 import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
+
+router.use(authenticateToken);
+router.use(requireMinifluxConfigured);
 
 /**
  * Helper to map Miniflux entry to Tidyflux Article
@@ -28,7 +31,7 @@ function mapEntryToArticle(entry, thumbnail) {
 }
 
 // Get articles
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const {
             page = 1,
@@ -187,7 +190,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get integrations status (must be before /:id to avoid route conflict)
-router.get('/integrations/status', authenticateToken, async (req, res) => {
+router.get('/integrations/status', async (req, res) => {
     try {
         const status = await req.miniflux.getIntegrationsStatus();
         res.json(status); // { has_integrations: true/false }
@@ -199,7 +202,7 @@ router.get('/integrations/status', authenticateToken, async (req, res) => {
 });
 
 // Get single article
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const entry = await req.miniflux.getEntry(id);
@@ -226,7 +229,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Mark read
-router.post('/:id/read', authenticateToken, async (req, res) => {
+router.post('/:id/read', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.updateEntriesStatus(parseInt(id), 'read');
@@ -239,7 +242,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
 });
 
 // Mark unread
-router.delete('/:id/read', authenticateToken, async (req, res) => {
+router.delete('/:id/read', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.updateEntriesStatus(parseInt(id), 'unread');
@@ -252,7 +255,7 @@ router.delete('/:id/read', authenticateToken, async (req, res) => {
 });
 
 // Batch mark read (multiple articles in one request)
-router.post('/batch-read', authenticateToken, async (req, res) => {
+router.post('/batch-read', async (req, res) => {
     try {
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0) {
@@ -270,7 +273,7 @@ router.post('/batch-read', authenticateToken, async (req, res) => {
 });
 
 // Mark all read
-router.post('/mark-all-read', authenticateToken, async (req, res) => {
+router.post('/mark-all-read', async (req, res) => {
     try {
         const { feed_id, group_id, after_published_at } = req.body;
 
@@ -324,7 +327,7 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
 });
 
 // Favorite
-router.post('/:id/favorite', authenticateToken, async (req, res) => {
+router.post('/:id/favorite', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.toggleBookmark(id);
@@ -337,7 +340,7 @@ router.post('/:id/favorite', authenticateToken, async (req, res) => {
 });
 
 
-router.delete('/:id/favorite', authenticateToken, async (req, res) => {
+router.delete('/:id/favorite', async (req, res) => {
     try {
         const { id } = req.params;
         // Miniflux's PUT /entries/:id only supports title/content, not starred.
@@ -354,7 +357,7 @@ router.delete('/:id/favorite', authenticateToken, async (req, res) => {
 // Fetch article content (Readability mode)
 // PUT /api/articles/:id/fetch-content
 // Note: We keep frontend interface as PUT as it modifies state, but backend calls Miniflux's GET endpoint
-router.put('/:id/fetch-content', authenticateToken, async (req, res) => {
+router.put('/:id/fetch-content', async (req, res) => {
     try {
         const { id } = req.params;
         // Run both requests in parallel
@@ -392,7 +395,7 @@ router.put('/:id/fetch-content', authenticateToken, async (req, res) => {
 });
 
 // Save entry to third-party services
-router.post('/:id/save', authenticateToken, async (req, res) => {
+router.post('/:id/save', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.saveEntry(id);

@@ -1,11 +1,14 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireMinifluxConfigured } from '../middleware/auth.js';
 import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
+router.use(authenticateToken);
+router.use(requireMinifluxConfigured);
+
 // Discover feeds from a website URL
-router.post('/discover', authenticateToken, async (req, res) => {
+router.post('/discover', async (req, res) => {
     try {
         const { url } = req.body;
         if (!url) return res.status(400).json({ error: 'URL is required' });
@@ -24,7 +27,7 @@ router.post('/discover', authenticateToken, async (req, res) => {
 });
 
 // Get all feeds
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         // Fetch feeds and counters in parallel
         const [feeds, counters] = await Promise.all([
@@ -57,7 +60,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get single feed
-router.get('/:id(\\d+)', authenticateToken, async (req, res) => {
+router.get('/:id(\\d+)', async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -74,7 +77,7 @@ router.get('/:id(\\d+)', authenticateToken, async (req, res) => {
 });
 
 // Add feed
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { url, group_id } = req.body;
 
@@ -120,7 +123,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Update feed (move to group/category)
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { group_id, category_id, title, site_url, feed_url } = req.body;
@@ -145,7 +148,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete feed
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.deleteFeed(id);
@@ -158,7 +161,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // Refresh feed
-router.post('/refresh/:id', authenticateToken, async (req, res) => {
+router.post('/refresh/:id', async (req, res) => {
     try {
         const { id } = req.params;
         await req.miniflux.refreshFeed(id);
@@ -171,7 +174,7 @@ router.post('/refresh/:id', authenticateToken, async (req, res) => {
 });
 
 // Refresh Group - return immediately, process in background
-router.post('/refresh-group/:groupId', authenticateToken, async (req, res) => {
+router.post('/refresh-group/:groupId', async (req, res) => {
     try {
         const { groupId } = req.params;
         const miniflux = req.miniflux;
@@ -197,7 +200,7 @@ router.post('/refresh-group/:groupId', authenticateToken, async (req, res) => {
 });
 
 // Refresh All - return immediately, process in background
-router.post('/refresh', authenticateToken, async (req, res) => {
+router.post('/refresh', async (req, res) => {
     try {
         const miniflux = req.miniflux;
         const feeds = await miniflux.getFeeds();
@@ -222,7 +225,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 });
 
 // OPML Export
-router.get('/opml/export', authenticateToken, async (req, res) => {
+router.get('/opml/export', async (req, res) => {
     try {
         const opmlContent = await req.miniflux.exportOPML();
         res.setHeader('Content-Type', 'application/xml');
@@ -236,7 +239,7 @@ router.get('/opml/export', authenticateToken, async (req, res) => {
 });
 
 // OPML Import
-router.post('/opml/import', authenticateToken, express.raw({ type: ['application/xml', 'text/xml', 'multipart/form-data'], limit: '10mb' }), async (req, res) => {
+router.post('/opml/import', express.raw({ type: ['application/xml', 'text/xml', 'multipart/form-data'], limit: '10mb' }), async (req, res) => {
     try {
         let opmlData = req.body;
 

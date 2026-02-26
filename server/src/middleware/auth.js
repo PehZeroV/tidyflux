@@ -115,6 +115,17 @@ export async function authenticateToken(req, res, next) {
 }
 
 /**
+ * 依赖 Miniflux 的接口守卫
+ */
+export function requireMinifluxConfigured(req, res, next) {
+    if (!req.miniflux) {
+        const lang = getLang(req);
+        return res.status(503).json({ error: t('miniflux_not_configured', lang) });
+    }
+    next();
+}
+
+/**
  * 生成 JWT Token
  */
 export function generateToken(payload) {

@@ -5,7 +5,7 @@
  */
 
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireMinifluxConfigured } from '../middleware/auth.js';
 import { DigestStore } from '../utils/digest-store.js';
 import { DigestService, getRecentUnreadArticles } from '../services/digest-service.js';
 import { PreferenceStore } from '../utils/preference-store.js';
@@ -15,13 +15,15 @@ import { t, getLang } from '../utils/i18n.js';
 
 const router = express.Router();
 
+router.use(authenticateToken);
+
 
 
 /**
  * GET /api/digest/list
  * 获取简报列表（用于文章列表显示）
  */
-router.get('/list', authenticateToken, async (req, res) => {
+router.get('/list', async (req, res) => {
     try {
         const { scope, scopeId, unreadOnly } = req.query;
 
@@ -58,7 +60,7 @@ router.get('/list', authenticateToken, async (req, res) => {
  * GET /api/digest/logs
  * 获取定时简报执行日志
  */
-router.get('/logs', authenticateToken, async (req, res) => {
+router.get('/logs', async (req, res) => {
     try {
         const userId = PreferenceStore.getUserId(req.user);
         const limit = Math.min(parseInt(req.query.limit) || 50, 200);
@@ -81,7 +83,7 @@ router.get('/logs', authenticateToken, async (req, res) => {
  * GET /api/digest/:id
  * 获取单个简报详情
  */
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const userId = PreferenceStore.getUserId(req.user);
@@ -107,7 +109,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
  * POST /api/digest/generate
  * 生成简报并存储
  */
-router.post('/generate', authenticateToken, async (req, res) => {
+router.post('/generate', requireMinifluxConfigured, async (req, res) => {
     // Check if client wants stream
     const useStream = req.query.stream === 'true' || req.headers.accept === 'text/event-stream';
 
@@ -279,7 +281,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
  * POST /api/digest/:id/read
  * 标记简报为已读
  */
-router.post('/:id/read', authenticateToken, async (req, res) => {
+router.post('/:id/read', async (req, res) => {
     try {
         const { id } = req.params;
         const userId = PreferenceStore.getUserId(req.user);
@@ -302,7 +304,7 @@ router.post('/:id/read', authenticateToken, async (req, res) => {
  * DELETE /api/digest/:id/read
  * 标记简报为未读
  */
-router.delete('/:id/read', authenticateToken, async (req, res) => {
+router.delete('/:id/read', async (req, res) => {
     try {
         const { id } = req.params;
         const userId = PreferenceStore.getUserId(req.user);
@@ -325,7 +327,7 @@ router.delete('/:id/read', authenticateToken, async (req, res) => {
  * DELETE /api/digest/:id
  * 删除简报
  */
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const userId = PreferenceStore.getUserId(req.user);
@@ -348,7 +350,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * GET /api/digest/preview
  * 预览可用于生成简报的文章
  */
-router.get('/preview', authenticateToken, async (req, res) => {
+router.get('/preview', requireMinifluxConfigured, async (req, res) => {
     try {
         const {
             scope = 'all',
@@ -398,7 +400,7 @@ router.get('/preview', authenticateToken, async (req, res) => {
  * POST /api/digest/test-push
  * 测试推送通知（通过后端代理，避免 CORS 问题）
  */
-router.post('/test-push', authenticateToken, async (req, res) => {
+router.post('/test-push', async (req, res) => {
     try {
         const { url, body, method } = req.body;
         if (!url) {
@@ -435,7 +437,7 @@ router.post('/test-push', authenticateToken, async (req, res) => {
  * POST /api/digest/run-task
  * 手动触发指定的定时简报任务
  */
-router.post('/run-task', authenticateToken, async (req, res) => {
+router.post('/run-task', requireMinifluxConfigured, async (req, res) => {
     try {
         const { taskIndex } = req.body;
         if (typeof taskIndex !== 'number') {
