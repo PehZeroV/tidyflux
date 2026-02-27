@@ -1,57 +1,78 @@
 import { Icons } from '../icons.js';
 import { i18n } from '../i18n.js';
 import { BREAKPOINTS } from '../../constants.js';
+import { escapeHtml } from '../view/utils.js';
 
 class PodcastPlayer {
     constructor() {
-        this.container = null;
+        // Playback state
         this.audioUrl = '';
         this.title = '';
         this.coverUrl = '';
-        this.sound = null;
         this.isPlaying = false;
         this.isLoading = false;
         this.duration = 0;
-        this.els = null;
 
-        // Preload Howler to minimize delay on first click
-        this.ensureHowlerLoaded().catch(() => { });
+        // UI state
+        this.container = null;
+        this.els = null;
+        this.isSeeking = false;
+        this.rafId = null;
+
+        // Tracks latest play attempt to ignore stale async callbacks
+        this.playAttemptId = 0;
+
+        // Persistent native audio element
+        this.audio = this.createAudioElement();
     }
 
-    async play(audioUrl, title = '', coverUrl = '') {
-        // Prevent multiple rapid clicks
-        if (this.isLoading) {
-            return;
-        }
+    createAudioElement() {
+        const audio = document.createElement('audio');
+        audio.id = 'podcast-audio';
+        audio.preload = 'metadata';
+        audio.setAttribute('playsinline', '');
+        audio.setAttribute('webkit-playsinline', '');
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
 
-        // If playing same audio, just expand/show
-        if (this.audioUrl === audioUrl && this.sound) {
+        audio.addEventListener('loadedmetadata', () => this.onMetadata());
+        audio.addEventListener('durationchange', () => this.onMetadata());
+        audio.addEventListener('play', () => this.onPlay());
+        audio.addEventListener('pause', () => this.onPause());
+        audio.addEventListener('ended', () => this.onEnded());
+        audio.addEventListener('error', (e) => this.onError(e));
+
+        return audio;
+    }
+
+    play(audioUrl, title = '', coverUrl = '') {
+        if (!audioUrl) return;
+
+        const isSameAudio = this.audioUrl === audioUrl;
+
+        if (isSameAudio && this.audioUrl) {
+            if (!this.container) {
+                this.initContainer();
+                this.render();
+                this.bindEvents();
+            }
             this.show();
             if (!this.isPlaying) {
-                this.sound.play();
+                this.attemptPlay(false);
             }
             return;
         }
 
-        this.isLoading = true;
-
-        // Stop previous
-        if (this.sound) {
-            this.sound.unload();
-            this.sound = null;
+        if (this.isLoading) {
+            return;
         }
 
+        this.isLoading = true;
+        this.isPlaying = false;
+        this.duration = 0;
         this.audioUrl = audioUrl;
         this.title = title;
         this.coverUrl = coverUrl;
-        this.isPlaying = false;
-        this.duration = 0;
-
-        // Best effort to keep user gesture sync:
-        // If Howl is not loaded, we must await. This might break iOS autoplay on first run.
-        if (!window.Howl) {
-            await this.ensureHowlerLoaded();
-        }
 
         if (!this.container) {
             this.initContainer();
@@ -59,30 +80,111 @@ class PodcastPlayer {
 
         this.render();
         this.bindEvents();
-        this.initHowl();
         this.show();
+
+        // Reset source then play immediately inside user gesture context.
+        this.audio.pause();
+        this.audio.src = audioUrl;
+        this.audio.currentTime = 0;
+        this.audio.load();
+
+        this.attemptPlay(false);
     }
 
-    async ensureHowlerLoaded() {
-        if (window.Howl) return;
+    // Optional API for compatibility; does not auto-play.
+    preload(audioUrl, title = '', coverUrl = '') {
+        if (!audioUrl || this.isPlaying) return;
+        if (this.audioUrl === audioUrl) return;
 
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = '/js/lib/howler.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
+        this.audioUrl = audioUrl;
+        this.title = title;
+        this.coverUrl = coverUrl;
+        this.isLoading = true;
+        this.duration = 0;
+
+        this.audio.pause();
+        this.audio.src = audioUrl;
+        this.audio.load();
+    }
+
+    attemptPlay(retried) {
+        if (!this.audioUrl) return;
+
+        const attemptId = ++this.playAttemptId;
+        const playPromise = this.audio.play();
+
+        if (!playPromise || typeof playPromise.catch !== 'function') {
+            return;
+        }
+
+        playPromise.catch((err) => {
+            // Ignore stale attempts.
+            if (attemptId !== this.playAttemptId) {
+                return;
+            }
+
+            if (err && err.name === 'AbortError' && !retried) {
+                setTimeout(() => {
+                    if (attemptId !== this.playAttemptId) return;
+                    if (!this.audioUrl || !this.audio.paused) return;
+                    this.attemptPlay(true);
+                }, 0);
+                return;
+            }
+
+            this.isLoading = false;
+            this.isPlaying = false;
+            this.updatePlayPauseIcon();
+            console.error('Native play error:', err);
         });
     }
 
+    onMetadata() {
+        const duration = this.audio.duration;
+        if (Number.isFinite(duration) && duration > 0) {
+            this.duration = duration;
+            if (this.els && this.els.totalTime) {
+                this.els.totalTime.textContent = this.formatTime(duration);
+            }
+        }
+        this.isLoading = false;
+    }
+
+    onPlay() {
+        this.isLoading = false;
+        this.isPlaying = true;
+        this.updatePlayPauseIcon();
+        this.startProgress();
+    }
+
+    onPause() {
+        this.isPlaying = false;
+        this.updatePlayPauseIcon();
+    }
+
+    onEnded() {
+        this.isPlaying = false;
+        this.updatePlayPauseIcon();
+        if (this.els) {
+            this.els.seekSlider.value = 0;
+            this.els.currTime.textContent = '0:00';
+        }
+    }
+
+    onError(err) {
+        this.isLoading = false;
+        this.isPlaying = false;
+        this.updatePlayPauseIcon();
+        if (this.audioUrl) {
+            console.error('Native audio error:', err);
+        }
+    }
+
     initContainer() {
-        // Match ID and Class from synthdaily
         this.container = document.createElement('div');
         this.container.id = 'persistent-player-container';
         this.container.className = 'persistent-player-container hidden';
 
-        // On desktop, append to content-panel for proper alignment
-        // On mobile, append to body
         const contentPanel = document.getElementById('content-panel');
         if (contentPanel && window.innerWidth >= BREAKPOINTS.TABLET) {
             contentPanel.appendChild(this.container);
@@ -91,68 +193,30 @@ class PodcastPlayer {
         }
     }
 
-    show() {
-        if (this.container) {
-            this.container.classList.remove('hidden');
-            document.body.classList.add('player-active');
-        }
-    }
-
-    hide() {
-        if (this.container) {
-            this.container.classList.add('hidden');
-            document.body.classList.remove('player-active');
-        }
-        if (this.sound) {
-            this.sound.pause();
-        }
-    }
-
-    close() {
-        // Completely remove from DOM
-        if (this.container) {
-            this.container.remove();
-            this.container = null;
-        }
-        document.body.classList.remove('player-active');
-
-        if (this.sound) {
-            this.sound.unload();
-            this.sound = null;
-        }
-
-        // Reset state
-        this.isPlaying = false;
-        this.audioUrl = '';
-        this.title = '';
-        this.coverUrl = '';
-        this.duration = 0;
-        this.els = null;
-    }
-
     render() {
         if (!this.container) return;
 
+        const safeTitle = escapeHtml(this.title);
         this.container.innerHTML = `
             <div class="player-content">
                 <div class="track-info">
-                    <span class="track-title" title="${this.title}">${this.title || i18n.t('player.unknown_title')}</span>
+                    <span class="track-title" title="${safeTitle}">${safeTitle || i18n.t('player.unknown_title')}</span>
                 </div>
                 <div class="player-controls-wrapper">
-                     <button id="player-prev-btn" class="player-nav-btn" aria-label="${i18n.t('player.prev')}">
+                    <button id="player-prev-btn" class="player-nav-btn" aria-label="${i18n.t('player.prev')}">
                         ${Icons.skip_previous}
                     </button>
                     <button id="player-play-btn" class="player-play-btn" aria-label="${i18n.t('player.play')}">
-                        ${Icons.play_arrow}
+                        ${this.isPlaying ? Icons.pause : Icons.play_arrow}
                     </button>
                     <button id="player-next-btn" class="player-nav-btn" aria-label="${i18n.t('player.next')}">
                         ${Icons.skip_next}
                     </button>
                 </div>
                 <div class="player-progress-wrapper">
-                    <span id="player-current-time" class="player-time">0:00</span>
+                    <span id="player-current-time" class="player-time">${this.formatTime(this.audio.currentTime || 0)}</span>
                     <input type="range" id="player-progress-bar" class="player-progress-bar" min="0" max="100" value="0" step="0.1">
-                    <span id="player-duration" class="player-time">0:00</span>
+                    <span id="player-duration" class="player-time">${this.formatTime(this.duration)}</span>
                 </div>
                 <button id="player-close-btn" class="player-close-btn" aria-label="${i18n.t('player.close')}">
                     ${Icons.close}
@@ -169,62 +233,24 @@ class PodcastPlayer {
             prevBtn: this.container.querySelector('#player-prev-btn'),
             nextBtn: this.container.querySelector('#player-next-btn')
         };
-    }
 
-    initHowl() {
-        this.sound = new Howl({
-            src: [this.audioUrl],
-            html5: true,
-            onload: () => {
-                this.isLoading = false;
-                this.duration = this.sound.duration();
-                if (this.els && this.els.totalTime) {
-                    this.els.totalTime.textContent = this.formatTime(this.duration);
-                }
-                // Don't call play() here, it's too late for iOS gesture if we waited for load
-            },
-            onplay: () => {
-                this.isPlaying = true;
-                this.updatePlayPauseIcon();
-                requestAnimationFrame(this.step.bind(this));
-            },
-            onpause: () => {
-                this.isPlaying = false;
-                this.updatePlayPauseIcon();
-            },
-            onstop: () => {
-                this.isPlaying = false;
-                this.updatePlayPauseIcon();
-            },
-            onend: () => {
-                this.isPlaying = false;
-                this.updatePlayPauseIcon();
-                if (this.els && this.els.seekSlider) this.els.seekSlider.value = 0;
-                if (this.els && this.els.currTime) this.els.currTime.textContent = '0:00';
-            },
-            onloaderror: (id, err) => {
-                this.isLoading = false;
-                console.error('Howl load error:', err);
-            },
-            onplayerror: (id, err) => {
-                this.isPlaying = false;
-                this.updatePlayPauseIcon();
-                console.error('Howl play error:', err);
-            }
-        });
-
-        // Call play immediately to satisfy iOS gesture requirement
-        this.sound.play();
+        // Sync initial progress bar.
+        if (this.duration > 0 && this.els.seekSlider) {
+            this.els.seekSlider.value = (this.audio.currentTime / this.duration) * 100;
+        }
     }
 
     bindEvents() {
         if (!this.els) return;
 
+        this.isSeeking = false;
+
         this.els.playPauseBtn.addEventListener('click', () => {
+            if (!this.audioUrl) return;
             if (this.isPlaying) {
-                this.sound.pause();
+                this.audio.pause();
             } else {
-                this.sound.play();
+                this.attemptPlay(false);
             }
         });
 
@@ -232,60 +258,102 @@ class PodcastPlayer {
             this.close();
         });
 
-        // Add seeking logic...
-        let isSeeking = false;
-
-        this.els.seekSlider.addEventListener('mousedown', () => { isSeeking = true; });
-        this.els.seekSlider.addEventListener('touchstart', () => { isSeeking = true; }, { passive: true });
+        this.els.seekSlider.addEventListener('touchstart', () => { this.isSeeking = true; }, { passive: true });
+        this.els.seekSlider.addEventListener('mousedown', () => { this.isSeeking = true; });
 
         this.els.seekSlider.addEventListener('input', () => {
-            if (this.duration) {
+            if (this.duration > 0 && this.els) {
                 const seekTime = (this.els.seekSlider.value / 100) * this.duration;
                 this.els.currTime.textContent = this.formatTime(seekTime);
             }
         });
 
         this.els.seekSlider.addEventListener('change', () => {
-            if (this.sound && this.duration) {
+            if (this.duration > 0) {
                 const seekTime = (this.els.seekSlider.value / 100) * this.duration;
-                this.sound.seek(seekTime);
+                this.audio.currentTime = seekTime;
             }
-            isSeeking = false;
+            this.isSeeking = false;
         });
 
-        this.els.seekSlider.addEventListener('mouseup', () => { isSeeking = false; });
-        this.els.seekSlider.addEventListener('touchend', () => { isSeeking = false; });
+        this.els.seekSlider.addEventListener('mouseup', () => { this.isSeeking = false; });
+        this.els.seekSlider.addEventListener('touchend', () => { this.isSeeking = false; });
 
         this.els.prevBtn.addEventListener('click', () => {
-            if (this.sound) {
-                const cur = this.sound.seek();
-                this.sound.seek(Math.max(0, cur - 10));
-            }
+            this.audio.currentTime = Math.max(0, (this.audio.currentTime || 0) - 10);
         });
 
         this.els.nextBtn.addEventListener('click', () => {
-            if (this.sound) {
-                const cur = this.sound.seek();
-                this.sound.seek(Math.min(this.duration, cur + 30));
-            }
+            const maxTime = this.duration > 0 ? this.duration : (this.audio.duration || Infinity);
+            this.audio.currentTime = Math.min(maxTime, (this.audio.currentTime || 0) + 30);
         });
-
-        this.isSeeking = () => isSeeking;
     }
 
-    step() {
-        if (!this.sound || !this.isPlaying) return;
+    show() {
+        if (!this.container) return;
+        this.container.classList.remove('hidden');
+        document.body.classList.add('player-active');
+    }
 
-        if (!this.isSeeking()) {
-            const seek = this.sound.seek() || 0;
-            const duration = this.duration || 1;
-            if (this.els && this.els.currTime) this.els.currTime.textContent = this.formatTime(seek);
-            if (this.els && this.els.seekSlider) {
-                this.els.seekSlider.value = (seek / duration) * 100;
-            }
+    hide() {
+        if (this.container) {
+            this.container.classList.add('hidden');
+            document.body.classList.remove('player-active');
+        }
+        this.audio.pause();
+    }
+
+    close() {
+        this.playAttemptId++;
+        this.stopProgress();
+
+        if (this.container) {
+            this.container.remove();
+            this.container = null;
         }
 
-        requestAnimationFrame(this.step.bind(this));
+        document.body.classList.remove('player-active');
+
+        this.audio.pause();
+        this.audio.removeAttribute('src');
+        this.audio.load();
+
+        this.audioUrl = '';
+        this.title = '';
+        this.coverUrl = '';
+        this.isPlaying = false;
+        this.isLoading = false;
+        this.duration = 0;
+        this.els = null;
+    }
+
+    startProgress() {
+        this.stopProgress();
+
+        const step = () => {
+            if (!this.isPlaying || !this.els) return;
+
+            if (!this.isSeeking) {
+                const current = this.audio.currentTime || 0;
+                const duration = this.duration || this.audio.duration || 0;
+
+                this.els.currTime.textContent = this.formatTime(current);
+                if (duration > 0) {
+                    this.els.seekSlider.value = (current / duration) * 100;
+                }
+            }
+
+            this.rafId = requestAnimationFrame(step);
+        };
+
+        this.rafId = requestAnimationFrame(step);
+    }
+
+    stopProgress() {
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
     }
 
     updatePlayPauseIcon() {
@@ -295,9 +363,10 @@ class PodcastPlayer {
     }
 
     formatTime(seconds) {
+        if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')} `;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 }
 

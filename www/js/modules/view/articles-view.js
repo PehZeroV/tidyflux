@@ -41,8 +41,7 @@ export const ArticlesView = {
     isScrolling: false,
     /** 滚动结束检测定时器 */
     scrollEndTimer: null,
-    /** 待插入的新文章队列（用户滚动时暂存） */
-    pendingNewArticles: [],
+
     /** 当前加载请求 ID (用于解决竞态条件) */
     currentRequestId: 0,
     /** 下一页数据缓存 */
@@ -96,8 +95,7 @@ export const ArticlesView = {
      * 加载文章列表
      */
     async loadArticles(feedId, groupId = null) {
-        const requestId = Date.now();
-        this.currentRequestId = requestId;
+        const requestId = ++this.currentRequestId;
 
         this._resetListState();
 
@@ -685,8 +683,8 @@ export const ArticlesView = {
             if (!result.articles || result.articles.length === 0) return;
 
             let maxId = 0;
-            if (AppState.articles.length > 0) {
-                maxId = Math.max(...AppState.articles.map(a => a.id));
+            for (const a of AppState.articles) {
+                if (a.id > maxId) maxId = a.id;
             }
 
             const newArticles = result.articles.filter(a => !existingIds.has(a.id) && a.id > maxId);

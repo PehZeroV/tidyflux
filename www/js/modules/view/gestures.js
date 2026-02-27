@@ -125,7 +125,8 @@ export const Gestures = {
      * 绑定滑动手势
      */
     bindSwipeGestures() {
-        if (window.innerWidth > BREAKPOINTS.TABLET) return;
+        if (this._swipeGesturesBound) return;
+        this._swipeGesturesBound = true;
 
         const vm = this.viewManager;
         let startX = 0;
@@ -144,6 +145,8 @@ export const Gestures = {
         };
 
         const handleTouchStart = (e) => {
+            // 桌面端宽度下不触发手势（运行时判断，支持窗口缩放场景）
+            if (window.innerWidth > BREAKPOINTS.TABLET) return;
             if (this.hasTextSelection()) return;
 
             const touch = e.touches[0];

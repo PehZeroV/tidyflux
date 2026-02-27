@@ -20,11 +20,7 @@ const SEARCH_CONFIG = {
  * 搜索状态
  */
 const searchState = {
-    lastQuery: '',
-    lastPage: 1,
-    hasMore: false,
-    total: 0,
-    isSearching: false
+    lastQuery: ''
 };
 
 
@@ -150,17 +146,16 @@ export const SearchView = {
 
                 // 更新搜索状态
                 searchState.lastQuery = query;
-                searchState.lastPage = 1;
-                searchState.hasMore = data.pagination && data.pagination.hasMore;
-                searchState.total = data.pagination ? data.pagination.total : 0;
+                const total = data.pagination ? data.pagination.total : 0;
+                const hasMore = data.pagination && data.pagination.hasMore;
 
                 AppState.articles = articles;
                 AppState.pagination = {
                     page: 1,
                     limit: SEARCH_CONFIG.PAGINATION_LIMIT,
-                    total: searchState.total,
-                    hasMore: searchState.hasMore,
-                    totalPages: Math.ceil(searchState.total / SEARCH_CONFIG.PAGINATION_LIMIT)
+                    total,
+                    hasMore,
+                    totalPages: Math.ceil(total / SEARCH_CONFIG.PAGINATION_LIMIT)
                 };
 
                 // 渲染结果
@@ -307,17 +302,16 @@ export const SearchView = {
 
             // 更新搜索状态
             searchState.lastQuery = query;
-            searchState.lastPage = 1;
-            searchState.hasMore = data.pagination && data.pagination.hasMore;
-            searchState.total = data.pagination ? data.pagination.total : 0;
+            const total = data.pagination ? data.pagination.total : 0;
+            const hasMore = data.pagination && data.pagination.hasMore;
 
             AppState.articles = articles;
             AppState.pagination = {
                 page: 1,
                 limit: SEARCH_CONFIG.PAGINATION_LIMIT,
-                total: searchState.total,
-                hasMore: searchState.hasMore,
-                totalPages: Math.ceil(searchState.total / SEARCH_CONFIG.PAGINATION_LIMIT)
+                total,
+                hasMore,
+                totalPages: Math.ceil(total / SEARCH_CONFIG.PAGINATION_LIMIT)
             };
 
             // 渲染结果
@@ -337,13 +331,4 @@ export const SearchView = {
         }
     },
 
-    /**
-     * 高亮搜索关键词
-     */
-    highlightQuery(text, query) {
-        if (!query || !text) return text;
-        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`(${escaped})`, 'gi');
-        return text.replace(regex, '<mark class="search-highlight">$1</mark>');
-    }
 };

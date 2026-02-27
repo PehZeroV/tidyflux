@@ -1,4 +1,4 @@
-import { createDialog } from './utils.js';
+import { createDialog, escapeHtml } from './utils.js';
 import { i18n } from '../i18n.js';
 
 /**
@@ -23,14 +23,25 @@ export class Modal {
                     <div class="custom-modal-body">${body}</div>
                     <div class="custom-modal-footer">${footer}</div>
                 </div>
-            `);
+            `, { preventClose: true });
 
+            const cleanups = [];
+            const addCleanup = (fn) => {
+                if (typeof fn === 'function') cleanups.push(fn);
+            };
+
+            let finalized = false;
             const finalize = (result) => {
+                if (finalized) return;
+                finalized = true;
+                for (let i = cleanups.length - 1; i >= 0; i--) {
+                    try { cleanups[i](); } catch { }
+                }
                 close();
                 resolve(result);
             };
 
-            if (onReady) onReady(dialog, finalize);
+            if (onReady) onReady(dialog, finalize, addCleanup);
         });
     }
 
@@ -42,17 +53,21 @@ export class Modal {
             title,
             body: `<p>${message}</p>`,
             footer: `<button class="appearance-mode-btn active ok-btn padded">${i18n.t('common.ok') || 'OK'}</button>`,
-            onReady: (dialog, finalize) => {
+            onReady: (dialog, finalize, addCleanup) => {
                 const okBtn = dialog.querySelector('.ok-btn');
                 okBtn.addEventListener('click', () => finalize());
 
                 const keyHandler = (e) => {
                     if (e.key === 'Enter' || e.key === 'Escape') {
                         finalize();
-                        document.removeEventListener('keydown', keyHandler);
                     }
                 };
                 document.addEventListener('keydown', keyHandler);
+                addCleanup(() => document.removeEventListener('keydown', keyHandler));
+
+                dialog.addEventListener('click', (e) => {
+                    if (e.target === dialog) finalize();
+                });
             }
         });
     }
@@ -68,7 +83,7 @@ export class Modal {
                 <button class="appearance-mode-btn settings-btn m-right-8">${settingsLabel}</button>
                 <button class="appearance-mode-btn active ok-btn padded">${i18n.t('common.ok') || 'OK'}</button>
             `,
-            onReady: (dialog, finalize) => {
+            onReady: (dialog, finalize, addCleanup) => {
                 const okBtn = dialog.querySelector('.ok-btn');
                 const settingsBtn = dialog.querySelector('.settings-btn');
 
@@ -81,10 +96,14 @@ export class Modal {
                 const keyHandler = (e) => {
                     if (e.key === 'Enter' || e.key === 'Escape') {
                         finalize();
-                        document.removeEventListener('keydown', keyHandler);
                     }
                 };
                 document.addEventListener('keydown', keyHandler);
+                addCleanup(() => document.removeEventListener('keydown', keyHandler));
+
+                dialog.addEventListener('click', (e) => {
+                    if (e.target === dialog) finalize();
+                });
             }
         });
     }
@@ -100,7 +119,7 @@ export class Modal {
                 <button class="appearance-mode-btn cancel-btn">${i18n.t('common.cancel') || 'Cancel'}</button>
                 <button class="appearance-mode-btn active confirm-btn btn-danger">${i18n.t('common.confirm') || 'Confirm'}</button>
             `,
-            onReady: (dialog, finalize) => {
+            onReady: (dialog, finalize, addCleanup) => {
                 const confirmBtn = dialog.querySelector('.confirm-btn');
                 const cancelBtn = dialog.querySelector('.cancel-btn');
 
@@ -110,13 +129,12 @@ export class Modal {
                 const keyHandler = (e) => {
                     if (e.key === 'Escape') {
                         finalize(false);
-                        document.removeEventListener('keydown', keyHandler);
                     } else if (e.key === 'Enter') {
                         finalize(true);
-                        document.removeEventListener('keydown', keyHandler);
                     }
                 };
                 document.addEventListener('keydown', keyHandler);
+                addCleanup(() => document.removeEventListener('keydown', keyHandler));
 
                 dialog.addEventListener('click', (e) => {
                     if (e.target === dialog) finalize(false);
@@ -133,13 +151,13 @@ export class Modal {
             title,
             body: `
                 <p>${message}</p>
-                <input type="text" class="custom-modal-input" value="${defaultValue}" />
+                <input type="text" class="custom-modal-input" value="${escapeHtml(defaultValue)}" />
             `,
             footer: `
                 <button class="appearance-mode-btn cancel-btn">${i18n.t('common.cancel') || 'Cancel'}</button>
                 <button class="appearance-mode-btn active confirm-btn btn-danger">${i18n.t('common.confirm') || 'OK'}</button>
             `,
-            onReady: (dialog, finalize) => {
+            onReady: (dialog, finalize, addCleanup) => {
                 const input = dialog.querySelector('input');
                 const confirmBtn = dialog.querySelector('.confirm-btn');
                 const cancelBtn = dialog.querySelector('.cancel-btn');
@@ -157,10 +175,10 @@ export class Modal {
                 const escHandler = (e) => {
                     if (e.key === 'Escape') {
                         finalize(null);
-                        document.removeEventListener('keydown', escHandler);
                     }
                 };
                 document.addEventListener('keydown', escHandler);
+                addCleanup(() => document.removeEventListener('keydown', escHandler));
 
                 dialog.addEventListener('click', (e) => {
                     if (e.target === dialog) finalize(null);

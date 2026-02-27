@@ -8,7 +8,8 @@ export const AuthManager = {
 
     getUser() {
         const user = localStorage.getItem(AUTH_KEYS.USER);
-        return user ? JSON.parse(user) : null;
+        if (!user) return null;
+        try { return JSON.parse(user); } catch { return null; }
     },
 
     isLoggedIn() {

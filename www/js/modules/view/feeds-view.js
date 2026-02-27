@@ -12,6 +12,7 @@ import { Icons } from '../icons.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { KeyboardShortcuts } from '../keyboard.js';
 import { AIService } from '../ai-service.js';
+import { escapeHtml } from './utils.js';
 
 const STORAGE_KEY_COLLAPSED = 'tidyflux_collapsed_groups';
 const STORAGE_KEY_PINNED = 'tidyflux_pinned_groups';
@@ -237,7 +238,7 @@ export const FeedsView = {
                 <div class="feed-group ${isCollapsed ? 'collapsed' : ''}" data-group-id="${g.id}">
                     <div class="feed-group-header">
                         ${Icons.chevron_down}
-                        <span class="feed-group-name" data-group-id="${g.id}">${g.name}</span>
+                        <span class="feed-group-name" data-group-id="${g.id}">${escapeHtml(g.name)}</span>
                         ${gUnread > 0 ? `<span class="feed-group-count">${gUnread}</span>` : ''}
                     </div>
                     <div class="feed-group-items">
@@ -345,7 +346,7 @@ export const FeedsView = {
         return `
             <button class="feed-item-btn ${AppState.currentFeedId === feed.id ? 'active' : ''}" data-feed-id="${feed.id}">
                 <img class="feed-icon" src="${DEFAULT_ICON}" data-src="${API_ENDPOINTS.FAVICON.BASE}?feedId=${feed.id}" decoding="async" alt="">
-                <span class="feed-name">${feed.title || i18n.t('common.unnamed')}</span>
+                <span class="feed-name">${escapeHtml(feed.title || i18n.t('common.unnamed'))}</span>
                 ${unread > 0 ? `<span class="feed-unread-count">${unread}</span>` : ''}
             </button>
         `;

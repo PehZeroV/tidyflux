@@ -51,9 +51,6 @@ esbuild "$ROOT_DIR/www/js/main.js" --bundle --minify --outfile="$DIST_DIR/www/js
 
 
 
-# 复制独立库文件
-mkdir -p "$DIST_DIR/www/js/lib"
-cp "$ROOT_DIR/www/js/lib/howler.min.js" "$DIST_DIR/www/js/lib/howler.min.js"
 
 # Copy theme-init.js (with version)
 cp "$ROOT_DIR/www/js/theme-init.js" "$DIST_DIR/www/js/theme-init-${BUILD_VERSION}.js"
@@ -74,7 +71,7 @@ const prodCacheList = [
   `/style-${buildVersion}.css`,
   `/js/main-${buildVersion}.js`,
   `/js/theme-init-${buildVersion}.js`,
-  '/js/lib/howler.min.js',
+
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/manifest.json',

@@ -14,6 +14,7 @@ import { FeedManager } from '../feed-manager.js';
 import { AIService } from '../ai-service.js';
 import { AICache } from '../ai-cache.js';
 import { i18n } from '../i18n.js';
+import { escapeHtml, safeUrl } from './utils.js';
 
 export const ArticlePreviewMixin = {
     /**
@@ -135,8 +136,8 @@ export const ArticlePreviewMixin = {
                 }
             }
             const content = article.content || article.summary || '';
-            const feedName = article.feed?.title || ref?.feedTitle || '';
-            const titleText = article.title || previewTitle;
+            const feedName = escapeHtml(article.feed?.title || ref?.feedTitle || '');
+            const titleText = escapeHtml(article.title || previewTitle);
 
             // 构建与正常文章一致的 header HTML
             let feedSourceHTML = '';
@@ -156,7 +157,7 @@ export const ArticlePreviewMixin = {
             }
 
             const previewTitleHTML = article.url
-                ? `<h1><a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-title-link">${titleText}</a></h1>`
+                ? `<h1><a href="${safeUrl(article.url)}" target="_blank" rel="noopener noreferrer" class="article-title-link">${titleText}</a></h1>`
                 : `<h1>${titleText}</h1>`;
 
             // 一次性替换整个滚动区域内容

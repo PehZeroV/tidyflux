@@ -96,7 +96,8 @@ export const Router = {
         // 5. 搜索 #/search?q=xxx
         const searchMatch = hash.match(/^#\/search\?q=(.+)$/);
         if (searchMatch) {
-            const query = decodeURIComponent(searchMatch[1]);
+            let query;
+            try { query = decodeURIComponent(searchMatch[1]); } catch { query = searchMatch[1]; }
             // 在移动端显示文章面板
             if (window.innerWidth <= BREAKPOINTS.DESKTOP) {
                 ViewManager.showPanel('articles');

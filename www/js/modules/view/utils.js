@@ -28,6 +28,20 @@ export function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+/**
+ * URL 协议白名单校验，阻止 javascript: 等危险协议
+ * @param {string} url - 原始 URL
+ * @returns {string} 安全 URL 或 '#'
+ */
+export function safeUrl(url) {
+    if (!url) return '#';
+    const trimmed = String(url).trim();
+    if (/^(https?:|mailto:|\/|#)/i.test(trimmed)) {
+        return trimmed.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    return '#';
+}
+
 const MS_PER_MINUTE = 60000;
 const MS_PER_HOUR = 3600000;
 const MS_PER_DAY = 86400000;

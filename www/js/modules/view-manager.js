@@ -482,12 +482,6 @@ export const ViewManager = {
         Dialogs.showDigestScheduleDialog(context);
     },
 
-    // ==================== Search 相关 ====================
-
-    showSearchDialog() {
-        SearchView.showSearchDialog();
-    },
-
     // ==================== Panel/Gestures 相关 ====================
 
     showPanel(panel) {

@@ -352,8 +352,9 @@ export class VirtualList {
 
         // 为新项设置预估高度（如果没有已知高度）
         for (const item of newItems) {
-            if (!this.itemHeights.has(item.id)) {
-                this.itemHeights.set(item.id, this.estimatedItemHeight);
+            const idStr = String(item.id);
+            if (!this.itemHeights.has(idStr)) {
+                this.itemHeights.set(idStr, this.estimatedItemHeight);
             }
         }
 
@@ -732,7 +733,7 @@ export class VirtualList {
         }
 
         const top = this.itemPositions[index];
-        const height = this.itemHeights.get(id) || this.estimatedItemHeight;
+        const height = this.itemHeights.get(String(id)) || this.estimatedItemHeight;
 
         // 如果该项已经在视口内，则微调或不滚动
         const containerHeight = this.container.clientHeight;

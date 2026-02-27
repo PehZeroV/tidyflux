@@ -5,7 +5,7 @@
 
 import { AppState } from '../../state.js';
 import { AuthManager } from '../auth-manager.js';
-import { createDialog } from './utils.js';
+import { createDialog, escapeHtml } from './utils.js';
 import { i18n } from '../i18n.js';
 import { API_ENDPOINTS } from '../../constants.js';
 import { Icons } from '../icons.js';
@@ -64,38 +64,42 @@ export const ScheduleDialogMixin = {
         if (groups.length > 0) {
             scopeListHtml += `<div style="${groupLabelStyle}">${i18n.t('nav.categories')}</div>`;
             groups.forEach(g => {
+                const safeName = escapeHtml(g.name);
                 scopeListHtml += `
-                    <label style="${checkboxStyle}" title="${g.name}">
+                    <label style="${checkboxStyle}" title="${safeName}">
                         <input type="checkbox" value="group_${g.id}" style="${cbInputStyle}">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${g.name}</span>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeName}</span>
                     </label>`;
             });
         }
 
         if (feeds.length > 0) {
-            scopeListHtml += `<div style="${groupLabelStyle}">${i18n.t('nav.feeds')}</div>`;
             groups.forEach(g => {
-                const groupFeeds = feeds.filter(f => f.category?.id == g.id);
+                const groupFeeds = feeds.filter(f => f.group_id == g.id);
+                if (groupFeeds.length === 0) return;
+                scopeListHtml += `<div style="${groupLabelStyle}">${escapeHtml(g.name)}</div>`;
                 groupFeeds.forEach(f => {
+                    const safeTitle = escapeHtml(f.title);
                     scopeListHtml += `
-                        <label style="${checkboxStyle}" title="${f.title}">
+                        <label style="${checkboxStyle}" title="${safeTitle}">
                             <input type="checkbox" value="feed_${f.id}" style="${cbInputStyle}">
-                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.title}</span>
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeTitle}</span>
                         </label>`;
                 });
             });
-            const ungroupedFeeds = feeds.filter(f => !f.category?.id || !groups.find(g => g.id == f.category?.id));
+            const ungroupedFeeds = feeds.filter(f => !f.group_id || !groups.find(g => g.id == f.group_id));
             ungroupedFeeds.forEach(f => {
+                const safeTitle = escapeHtml(f.title);
                 scopeListHtml += `
-                    <label style="${checkboxStyle}" title="${f.title}">
+                    <label style="${checkboxStyle}" title="${safeTitle}">
                         <input type="checkbox" value="feed_${f.id}" style="${cbInputStyle}">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.title}</span>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeTitle}</span>
                     </label>`;
             });
         }
 
         const { dialog, close } = createDialog('settings-dialog', `
-            <div class="settings-dialog-content" style="position: relative; max-width: 400px; min-height: 480px;">
+            <div class="settings-dialog-content" style="position: relative; max-width: 560px; min-height: 480px;">
                 <button class="icon-btn close-dialog-btn" title="${i18n.t('settings.close')}" style="position: absolute; right: 16px; top: 16px; width: 32px; height: 32px;">
                     ${Icons.close}
                 </button>
@@ -103,7 +107,7 @@ export const ScheduleDialogMixin = {
 
                 <div style="margin-bottom: 20px;">
                     <div class="settings-item-label" style="margin-bottom: 8px;">${i18n.t('ai.digest_target')}</div>
-                    <div id="schedule-scope-list" style="max-height: 200px; overflow-y: auto; border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--card-shadow); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px;">
+                    <div id="schedule-scope-list" style="max-height: 200px; overflow-y: auto; border-radius: var(--radius); background: var(--card-bg); box-shadow: var(--card-shadow); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); padding: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;">
                         ${scopeListHtml}
                     </div>
                     <div id="scope-selection-hint" style="font-size: 0.8em; margin-top: 6px;"></div>

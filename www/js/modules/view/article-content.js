@@ -14,6 +14,7 @@ import { DOMElements } from '../../dom.js';
 import { AppState } from '../../state.js';
 import { BREAKPOINTS } from '../../constants.js';
 import { FeedManager } from '../feed-manager.js';
+import { escapeHtml, safeUrl } from './utils.js';
 
 
 import { i18n } from '../i18n.js';
@@ -333,7 +334,7 @@ export const ArticleContentView = {
         DOMElements.articleContent.innerHTML = `
             <header class="article-header digest-header">
                 <h1>
-                    ${digest.title}
+                    ${escapeHtml(digest.title)}
                 </h1>
                 <div class="article-header-info" style="
                     color: var(--text-secondary); 
@@ -345,7 +346,7 @@ export const ArticleContentView = {
                 ">
                     <span style="color: var(--accent-color); font-weight: 500;">${i18n.t('digest.title')}</span>
                     <span style="opacity: 0.5;">·</span>
-                    <span>${digest.feed_title || digest.scopeName || ''}</span>
+                    <span>${escapeHtml(digest.feed_title || digest.scopeName || '')}</span>
                     <span style="opacity: 0.5;">·</span>
                     <span>${i18n.t('digest.article_count', { count: digest.article_count || digest.articleCount || 0 })}</span>
                 </div>
@@ -409,7 +410,7 @@ export const ArticleContentView = {
         // 构建标题上方的订阅源信息（icon + 名称，可点击进入订阅源）
         let feedSourceHTML = '';
         if (article.feed_id) {
-            const feedTitle = article.feed_title || '';
+            const feedTitle = escapeHtml(article.feed_title || '');
             feedSourceHTML = `
                 <a href="#/feed/${article.feed_id}" class="article-feed-source" title="${feedTitle}">
                     <img src="/api/favicon?feedId=${article.feed_id}" class="favicon" loading="lazy" decoding="async" alt="${feedTitle}" style="width: 14px; height: 14px; border-radius: 3px; margin: 0; display: block;">
@@ -419,7 +420,7 @@ export const ArticleContentView = {
         } else if (article.feed_title) {
             feedSourceHTML = `
                 <span class="article-feed-source" style="cursor: default;">
-                    <span>${article.feed_title}</span>
+                    <span>${escapeHtml(article.feed_title)}</span>
                 </span>
             `;
         }
@@ -428,7 +429,7 @@ export const ArticleContentView = {
         const metaParts = [];
         if (dateStr) metaParts.push(`<span>${dateStr}</span>`);
         if (audioEnclosure) {
-            metaParts.push(`<button class="podcast-play-wrapper" id="podcast-play-btn" data-url="${audioEnclosure.url}" data-title="${article.title || ''}" data-cover="${article.thumbnail_url || ''}">
+            metaParts.push(`<button class="podcast-play-wrapper" id="podcast-play-btn" data-url="${escapeHtml(audioEnclosure.url)}" data-title="${escapeHtml(article.title || '')}" data-cover="${escapeHtml(article.thumbnail_url || '')}">
                 <span class="podcast-play-icon">${Icons.play_circle}</span>
                 <span class="podcast-play-text">${i18n.t('article.play_podcast')}</span>
             </button>`);
@@ -436,9 +437,10 @@ export const ArticleContentView = {
         const metaHTML = metaParts.join('<span style="margin: 0 8px; opacity: 0.5;">·</span>');
 
         // 可点击的标题
+        const safeTitle = escapeHtml(article.title);
         const titleHTML = article.url
-            ? `<h1><a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-title-link">${article.title}</a></h1>`
-            : `<h1>${article.title}</h1>`;
+            ? `<h1><a href="${safeUrl(article.url)}" target="_blank" rel="noopener noreferrer" class="article-title-link">${safeTitle}</a></h1>`
+            : `<h1>${safeTitle}</h1>`;
 
         const isFavorited = article.is_favorited;
         const isRead = article.is_read;

@@ -5,7 +5,7 @@
 
 import { AppState } from '../../state.js';
 import { AuthManager } from '../auth-manager.js';
-import { createDialog, showToast } from './utils.js';
+import { createDialog, showToast, escapeHtml } from './utils.js';
 import { Modal } from './components.js';
 import { i18n } from '../i18n.js';
 import { AIService } from '../ai-service.js';
@@ -449,11 +449,11 @@ export const ManagerDialogMixin = {
             if (task.scope === 'all') return i18n.t('nav.all');
             if (task.scope === 'group') {
                 const group = AppState.groups?.find(g => g.id == (task.scopeId || task.groupId));
-                return group ? group.name : `Group #${task.scopeId || task.groupId}`;
+                return group ? escapeHtml(group.name) : `Group #${task.scopeId || task.groupId}`;
             }
             if (task.scope === 'feed') {
                 const feed = AppState.feeds?.find(f => f.id == (task.scopeId || task.feedId));
-                return feed ? feed.title : `Feed #${task.scopeId || task.feedId}`;
+                return feed ? escapeHtml(feed.title) : `Feed #${task.scopeId || task.feedId}`;
             }
             return i18n.t('common.unnamed');
         };
@@ -781,7 +781,7 @@ export const ManagerDialogMixin = {
         };
 
         const renderLogItem = (log) => {
-            const scopeName = log.scope_name || (log.scope === 'all' ? i18n.t('nav.all') : `#${log.scope_id || ''}`);
+            const scopeName = escapeHtml(log.scope_name) || (log.scope === 'all' ? i18n.t('nav.all') : `#${log.scope_id || ''}`);
             const statusBadge = getStatusBadge(log.status);
             const triggerBadge = getTriggerBadge(log.triggered_by);
             const pushBadge = getPushBadge(log.push_status);
@@ -799,7 +799,7 @@ export const ManagerDialogMixin = {
                     details += ` <span style="opacity: 0.5;">·</span> <span style="font-family: monospace; font-size: 0.9em;">↑${fmt(pt)} ↓${fmt(ct)}</span>`;
                 }
             } else if (log.error) {
-                details = `<span style="color: var(--danger-color);">${log.error}</span>`;
+                details = `<span style="color: var(--danger-color);">${escapeHtml(log.error)}</span>`;
             }
 
             const div = document.createElement('div');
@@ -820,7 +820,7 @@ export const ManagerDialogMixin = {
                     <span style="opacity: 0.4;">·</span>
                     ${details}
                 </div>` : `<div style="margin-top: 2px; font-family: monospace; color: var(--meta-color); font-size: 0.85em; opacity: 0.7;">${timeStr}</div>`}
-                ${log.push_error ? `<div style="margin-top: 2px; font-size: 0.8em; color: var(--danger-color);">🔔 ${log.push_error}</div>` : ''}
+                ${log.push_error ? `<div style="margin-top: 2px; font-size: 0.8em; color: var(--danger-color);">🔔 ${escapeHtml(log.push_error)}</div>` : ''}
             `;
             return div;
         };

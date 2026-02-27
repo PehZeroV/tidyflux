@@ -1,4 +1,6 @@
-const CACHE_NAME = 'tidyflux-cache-v9.8';
+const CACHE_NAME = 'tidyflux-cache-v9.16';
+
+
 
 const URLS_TO_CACHE = [
   '/',
@@ -69,25 +71,33 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.match(request).then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(request).then(response => {
-          if (response && response.ok) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseToCache);
-            });
+  // Skip non-same-origin requests entirely — let the browser handle them natively.
+  // This is critical for audio/media streaming on iOS, which breaks when intercepted
+  // by a service worker (Range request headers are not properly forwarded).
+  if (url.origin !== self.location.origin) {
+    // Exception: cache Google Fonts (same-origin check would skip them)
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+      event.respondWith(
+        caches.match(request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
           }
-          return response;
-        });
-      })
-    );
+          return fetch(request).then(response => {
+            if (response && response.ok) {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(request, responseToCache);
+              });
+            }
+            return response;
+          });
+        })
+      );
+    }
     return;
   }
+
+
 
   if (url.pathname === '/api/favicon') {
     event.respondWith(
