@@ -352,7 +352,8 @@ export const ArticleAIMixin = {
 
                 try {
                     // 先检查缓存
-                    const cached = await AICache.getSummary(article.id);
+                    const targetLang = AIService.getTargetLang();
+                    const cached = await AICache.getSummary(article.id, targetLang);
                     if (cached) {
                         summaryContent.innerHTML = this.parseMarkdown(cached);
                         article._aiSummary = cached;
@@ -368,7 +369,6 @@ export const ArticleAIMixin = {
                     // 获取纯文本内容用于总结
                     const rawContent = AIService.extractText(article.content || '');
 
-                    const targetLang = AIService.getTargetLang();
 
                     let streamedText = '';
                     await AIService.summarize(rawContent, targetLang, (chunk) => {
@@ -377,7 +377,7 @@ export const ArticleAIMixin = {
                     }, signal);
 
                     // 写入缓存
-                    AICache.setSummary(article.id, streamedText).catch(() => { });
+                    AICache.setSummary(article.id, streamedText, targetLang).catch(() => { });
 
                     summarizeBtn.classList.remove('loading');
                     summarizeBtn.classList.add('active');
@@ -528,8 +528,9 @@ export const ArticleAIMixin = {
         }
 
         // 先检查缓存
+        const targetLang = AIService.getTargetLang();
         try {
-            const cached = await AICache.getSummary(article.id);
+            const cached = await AICache.getSummary(article.id, targetLang);
             if (cached) {
                 article._aiSummary = cached;
                 summaryBox.style.display = 'block';
@@ -566,7 +567,6 @@ export const ArticleAIMixin = {
             article._autoSummarizeController = new AbortController();
             const signal = article._autoSummarizeController.signal;
 
-            const targetLang = AIService.getTargetLang();
 
             let streamedText = '';
             await AIService.summarize(rawContent, targetLang, (chunk) => {
@@ -576,7 +576,7 @@ export const ArticleAIMixin = {
 
             // 缓存结果到内存和服务端
             article._aiSummary = streamedText;
-            AICache.setSummary(article.id, streamedText).catch(() => { });
+            AICache.setSummary(article.id, streamedText, targetLang).catch(() => { });
             if (summarizeBtn) {
                 summarizeBtn.classList.remove('loading');
                 summarizeBtn.classList.add('active');

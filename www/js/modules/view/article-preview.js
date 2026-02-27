@@ -210,8 +210,9 @@ export const ArticlePreviewMixin = {
         if (!rawContent || rawContent.trim().length < 50) return;
 
         // 先检查缓存
+        const targetLang = AIService.getTargetLang();
         try {
-            const cached = await AICache.getSummary(article.id);
+            const cached = await AICache.getSummary(article.id, targetLang);
             if (cached) {
                 this._insertPreviewSummary(contentEl, this.parseMarkdown(cached));
                 return;
@@ -222,16 +223,14 @@ export const ArticlePreviewMixin = {
         const summaryEl = this._insertPreviewSummary(contentEl, `<span style="opacity:0.6;">${i18n.t('ai.summarizing')}</span>`);
 
         try {
-            const targetLang = AIService.getTargetLang();
             let streamedText = '';
-
             await AIService.summarize(rawContent, targetLang, (chunk) => {
                 streamedText += chunk;
                 const contentEl = summaryEl.querySelector('.preview-summary-content');
                 if (contentEl) contentEl.innerHTML = this.parseMarkdown(streamedText);
             }, signal);
 
-            AICache.setSummary(article.id, streamedText).catch(() => { });
+            AICache.setSummary(article.id, streamedText, targetLang).catch(() => { });
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error('[PreviewSummary] Failed:', err);

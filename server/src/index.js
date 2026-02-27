@@ -22,6 +22,7 @@ import { AIPretranslateScheduler } from './jobs/ai-pretranslate-scheduler.js';
 import { PreferenceStore } from './utils/preference-store.js';
 import { DigestStore } from './utils/digest-store.js';
 import { getDb, closeDb } from './utils/database.js';
+import { CacheStore } from './utils/cache-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -94,7 +95,18 @@ async function startServer() {
             res.sendFile(join(wwwPath, 'sw.js'));
         });
 
-        app.use(express.static(wwwPath));
+        app.use(express.static(wwwPath, {
+            setHeaders: (res, filePath) => {
+                // 带版本号的文件（如 style-1740000000.css）：文件名每次构建都变，安全长缓存 1 年
+                if (/[-\.]\d{8,}\.(css|js)$/i.test(filePath)) {
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+                }
+                // 字体、图标、图片等不常变化的资源：长缓存 7 天
+                else if (/\.(woff2?|ttf|eot|otf|png|svg|ico|webp|jpg|jpeg|gif)$/i.test(filePath)) {
+                    res.set('Cache-Control', 'public, max-age=604800, immutable');
+                }
+            }
+        }));
 
         // SPA fallback - serve index.html for all non-API routes
         app.get('*', (req, res) => {
@@ -114,6 +126,8 @@ async function startServer() {
             DigestScheduler.start();
             // 启动 AI 预翻译/摘要调度器
             AIPretranslateScheduler.start();
+            // 启动缓存定时清理
+            CacheStore.startCleanupTimer();
         });
     } catch (error) {
         console.error('Failed to start server:', error);

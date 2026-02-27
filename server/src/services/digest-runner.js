@@ -26,6 +26,7 @@ export const DigestRunner = {
 
         const targetLang = aiConfig.targetLang || aiConfig.summarizeLang || 'zh-CN';
         const userTimezone = prefs.digest_timezone || '';
+        const uiLang = prefs.language || 'zh';
 
         const digestOptions = {
             scope: task.scope || 'all',
@@ -34,7 +35,8 @@ export const DigestRunner = {
             aiConfig: aiConfig,
             prompt: aiConfig.digestPrompt,
             unreadOnly: task.unreadOnly !== false, // default true
-            timezone: userTimezone
+            timezone: userTimezone,
+            uiLang: uiLang
         };
 
         if (task.scope === 'feed') {

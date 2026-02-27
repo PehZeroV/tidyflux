@@ -387,10 +387,14 @@ export const AIPretranslateScheduler = {
             if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
             if (!enabledFeeds.has(entry.feed_id)) continue;
 
-            // 检查缓存
-            const cacheKey = `summary:${entry.id}`;
+            // 检查缓存（先查新 key，再查旧 key）
+            const cacheKey = `summary:${entry.id}:${targetLang}`;
             const cached = CacheStore.get(userId, cacheKey);
             if (cached) continue;
+            // 兼容旧 key
+            const oldCacheKey = `summary:${entry.id}`;
+            const oldCached = CacheStore.get(userId, oldCacheKey);
+            if (oldCached) continue;
 
             const content = entry.content || '';
             if (!content.trim()) continue;

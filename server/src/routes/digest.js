@@ -158,7 +158,8 @@ router.post('/generate', requireMinifluxConfigured, async (req, res) => {
             prompt: customPrompt,
             aiConfig: storedAiConfig,
             timezone: prefs.digest_timezone || '',
-            unreadOnly: unreadOnly !== false
+            unreadOnly: unreadOnly !== false,
+            uiLang: getLang(req)
         };
 
         if (afterTimestamp) options.afterTimestamp = parseInt(afterTimestamp);
@@ -359,18 +360,33 @@ router.post('/test-push', async (req, res) => {
             return res.status(400).json({ error: 'URL is required' });
         }
 
-        const useMethod = (method || 'POST').toUpperCase();
-        let resp;
-        if (useMethod === 'GET') {
-            resp = await fetch(url, { method: 'GET' });
-        } else {
-            resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: body || '{}'
-            });
+        // 只允许 http/https，防止 file:// 等协议
+        let parsed;
+        try {
+            parsed = new URL(url);
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL' });
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return res.status(400).json({ error: 'Only http and https URLs are allowed' });
         }
 
+        const ALLOWED_METHODS = ['GET', 'POST'];
+        const useMethod = (method || 'POST').toUpperCase();
+        if (!ALLOWED_METHODS.includes(useMethod)) {
+            return res.status(400).json({ error: 'Only GET and POST methods are allowed' });
+        }
+        const fetchOptions = {
+            method: useMethod,
+            signal: AbortSignal.timeout(10000) // 10s 超时，防止上游卡住占用连接
+        };
+
+        if (useMethod !== 'GET') {
+            fetchOptions.headers = { 'Content-Type': 'application/json' };
+            fetchOptions.body = body || '{}';
+        }
+
+        const resp = await fetch(url, fetchOptions);
         const responseText = await resp.text();
         res.json({
             status: resp.status,
@@ -380,7 +396,7 @@ router.post('/test-push', async (req, res) => {
     } catch (error) {
         console.error('Test push error:', error);
         res.status(500).json({
-            error: error.message
+            error: error.name === 'TimeoutError' ? 'Request timed out (10s)' : error.message
         });
     }
 });

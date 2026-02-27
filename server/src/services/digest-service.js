@@ -194,11 +194,13 @@ export const DigestService = {
             prompt: customPrompt,
             aiConfig,
             unreadOnly = true,
-            timezone = ''
+            timezone = '',
+            uiLang = ''
         } = options;
 
-        const isEn = targetLang && (targetLang.toLowerCase().includes('english') || targetLang.toLowerCase().includes('en'));
-        const lang = isEn ? 'en' : 'zh';
+        // uiLang: the interface language (from Accept-Language or stored preference)
+        // Used for UI strings like the digest title word, NOT for AI generation
+        const lang = uiLang === 'en' ? 'en' : (uiLang === 'zh' ? 'zh' : (uiLang ? 'en' : 'zh'));
 
         // 获取 Scope 名称（需要 Miniflux Client）
         let scopeName = t('all_subscriptions', lang);

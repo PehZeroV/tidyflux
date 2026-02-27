@@ -52,20 +52,22 @@ export class MinifluxClient {
     async request(endpoint, options = {}, retries = MAX_RETRIES) {
         const url = `${this.baseUrl}/v1${endpoint}`;
 
-        const requestOptions = {
-            method: options.method || 'GET',
-            headers: {
-                ...this.getAuthHeader(),
-                ...options.headers
-            },
-            body: options.body,
-            // 原生 fetch 不支持 agent/timeout，使用 AbortSignal.timeout() 实现超时控制
-            signal: AbortSignal.timeout(options.timeout || DEFAULT_TIMEOUT)
+        const method = options.method || 'GET';
+        const headers = {
+            ...this.getAuthHeader(),
+            ...options.headers
         };
+        const timeout = options.timeout || DEFAULT_TIMEOUT;
 
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const response = await fetch(url, requestOptions);
+                // 每次重试都创建新的 AbortSignal，避免前一次超时后 signal 已永久中止
+                const response = await fetch(url, {
+                    method,
+                    headers,
+                    body: options.body,
+                    signal: AbortSignal.timeout(timeout)
+                });
 
                 // 处理 204 No Content
                 if (response.status === 204) {

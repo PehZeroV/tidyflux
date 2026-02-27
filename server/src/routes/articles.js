@@ -148,7 +148,6 @@ router.get('/', async (req, res) => {
 
         const total = totalFromMiniflux - filteredOutCount;
 
-        const entryUrls = new Map();
         const articles = entries.map(entry => {
             // Try to find a thumbnail from enclosures or content
             let thumbnail = null;
@@ -162,14 +161,11 @@ router.get('/', async (req, res) => {
             }
 
             if (rawImageUrl) {
-                entryUrls.set(entry.id, rawImageUrl);
                 thumbnail = getThumbnailUrl(rawImageUrl);
             }
 
             return mapEntryToArticle(entry, thumbnail);
         });
-
-        // 异步预热缩略图缓存
 
 
         res.json({

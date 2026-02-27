@@ -123,7 +123,7 @@ export class VirtualList {
         });
 
         // 事件委托：处理点击事件
-        this.container.addEventListener('click', (e) => {
+        this.clickHandler = (e) => {
             const itemEl = e.target.closest('.article-item');
             if (itemEl && this.onItemClick) {
                 const id = itemEl.dataset.id;
@@ -133,7 +133,8 @@ export class VirtualList {
                     this.onItemClick(item);
                 }
             }
-        });
+        };
+        this.container.addEventListener('click', this.clickHandler);
 
         this.containerHeight = this.container.clientHeight;
     }
@@ -679,8 +680,9 @@ export class VirtualList {
         if (this._scrollEndTimer) {
             clearTimeout(this._scrollEndTimer);
         }
-        if (this.scrollHandler && this.container) {
-            this.container.removeEventListener('scroll', this.scrollHandler);
+        if (this.container) {
+            if (this.scrollHandler) this.container.removeEventListener('scroll', this.scrollHandler);
+            if (this.clickHandler) this.container.removeEventListener('click', this.clickHandler);
         }
         this.renderedItems.clear();
         this.itemHeights.clear();

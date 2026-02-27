@@ -27,16 +27,27 @@ export const AICache = {
 
     /**
      * 获取缓存的摘要
+     * @param {string|number} entryId
+     * @param {string} [lang] - 目标语言，如 'zh-CN'、'fr'
      */
-    async getSummary(entryId) {
+    async getSummary(entryId, lang) {
+        if (lang) {
+            // 优先查带语言的新 key
+            const result = await this._get(_makeKey(entryId, 'summary', lang));
+            if (result) return result;
+        }
+        // 回退到不带语言的旧 key（兼容历史缓存）
         return this._get(_makeKey(entryId, 'summary'));
     },
 
     /**
-     * 保存摘要到缓存
+     * 保存摘要到缓存（使用带语言的新 key）
+     * @param {string|number} entryId
+     * @param {string} content
+     * @param {string} [lang] - 目标语言
      */
-    async setSummary(entryId, content) {
-        return this._set(_makeKey(entryId, 'summary'), content);
+    async setSummary(entryId, content, lang) {
+        return this._set(_makeKey(entryId, 'summary', lang), content);
     },
 
     /**
@@ -54,10 +65,17 @@ export const AICache = {
     },
 
     /**
-     * 删除缓存的摘要
+     * 删除缓存的摘要（同时清除新旧 key）
+     * @param {string|number} entryId
+     * @param {string} [lang] - 目标语言
      */
-    async deleteSummary(entryId) {
-        return this._delete(_makeKey(entryId, 'summary'));
+    async deleteSummary(entryId, lang) {
+        // 删除旧 key（无语言）
+        this._delete(_makeKey(entryId, 'summary')).catch(() => { });
+        // 删除新 key（带语言）
+        if (lang) {
+            this._delete(_makeKey(entryId, 'summary', lang)).catch(() => { });
+        }
     },
 
     /**

@@ -115,7 +115,8 @@ echo "📄 处理 index.html..."
 # Copy and Rewrite index.html references
 sed "s|/style.css|/style-${BUILD_VERSION}.css|g" "$ROOT_DIR/www/index.html" | \
 sed "s|/js/main.js|/js/main-${BUILD_VERSION}.js|g" | \
-sed "s|/js/theme-init.js|/js/theme-init-${BUILD_VERSION}.js|g" > "$DIST_DIR/www/index.html"
+sed "s|/js/theme-init.js|/js/theme-init-${BUILD_VERSION}.js|g" | \
+sed "s|/css/fonts.css|/css/fonts-${BUILD_VERSION}.css|g" > "$DIST_DIR/www/index.html"
 
 # 复制静态资源
 echo "📁 复制静态资源..."
@@ -131,7 +132,7 @@ if [ -d "$ROOT_DIR/www/fonts" ]; then
 fi
 if [ -f "$ROOT_DIR/www/css/fonts.css" ]; then
     mkdir -p "$DIST_DIR/www/css"
-    cp "$ROOT_DIR/www/css/fonts.css" "$DIST_DIR/www/css/fonts.css"
+    cp "$ROOT_DIR/www/css/fonts.css" "$DIST_DIR/www/css/fonts-${BUILD_VERSION}.css"
 fi
 
 # ========================================

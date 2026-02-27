@@ -7,10 +7,57 @@
 import { getDb } from './database.js';
 
 const MAX_ENTRIES_PER_USER = 1000000;
-const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 每天最多检查一次
+const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 小时
 
 export const CacheStore = {
-    _lastCleanupTime: 0,
+    _cleanupTimer: null,
+
+    /**
+     * 启动 24 小时定时清理（进程启动时调用一次）
+     */
+    startCleanupTimer() {
+        if (this._cleanupTimer) return;
+        // 启动后延迟 1 分钟执行首次清理，之后每 24 小时一次
+        const initTimer = setTimeout(() => this._cleanupAll(), 60 * 1000);
+        if (initTimer.unref) initTimer.unref();
+        this._cleanupTimer = setInterval(() => this._cleanupAll(), CLEANUP_INTERVAL);
+        // 允许进程正常退出
+        if (this._cleanupTimer.unref) this._cleanupTimer.unref();
+    },
+
+    /**
+     * 清理所有用户的超量缓存
+     */
+    _cleanupAll() {
+        try {
+            const db = getDb();
+            const users = db.prepare(
+                'SELECT DISTINCT user_id FROM ai_cache'
+            ).all();
+
+            for (const { user_id } of users) {
+                const count = db.prepare(
+                    'SELECT COUNT(*) as cnt FROM ai_cache WHERE user_id = ?'
+                ).get(user_id);
+
+                if (count.cnt > MAX_ENTRIES_PER_USER) {
+                    const excess = count.cnt - MAX_ENTRIES_PER_USER;
+                    db.prepare(`
+                        DELETE FROM ai_cache WHERE rowid IN (
+                            SELECT rowid FROM ai_cache
+                            WHERE user_id = ?
+                            ORDER BY timestamp ASC
+                            LIMIT ?
+                        )
+                    `).run(user_id, excess);
+                    console.log(`[CacheStore] Cleaned ${excess} expired entries for user ${user_id}`);
+                }
+            }
+        } catch (err) {
+            console.error('[CacheStore] Cleanup error:', err.message);
+        }
+    },
+
     /**
      * 读取缓存
      * @param {string} userId
@@ -108,7 +155,6 @@ export const CacheStore = {
         });
 
         insertMany(entries);
-        this._maybeCleanup(userId);
     },
 
     /**
@@ -118,33 +164,6 @@ export const CacheStore = {
     clear(userId) {
         const db = getDb();
         db.prepare('DELETE FROM ai_cache WHERE user_id = ?').run(userId);
-    },
-
-    /**
-     * 按时间节流触发清理（每天最多检查一次）
-     * @param {string} userId
-     */
-    _maybeCleanup(userId) {
-        const now = Date.now();
-        if (now - this._lastCleanupTime < CLEANUP_INTERVAL) return;
-        this._lastCleanupTime = now;
-
-        const db = getDb();
-        const count = db.prepare(
-            'SELECT COUNT(*) as cnt FROM ai_cache WHERE user_id = ?'
-        ).get(userId);
-
-        if (count.cnt <= MAX_ENTRIES_PER_USER) return;
-
-        const excess = count.cnt - MAX_ENTRIES_PER_USER;
-        db.prepare(`
-            DELETE FROM ai_cache WHERE rowid IN (
-                SELECT rowid FROM ai_cache
-                WHERE user_id = ?
-                ORDER BY timestamp ASC
-                LIMIT ?
-            )
-        `).run(userId, excess);
     },
 
     /**

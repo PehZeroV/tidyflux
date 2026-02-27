@@ -51,7 +51,7 @@ export const ArticleToolbarMixin = {
         delete article._translatedContent;
 
         // 清除服务端 AI 缓存
-        AICache.deleteSummary(article.id).catch(() => { });
+        AICache.deleteSummary(article.id, AIService.getTargetLang()).catch(() => { });
         AICache.deleteTranslation(article.id, AIService.getTargetLang()).catch(() => { });
 
         // 标题翻译块保留逻辑
