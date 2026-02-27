@@ -11,7 +11,6 @@ import { initTheme } from './modules/theme-manager.js';
 import { i18n } from './modules/i18n.js';
 import { AIService } from './modules/ai-service.js';
 import { AICache } from './modules/ai-cache.js';
-import { initPanelResizer } from './modules/panel-resizer.js';
 import { initTooltips } from './modules/view/utils.js';
 
 async function initApp() {
@@ -48,9 +47,6 @@ async function initApp() {
 
     // 初始化三栏布局
     await ViewManager.initThreeColumnLayout();
-
-    // 初始化面板拖拽调节功能
-    initPanelResizer();
 
     Router.handleInitialHash();
 

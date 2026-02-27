@@ -570,8 +570,14 @@ export const ArticleContentView = {
         text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
         text = text.replace(/~~(.*?)~~/g, '<del>$1</del>');
 
-        // 6. 链接 [text](url)
-        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+        // 6. 链接 [text](url) — 仅允许安全协议
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+            if (/^(https?:|mailto:|\/|#)/i.test(url)) {
+                const safeUrl = url.replace(/"/g, '&quot;');
+                return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+            }
+            return linkText; // 不安全协议，只显示文本
+        });
 
         // 分隔线
         text = text.replace(/^---+$/gim, '<hr class="md-hr">');

@@ -275,7 +275,7 @@ export const KeyboardShortcuts = {
         if (overlay) return true;
         const modal = document.querySelector('.modal-overlay');
         if (modal) return true;
-        const contextMenu = document.querySelector('.context-menu.show');
+        const contextMenu = document.querySelector('body > .context-menu');
         if (contextMenu) return true;
         return false;
     },

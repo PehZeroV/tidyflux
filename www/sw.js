@@ -9,7 +9,6 @@ const URLS_TO_CACHE = [
   '/css/base.css',
   '/css/themes.css',
   '/css/layout.css',
-  '/css/list.css',
   '/css/article.css',
   '/css/modals.css',
   '/css/auth.css',

@@ -4,6 +4,7 @@ import { AppState } from '../../state.js';
 import { DOMElements } from '../../dom.js';
 import { ArticlesView } from './articles-view.js';
 import { Icons } from '../icons.js';
+import { escapeHtml } from './utils.js';
 
 /**
  * 搜索功能常量配置
@@ -20,12 +21,10 @@ const SEARCH_CONFIG = {
  */
 const searchState = {
     lastQuery: '',
-    lastResults: null,
     lastPage: 1,
     hasMore: false,
     total: 0,
-    isSearching: false,
-    scrollHandler: null
+    isSearching: false
 };
 
 
@@ -151,7 +150,6 @@ export const SearchView = {
 
                 // 更新搜索状态
                 searchState.lastQuery = query;
-                searchState.lastResults = articles;
                 searchState.lastPage = 1;
                 searchState.hasMore = data.pagination && data.pagination.hasMore;
                 searchState.total = data.pagination ? data.pagination.total : 0;
@@ -220,7 +218,7 @@ export const SearchView = {
         DOMElements.currentFeedTitle.style.display = 'flex';
         DOMElements.currentFeedTitle.style.alignItems = 'center';
         DOMElements.currentFeedTitle.innerHTML = `
-            ${i18n.t('common.search')}:&nbsp;<span class="search-query-text">${query}</span>
+            ${i18n.t('common.search')}:&nbsp;<span class="search-query-text">${escapeHtml(query)}</span>
             <button id="exit-search-btn" class="icon-btn" style="margin-left: 8px; width: 24px; height: 24px; min-width: 24px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; padding: 0; background: none; border: none; cursor: pointer; color: inherit; opacity: 0.7;" title="${i18n.t('common.close')}">
                 ${Icons.close}
             </button>
@@ -309,7 +307,6 @@ export const SearchView = {
 
             // 更新搜索状态
             searchState.lastQuery = query;
-            searchState.lastResults = articles;
             searchState.lastPage = 1;
             searchState.hasMore = data.pagination && data.pagination.hasMore;
             searchState.total = data.pagination ? data.pagination.total : 0;

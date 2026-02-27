@@ -451,16 +451,18 @@ export const ArticleChatMixin = {
         const systemContext = this._buildArticleContext(article);
         const prompt = this._buildConversationPrompt(systemContext, this._chatMessages);
 
+
+        // 跟踪用户是否正在手动浏览上方内容，如果是则不自动滚到底部
+        let userScrolled = false;
+        const scrollHandler = () => {
+            const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
+            userScrolled = distanceFromBottom > 50;
+        };
+
         try {
             this._chatController = new AbortController();
             const signal = this._chatController.signal;
 
-            // 跟踪用户是否正在手动浏览上方内容，如果是则不自动滚到底部
-            let userScrolled = false;
-            const scrollHandler = () => {
-                const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
-                userScrolled = distanceFromBottom > 50;
-            };
             messagesContainer.addEventListener('scroll', scrollHandler);
 
             let streamedText = '';
@@ -471,8 +473,6 @@ export const ArticleChatMixin = {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
             }, signal);
-
-            messagesContainer.removeEventListener('scroll', scrollHandler);
 
             // 保存 AI 回复
             this._chatMessages.push({ role: 'assistant', content: streamedText });
@@ -500,6 +500,7 @@ export const ArticleChatMixin = {
                 this._sendMessage(article, userMessage);
             });
         } finally {
+            messagesContainer.removeEventListener('scroll', scrollHandler);
             this._chatController = null;
             if (this._chatPanel) {
                 input.disabled = false;

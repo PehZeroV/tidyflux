@@ -82,11 +82,15 @@ export const FeedsView = {
             }
 
             // 同步折叠和置顶状态
-            if (AppState.preferences.collapsed_groups) {
-                localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(AppState.preferences.collapsed_groups));
-            }
-            if (AppState.preferences.pinned_groups) {
-                localStorage.setItem(STORAGE_KEY_PINNED, JSON.stringify(AppState.preferences.pinned_groups));
+            try {
+                if (AppState.preferences.collapsed_groups) {
+                    localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(AppState.preferences.collapsed_groups));
+                }
+                if (AppState.preferences.pinned_groups) {
+                    localStorage.setItem(STORAGE_KEY_PINNED, JSON.stringify(AppState.preferences.pinned_groups));
+                }
+            } catch (e) {
+                console.warn('localStorage sync failed (private mode?):', e);
             }
 
             // Sync keyboard shortcuts from server preferences
@@ -358,12 +362,16 @@ export const FeedsView = {
         this._setupIconObserver(listEl);
 
         // Favicon 加载失败回退（使用 capture 捕获 error 事件）
-        listEl.addEventListener('error', (e) => {
-            if (e.target.tagName === 'IMG' && e.target.classList.contains('feed-icon')) {
-                e.target.src = DEFAULT_ICON;
-                e.target.onerror = null; // Prevent infinite loop if fallback also fails
-            }
-        }, true);
+        // 只绑定一次，避免重复绑定
+        if (!listEl._feedIconErrorBound) {
+            listEl.addEventListener('error', (e) => {
+                if (e.target.tagName === 'IMG' && e.target.classList.contains('feed-icon')) {
+                    e.target.src = DEFAULT_ICON;
+                    e.target.onerror = null; // Prevent infinite loop if fallback also fails
+                }
+            }, true);
+            listEl._feedIconErrorBound = true;
+        }
 
         // 今天按钮
         const todayBtn = document.getElementById('today-btn');
