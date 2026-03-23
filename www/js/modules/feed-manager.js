@@ -453,6 +453,28 @@ export const FeedManager = {
         return response.ok;
     },
 
+    async warmupAIPretranslate(feedIds = []) {
+        const normalizedFeedIds = [...new Set(
+            (feedIds || [])
+                .map(feedId => parseInt(feedId, 10))
+                .filter(feedId => Number.isFinite(feedId) && feedId > 0)
+        )];
+        if (normalizedFeedIds.length === 0) return true;
+
+        const response = await AuthManager.fetchWithAuth('/api/preferences/pretranslate-warmup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feed_ids: normalizedFeedIds })
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || i18n.t('auth.config_save_failed'));
+        }
+
+        return true;
+    },
+
     /**
      * 获取今日未读文章数量（轻量级请求）
      */

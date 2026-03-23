@@ -3,6 +3,8 @@ import { authenticateToken } from '../middleware/auth.js';
 import { PreferenceStore } from '../utils/preference-store.js';
 import { t, getLang } from '../utils/i18n.js';
 import { AIPretranslateScheduler } from '../jobs/ai-pretranslate-scheduler.js';
+import { PublicRssScheduler } from '../jobs/public-rss-scheduler.js';
+import { PUBLIC_RSS_IMPACT_KEYS } from '../services/public-rss-service.js';
 
 // AI 相关的配置 key，变更时需要通知调度器重启
 const AI_CONFIG_KEYS = new Set([
@@ -38,6 +40,19 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+router.post('/pretranslate-warmup', authenticateToken, async (req, res) => {
+    try {
+        const userId = PreferenceStore.getUserId(req.user);
+        const feedIds = Array.isArray(req.body?.feed_ids) ? req.body.feed_ids : [];
+        const queued = AIPretranslateScheduler.requestFeedWarmup(userId, feedIds);
+        res.json({ success: true, queued });
+    } catch (error) {
+        console.error('Pretranslate warmup request error:', error);
+        const lang = getLang(req);
+        res.status(500).json({ error: t('update_preferences_failed', lang) });
+    }
+});
+
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const userId = PreferenceStore.getUserId(req.user);
@@ -47,6 +62,7 @@ router.post('/', authenticateToken, async (req, res) => {
             updates = { [updates.key]: updates.value };
         }
 
+        const previousPrefs = await PreferenceStore.get(userId);
         const { success, preferences: newPrefs } = await PreferenceStore.update(userId, updates);
 
         if (success) {
@@ -55,6 +71,14 @@ router.post('/', authenticateToken, async (req, res) => {
             const aiChanged = changedKeys.some(k => AI_CONFIG_KEYS.has(k));
             if (aiChanged) {
                 AIPretranslateScheduler.notifyConfigChanged();
+                AIPretranslateScheduler.requestWarmupForPreferenceChange(userId, previousPrefs, newPrefs, changedKeys)
+                    .catch(error => {
+                        console.error('Preference-change warmup error:', error);
+                    });
+            }
+            const publicRssChanged = changedKeys.some(k => PUBLIC_RSS_IMPACT_KEYS.has(k));
+            if (publicRssChanged) {
+                PublicRssScheduler.notifyConfigChanged();
             }
 
             res.json({ success: true, preferences: maskSensitiveData(newPrefs) });

@@ -7,8 +7,54 @@ import { AppState } from '../../state.js';
 import { createDialog } from './utils.js';
 import { i18n } from '../i18n.js';
 import { AIService } from '../ai-service.js';
+import { FeedManager } from '../feed-manager.js';
 import { Icons } from '../icons.js';
 import { ArticlesTitleTranslation } from './articles-title-translation.js';
+
+const MODE_GLOBAL_PREF_MAP = Object.freeze({
+    translation: 'ai_pretranslate_title',
+    translate: 'ai_pretranslate_translate',
+    summary: 'ai_pretranslate_summary'
+});
+
+function isWarmupEnabledForMode(mode) {
+    const globalPrefKey = MODE_GLOBAL_PREF_MAP[mode];
+    return !!(globalPrefKey && AppState.preferences?.[globalPrefKey]);
+}
+
+function getWarmupFeedIdsForMode(mode, candidateFeedIds = null) {
+    const globalPrefKey = MODE_GLOBAL_PREF_MAP[mode];
+    if (!globalPrefKey || !AppState.preferences?.[globalPrefKey]) {
+        return [];
+    }
+
+    const feedIdSet = candidateFeedIds
+        ? new Set((candidateFeedIds || []).map(feedId => String(feedId)))
+        : null;
+    const { shouldFeed } = AIService.getOverrideAccessors(mode);
+
+    return [...new Set(
+        (AppState.feeds || [])
+            .filter(feed => {
+                if (feedIdSet && !feedIdSet.has(String(feed.id))) return false;
+                return shouldFeed(feed.id);
+            })
+            .map(feed => String(feed.id))
+    )];
+}
+
+function triggerWarmupForFeeds(feedIds = []) {
+    const normalizedFeedIds = [...new Set(
+        (feedIds || [])
+            .map(feedId => String(feedId))
+            .filter(Boolean)
+    )];
+    if (normalizedFeedIds.length === 0) return;
+
+    FeedManager.warmupAIPretranslate(normalizedFeedIds).catch(error => {
+        console.warn('[AI Auto] Failed to queue AI warmup:', error);
+    });
+}
 
 /**
  * AI 自动化管理对话框
@@ -181,19 +227,21 @@ export const TranslationDialogMixin = {
 
         // Background pretranslate toggles (per-feature)
         const pretranslateToggles = [
-            { id: '#pretranslate-title-toggle', key: 'ai_pretranslate_title' },
-            { id: '#pretranslate-translate-toggle', key: 'ai_pretranslate_translate' },
-            { id: '#pretranslate-summary-toggle', key: 'ai_pretranslate_summary' },
+            { id: '#pretranslate-title-toggle', key: 'ai_pretranslate_title', mode: 'translation' },
+            { id: '#pretranslate-translate-toggle', key: 'ai_pretranslate_translate', mode: 'translate' },
+            { id: '#pretranslate-summary-toggle', key: 'ai_pretranslate_summary', mode: 'summary' },
         ];
-        for (const { id, key } of pretranslateToggles) {
+        for (const { id, key, mode } of pretranslateToggles) {
             const cb = dialog.querySelector(id);
             if (cb) {
                 cb.addEventListener('change', async () => {
                     try {
-                        const { FeedManager } = await import('../feed-manager.js');
                         await FeedManager.setPreference(key, cb.checked);
                         if (AppState.preferences) {
                             AppState.preferences[key] = cb.checked;
+                        }
+                        if (cb.checked) {
+                            triggerWarmupForFeeds(getWarmupFeedIdsForMode(mode));
                         }
                     } catch (err) {
                         console.error(`[AI Auto] Failed to save ${key}:`, err);
@@ -416,6 +464,18 @@ export const TranslationDialogMixin = {
 
                     // Single save to server
                     await batchSetterMap[mode](batchEntries);
+                    if (selectAllCb.checked) {
+                        const allFeedIds = [
+                            ...Array.from(groupCbs).flatMap(gcb => {
+                                const group = gcb.closest(`.${prefix}-group`);
+                                return Array.from(group.querySelectorAll(`.${prefix}-feed-checkbox`)).map(fcb => fcb.dataset.feedId);
+                            }),
+                            ...Array.from(ungroupedFeedCbs).map(fcb => fcb.dataset.feedId)
+                        ];
+                        if (isWarmupEnabledForMode(mode)) {
+                            triggerWarmupForFeeds(allFeedIds);
+                        }
+                    }
 
                     // 标题翻译模式：立即触发当前列表的标题翻译
                     if (mode === 'translation') {
@@ -460,6 +520,12 @@ export const TranslationDialogMixin = {
 
                     await batchSetterMap[mode](batchEntries);
                     updateSelectAllState();
+                    if (cb.checked) {
+                        const groupFeedIds = Array.from(feedCbs).map(feedCb => feedCb.dataset.feedId);
+                        if (isWarmupEnabledForMode(mode)) {
+                            triggerWarmupForFeeds(groupFeedIds);
+                        }
+                    }
 
                     // 标题翻译模式：立即触发当前列表的标题翻译
                     if (mode === 'translation') {
@@ -492,6 +558,11 @@ export const TranslationDialogMixin = {
                     }
 
                     updateSelectAllState();
+                    if (cb.checked) {
+                        if (isWarmupEnabledForMode(mode)) {
+                            triggerWarmupForFeeds([feedId]);
+                        }
+                    }
 
                     // 标题翻译模式：立即触发当前列表的标题翻译
                     if (mode === 'translation') {

@@ -20,6 +20,7 @@ import { SettingsDialogMixin } from './dialog-settings.js';
 import { ScheduleDialogMixin } from './dialog-schedule.js';
 import { ManagerDialogMixin } from './dialog-manager.js';
 import { TranslationDialogMixin } from './dialog-ai-automation.js';
+import { PublicRssDialogMixin } from './dialog-public-rss.js';
 
 
 /**
@@ -607,5 +608,5 @@ export const Dialogs = {
     ...ScheduleDialogMixin,
     ...ManagerDialogMixin,
     ...TranslationDialogMixin,
+    ...PublicRssDialogMixin,
 };
-

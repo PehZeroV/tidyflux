@@ -198,8 +198,8 @@ export const SettingsDialogMixin = {
                         <div style="font-size: 0.75em; color: var(--meta-color); margin-top: 4px; margin-bottom: 12px;">${i18n.t('ai.concurrency_hint')}</div>
 
                         <div style="margin-bottom: 12px;">
-                            <label class="miniflux-input-label">${i18n.t('ai.target_lang')}</label>
-                            <select id="ai-target-lang" class="dialog-select">
+                                <label class="miniflux-input-label">${i18n.t('ai.target_lang')}</label>
+                                <select id="ai-target-lang" class="dialog-select">
                                 ${AI_LANGUAGES.map(lang =>
             `<option value="${lang.id}">${lang.name}</option>`
         ).join('')}
@@ -253,9 +253,8 @@ export const SettingsDialogMixin = {
                         <div id="ai-settings-msg" style="margin-top: 8px; font-size: 0.8em; line-height: 1.5;"></div>
                     </form>
                 </div>
-                
 
-` : ''}
+                ` : ''}
                 
                 ${showFullSettings ? `
                 <div class="settings-section">
@@ -263,6 +262,18 @@ export const SettingsDialogMixin = {
                     <div class="appearance-mode-group" style="display: flex; gap: 8px;">
                         <button type="button" id="settings-manage-translation-btn" class="appearance-mode-btn active" style="justify-content: center; flex: 1;">${i18n.t('ai.ai_automation')}</button>
                         <button type="button" id="settings-manage-digest-btn" class="appearance-mode-btn active" style="justify-content: center; flex: 1;">${i18n.t('digest.manager_title')}</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-title">${i18n.t('settings.public_rss')}</div>
+                    <div style="font-size: 0.85em; color: var(--meta-color); line-height: 1.6; margin-bottom: 10px;">
+                        ${i18n.t('settings.public_rss_desc_short')}
+                    </div>
+                    <div class="appearance-mode-group">
+                        <button type="button" id="settings-public-rss-btn" class="appearance-mode-btn active" style="justify-content: center; width: 100%;">
+                            ${i18n.t('settings.public_rss_manager')}
+                        </button>
                     </div>
                 </div>
 
@@ -399,6 +410,14 @@ export const SettingsDialogMixin = {
                 translationBtn.addEventListener('click', () => {
                     close();
                     this.showTranslationDialog();
+                });
+            }
+
+            const publicRssBtn = dialog.querySelector('#settings-public-rss-btn');
+            if (publicRssBtn) {
+                publicRssBtn.addEventListener('click', () => {
+                    close();
+                    this.showPublicRssManagerDialog();
                 });
             }
         }

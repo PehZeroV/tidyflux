@@ -14,11 +14,13 @@ import digestRoutes from './routes/digest.js';
 import aiRoutes from './routes/ai.js';
 import cacheRoutes from './routes/cache.js';
 import chatRoutes from './routes/chat.js';
+import publicRssRoutes from './routes/public-rss.js';
 
 import helmet from 'helmet';
 import { UserStore } from './utils/user-store.js';
 import { DigestScheduler } from './jobs/digest-scheduler.js';
 import { AIPretranslateScheduler } from './jobs/ai-pretranslate-scheduler.js';
+import { PublicRssScheduler } from './jobs/public-rss-scheduler.js';
 import { PreferenceStore } from './utils/preference-store.js';
 import { DigestStore } from './utils/digest-store.js';
 import { getDb, closeDb } from './utils/database.js';
@@ -74,6 +76,7 @@ async function startServer() {
         app.use('/api/ai', aiRoutes);
         app.use('/api/cache', cacheRoutes);
         app.use('/api/chat', chatRoutes);
+        app.use('/rss', publicRssRoutes);
 
 
 
@@ -126,6 +129,8 @@ async function startServer() {
             DigestScheduler.start();
             // 启动 AI 预翻译/摘要调度器
             AIPretranslateScheduler.start();
+            // 启动公开 RSS 静态生成调度器
+            PublicRssScheduler.start();
             // 启动缓存定时清理
             CacheStore.startCleanupTimer();
         });

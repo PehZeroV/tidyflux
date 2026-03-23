@@ -12,6 +12,8 @@
 import { PreferenceStore } from '../utils/preference-store.js';
 import { CacheStore } from '../utils/cache-store.js';
 import { getMinifluxClient } from '../middleware/auth.js';
+import { PublicRssScheduler } from './public-rss-scheduler.js';
+import { getFeedPublicRssConfig } from '../services/public-rss-service.js';
 import {
     summarizeText,
     translateTitlesBatch,
@@ -26,6 +28,9 @@ const SCHEDULER_INTERVAL = 5 * 60 * 1000;   // 5 分钟
 const TITLE_BATCH_SIZE = 10;                 // 标题翻译每批最多 10 个
 const FETCH_HOURS = 24;                      // 获取最近 24 小时的未读文章
 const MAX_CONTENT_LENGTH = 50000;            // 文章内容截断长度
+const WARMUP_DEFAULT_LIMIT = 20;             // 按 feed 预热时默认最近 20 篇
+const WARMUP_MAX_LIMIT = 100;                // 预热最多 100 篇
+const WARMUP_QUEUE_DELAY = 500;              // 合并短时间内的多次预热请求
 
 // 429 退避参数
 const BACKOFF_INITIAL = 30000;               // 初始退避 30 秒
@@ -33,6 +38,30 @@ const BACKOFF_MAX = 300000;                  // 最大退避 5 分钟
 const BACKOFF_MULTIPLIER = 2;
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function normalizeWarmupLimit(value) {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) return WARMUP_DEFAULT_LIMIT;
+    return Math.min(parsed, WARMUP_MAX_LIMIT);
+}
+
+function getWarmupLimitForFeed(prefs, feedId) {
+    return normalizeWarmupLimit(getFeedPublicRssConfig(prefs, feedId).limit);
+}
+
+function hasUsableAIConfig(aiConfig) {
+    const isOllama = aiConfig?.provider === 'ollama';
+    if (!aiConfig?.apiUrl) return false;
+    return isOllama || !!aiConfig?.apiKey;
+}
+
+function normalizeFeedIds(feedIds = []) {
+    return [...new Set(
+        (feedIds || [])
+            .map(feedId => parseInt(feedId, 10))
+            .filter(feedId => Number.isFinite(feedId) && feedId > 0)
+    )];
+}
 
 /**
  * 解析 overrides 配置，返回需要启用某功能的 feedId 集合
@@ -67,6 +96,11 @@ function resolveEnabledFeeds(overrides, feeds) {
     return result;
 }
 
+function resolveActiveFeedsForMode(prefs, feeds, globalKey, overrideKey) {
+    if (!prefs?.[globalKey]) return new Set();
+    return resolveEnabledFeeds(prefs?.[overrideKey], feeds);
+}
+
 /**
  * 带 429 退避的 AI 调用包装器
  */
@@ -94,6 +128,9 @@ export const AIPretranslateScheduler = {
     _abortController: null,   // 当前轮次的 AbortController
     _scheduledTimer: null,    // 下一轮定时器
     _started: false,          // 是否已启动过（防止重复启动）
+    _warmupRunning: false,    // 手动预热是否正在运行
+    _warmupTimer: null,       // 预热调度器
+    _pendingWarmupByUser: new Map(), // userId -> Set(feedId)
 
     /**
      * 单次执行入口（内部使用）
@@ -148,6 +185,134 @@ export const AIPretranslateScheduler = {
         }
         // 等待当前轮次结束后立即开始新一轮（稍作延迟确保 finally 块执行完）
         setTimeout(() => this._run(), 500);
+    },
+
+    requestFeedWarmup(userId, feedIds = []) {
+        const normalizedFeedIds = normalizeFeedIds(feedIds);
+        if (!userId || normalizedFeedIds.length === 0) return 0;
+
+        const key = String(userId);
+        const pending = this._pendingWarmupByUser.get(key) || new Set();
+        normalizedFeedIds.forEach(feedId => pending.add(String(feedId)));
+        this._pendingWarmupByUser.set(key, pending);
+
+        if (!this._warmupRunning) {
+            this._scheduleWarmup(WARMUP_QUEUE_DELAY);
+        }
+
+        return pending.size;
+    },
+
+    async requestWarmupForPreferenceChange(userId, previousPrefs = {}, nextPrefs = {}, changedKeys = []) {
+        if (!userId) return 0;
+
+        const relevantKeys = new Set(changedKeys || []);
+        const aiConfigChanged = relevantKeys.has('ai_config');
+        const titleChanged = aiConfigChanged || relevantKeys.has('ai_pretranslate_title') || relevantKeys.has('title_translation_overrides');
+        const translateChanged = aiConfigChanged || relevantKeys.has('ai_pretranslate_translate') || relevantKeys.has('auto_translate_overrides');
+        const summaryChanged = aiConfigChanged || relevantKeys.has('ai_pretranslate_summary') || relevantKeys.has('auto_summary_overrides');
+
+        if (!titleChanged && !translateChanged && !summaryChanged) {
+            return 0;
+        }
+
+        const nextHasConfig = hasUsableAIConfig(nextPrefs?.ai_config);
+        if (!nextHasConfig) {
+            return 0;
+        }
+
+        const previousHasConfig = hasUsableAIConfig(previousPrefs?.ai_config);
+
+        let feeds;
+        try {
+            const miniflux = await getMinifluxClient();
+            if (!miniflux) return 0;
+            feeds = await miniflux.getFeeds();
+        } catch (err) {
+            console.error('[AI Pretranslate] Failed to resolve feeds for preference-change warmup:', err.message);
+            return 0;
+        }
+
+        const pendingFeedIds = new Set();
+        const modeDefs = [
+            {
+                shouldCheck: titleChanged,
+                globalKey: 'ai_pretranslate_title',
+                overrideKey: 'title_translation_overrides'
+            },
+            {
+                shouldCheck: translateChanged,
+                globalKey: 'ai_pretranslate_translate',
+                overrideKey: 'auto_translate_overrides'
+            },
+            {
+                shouldCheck: summaryChanged,
+                globalKey: 'ai_pretranslate_summary',
+                overrideKey: 'auto_summary_overrides'
+            }
+        ];
+
+        for (const { shouldCheck, globalKey, overrideKey } of modeDefs) {
+            if (!shouldCheck) continue;
+
+            const nextActiveFeeds = resolveActiveFeedsForMode(nextPrefs, feeds, globalKey, overrideKey);
+            if (nextActiveFeeds.size === 0) continue;
+
+            if (aiConfigChanged && !previousHasConfig) {
+                nextActiveFeeds.forEach(feedId => pendingFeedIds.add(feedId));
+                continue;
+            }
+
+            const previousActiveFeeds = resolveActiveFeedsForMode(previousPrefs, feeds, globalKey, overrideKey);
+            nextActiveFeeds.forEach(feedId => {
+                if (!previousActiveFeeds.has(feedId)) {
+                    pendingFeedIds.add(feedId);
+                }
+            });
+        }
+
+        if (pendingFeedIds.size === 0) {
+            return 0;
+        }
+
+        return this.requestFeedWarmup(userId, [...pendingFeedIds]);
+    },
+
+    _scheduleWarmup(delay = WARMUP_QUEUE_DELAY) {
+        if (this._warmupTimer) {
+            clearTimeout(this._warmupTimer);
+        }
+        this._warmupTimer = setTimeout(() => this._runWarmups(), delay);
+        if (this._warmupTimer.unref) this._warmupTimer.unref();
+    },
+
+    async _runWarmups() {
+        if (this._warmupRunning) return;
+
+        const pendingByUser = new Map(
+            [...this._pendingWarmupByUser.entries()].map(([userId, feedSet]) => [userId, [...feedSet]])
+        );
+        this._pendingWarmupByUser.clear();
+        if (pendingByUser.size === 0) return;
+
+        try {
+            this._warmupRunning = true;
+            const miniflux = await getMinifluxClient();
+            if (!miniflux) return;
+
+            for (const [userId, feedIds] of pendingByUser.entries()) {
+                try {
+                    await this.warmupFeeds(userId, feedIds, miniflux);
+                } catch (err) {
+                    console.error(`[AI Pretranslate] Warmup failed for user ${userId}:`, err.message);
+                }
+            }
+        } finally {
+            this._warmupRunning = false;
+            if (this._pendingWarmupByUser.size > 0) {
+                this._scheduleWarmup(WARMUP_QUEUE_DELAY);
+            }
+        }
     },
 
     /**
@@ -254,6 +419,101 @@ export const AIPretranslateScheduler = {
         // 3. 自动摘要（逐篇处理）
         if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
         await this._processAutoSummary(userId, relevantEntries, summaryFeeds, targetLang, aiConfig, backoffState, signal);
+
+        PublicRssScheduler.markFeedsDirty([...allFeedIds]);
+    },
+
+    async warmupFeeds(userId, feedIds = [], minifluxInstance = null) {
+        const normalizedFeedIds = normalizeFeedIds(feedIds);
+        if (normalizedFeedIds.length === 0) {
+            return { processed: 0, feeds: [] };
+        }
+
+        const miniflux = minifluxInstance || await getMinifluxClient();
+        if (!miniflux) {
+            return { processed: 0, feeds: [] };
+        }
+
+        const prefs = await PreferenceStore.get(userId);
+        const enableTitle = !!prefs.ai_pretranslate_title;
+        const enableTranslate = !!prefs.ai_pretranslate_translate;
+        const enableSummary = !!prefs.ai_pretranslate_summary;
+        if (!enableTitle && !enableTranslate && !enableSummary) {
+            return { processed: 0, feeds: [] };
+        }
+
+        const aiConfig = prefs.ai_config;
+        if (!hasUsableAIConfig(aiConfig)) {
+            return { processed: 0, feeds: [] };
+        }
+
+        const targetLang = aiConfig.targetLang || 'zh-CN';
+        const titleOverrides = prefs.title_translation_overrides;
+        const translateOverrides = prefs.auto_translate_overrides;
+        const summaryOverrides = prefs.auto_summary_overrides;
+
+        let feeds;
+        try {
+            feeds = await miniflux.getFeeds();
+        } catch (err) {
+            console.error(`[AI Pretranslate] Warmup failed to get feeds for user ${userId}:`, err.message);
+            return { processed: 0, feeds: [] };
+        }
+
+        const requestedFeedIds = new Set(normalizedFeedIds);
+        const titleFeeds = enableTitle ? resolveEnabledFeeds(titleOverrides, feeds) : new Set();
+        const translateFeeds = enableTranslate ? resolveEnabledFeeds(translateOverrides, feeds) : new Set();
+        const summaryFeeds = enableSummary ? resolveEnabledFeeds(summaryOverrides, feeds) : new Set();
+
+        const warmupTitleFeeds = new Set([...titleFeeds].filter(feedId => requestedFeedIds.has(feedId)));
+        const warmupTranslateFeeds = new Set([...translateFeeds].filter(feedId => requestedFeedIds.has(feedId)));
+        const warmupSummaryFeeds = new Set([...summaryFeeds].filter(feedId => requestedFeedIds.has(feedId)));
+        const activeFeedIds = [...new Set([
+            ...warmupTitleFeeds,
+            ...warmupTranslateFeeds,
+            ...warmupSummaryFeeds
+        ])];
+
+        if (activeFeedIds.length === 0) {
+            return { processed: 0, feeds: [] };
+        }
+
+        const entryMap = new Map();
+        for (const feedId of activeFeedIds) {
+            const limit = getWarmupLimitForFeed(prefs, feedId);
+            try {
+                const response = await miniflux.getEntries({
+                    feed_id: feedId,
+                    order: 'published_at',
+                    direction: 'desc',
+                    limit
+                });
+                for (const entry of response.entries || []) {
+                    entryMap.set(String(entry.id), entry);
+                }
+            } catch (err) {
+                console.error(`[AI Pretranslate] Warmup failed to get entries for feed ${feedId}:`, err.message);
+            }
+        }
+
+        const relevantEntries = [...entryMap.values()].sort((a, b) => {
+            const aTime = new Date(a.published_at || 0).getTime();
+            const bTime = new Date(b.published_at || 0).getTime();
+            return bTime - aTime;
+        });
+        if (relevantEntries.length === 0) {
+            return { processed: 0, feeds: activeFeedIds };
+        }
+
+        console.log(`[AI Pretranslate] Warmup user ${userId}: ${relevantEntries.length} recent articles across ${activeFeedIds.length} feeds`);
+
+        const backoffState = { backoff: BACKOFF_INITIAL };
+        await this._processTitleTranslation(userId, relevantEntries, warmupTitleFeeds, targetLang, aiConfig, backoffState);
+        await this._processFullTranslation(userId, relevantEntries, warmupTranslateFeeds, targetLang, aiConfig, backoffState);
+        await this._processAutoSummary(userId, relevantEntries, warmupSummaryFeeds, targetLang, aiConfig, backoffState);
+
+        PublicRssScheduler.markFeedsDirty(activeFeedIds);
+        return { processed: relevantEntries.length, feeds: activeFeedIds };
     },
 
     /**
